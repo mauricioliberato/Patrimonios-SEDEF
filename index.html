@@ -326,6 +326,10 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="8" rx="1.5"/><path d="M6 18v2M10 18v2M14 18v2M18 18v2"/><circle cx="6" cy="10" r=".6" fill="currentColor" stroke="none"/><circle cx="9" cy="10" r=".6" fill="currentColor" stroke="none"/></svg>
         Switchs NR e IARAS <span class="nav-badge" id="badge-sw">0</span>
       </button>
+      <button class="nav-item" data-view="pontosrede">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="2.2"/><path d="M12 7.2V12M12 12H5v3M12 12h7v3M5 15v3M19 15v3"/><circle cx="5" cy="19.5" r="1.6"/><circle cx="19" cy="19.5" r="1.6"/></svg>
+        Pontos de Rede <span class="nav-badge" id="badge-pr">0</span>
+      </button>
       <div class="nav-sep">Cadastros auxiliares</div>
       <button class="nav-item" data-view="tecnicos">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5"/></svg>
@@ -909,6 +913,77 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
         </div>
       </section>
 
+      <!-- ========== PONTOS DE REDE ========== -->
+      <section class="view" id="view-pontosrede">
+        <div class="card" id="cardPrForm">
+          <div class="card-h">
+            <h3 id="prFormTitle">Cadastro de ponto de rede</h3>
+            <span class="pill warn" id="prEditBadge" style="display:none">✎ EDITANDO</span>
+            <span class="sub">Mapeamento de pontos, patch panel e portas de switch</span>
+          </div>
+          <div class="card-b">
+            <form id="formPonto" autocomplete="off">
+              <input type="hidden" id="prId">
+              <div class="fgrid">
+                <div class="field c4">
+                  <label>Patch Panel <b>*</b></label>
+                  <select id="prPatch"><option value="">Selecione…</option><option>Telefonia</option><option value="01">01</option><option value="02">02</option><option value="03">03</option><option value="04">04</option><option value="05">05</option><option value="06">06</option><option value="07">07</option><option value="08">08</option><option value="09">09</option><option value="10">10</option></select>
+                </div>
+                <div class="field c4">
+                  <label>Ponto</label>
+                  <input type="text" id="prPonto" class="mono" placeholder="Ex.: 12">
+                </div>
+                <div class="field c4">
+                  <label>Tipo</label>
+                  <select id="prTipo"><option value="">Selecione…</option><option>Rede</option><option>Telefone</option><option>Não Identificado</option></select>
+                </div>
+                <div class="field c4">
+                  <label>Switch</label>
+                  <select id="prSwitch"><option value="">Selecione…</option><option value="01">01</option><option value="02">02</option><option value="03">03</option><option value="04">04</option><option value="05">05</option></select>
+                </div>
+                <div class="field c4">
+                  <label>Porta</label>
+                  <select id="prPorta"><option value="">Selecione…</option><option value="01">01</option><option value="02">02</option><option value="03">03</option><option value="04">04</option><option value="05">05</option><option value="06">06</option><option value="07">07</option><option value="08">08</option><option value="09">09</option><option value="10">10</option><option value="11">11</option><option value="12">12</option><option value="13">13</option><option value="14">14</option><option value="15">15</option><option value="16">16</option><option value="17">17</option><option value="18">18</option><option value="19">19</option><option value="20">20</option><option value="21">21</option><option value="22">22</option><option value="23">23</option><option value="24">24</option><option value="25">25</option><option value="26">26</option><option value="27">27</option><option value="28">28</option><option value="29">29</option><option value="30">30</option><option value="31">31</option><option value="32">32</option><option value="33">33</option><option value="34">34</option><option value="35">35</option><option value="36">36</option><option value="37">37</option><option value="38">38</option><option value="39">39</option><option value="40">40</option><option value="41">41</option><option value="42">42</option><option value="43">43</option><option value="44">44</option><option value="45">45</option><option value="46">46</option><option value="47">47</option><option value="48">48</option></select>
+                </div>
+                <div class="field c4">
+                  <label>Setor</label>
+                  <select id="prSetor"></select>
+                </div>
+                <div class="field c12">
+                  <label>Observação</label>
+                  <input type="text" id="prObs" placeholder="Observações gerais">
+                </div>
+                <div class="c12 form-actions">
+                  <button type="submit" class="btn btn-accent" id="btnPrSubmit">✔ Salvar ponto</button>
+                  <button type="button" class="btn btn-ghost" id="btnPrCancel" style="display:none">Cancelar edição</button>
+                  <button type="reset" class="btn btn-ghost">Limpar</button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-h">
+            <h3>Pontos de rede cadastrados</h3>
+            <div class="toolbar">
+              <input type="text" id="prBusca" placeholder="🔍 Buscar patch panel, ponto, tipo, switch, porta, setor…">
+            </div>
+          </div>
+          <div class="card-b flush">
+            <div class="table-wrap">
+              <table>
+                <thead><tr>
+                  <th>Patch Panel</th><th>Ponto</th><th>Tipo</th><th>Switch</th><th>Porta</th><th>Setor</th><th>Observação</th><th class="td-r">Ações</th>
+                </tr></thead>
+                <tbody id="prTbody"></tbody>
+              </table>
+            </div>
+          </div>
+          <div style="padding:10px 20px;border-top:1px solid var(--line)"><span class="subtle" id="prResumo"></span></div>
+        </div>
+      </section>
+
       <!-- ========== TÉCNICOS ========== -->
       <section class="view" id="view-tecnicos">
         <div class="card">
@@ -1143,7 +1218,7 @@ let unsubscribers=[];
 
 /* cada "seção" do sistema vira um documento próprio dentro da coleção "sistema",
    assim uma pessoa mexendo em Equipamentos não sobrescreve quem está mexendo em Empréstimos */
-const SECOES=['equipamentos','tecnicos','setores','emprestimos','guias','impressoras','switches','listas','eqSnap'];
+const SECOES=['equipamentos','tecnicos','setores','emprestimos','guias','impressoras','switches','pontosRede','listas','eqSnap'];
 function docRefSecao(nome){return fsdb.collection('sistema').doc(nome);}
 function dadosDaSecao(nome){
   if(nome==='listas')return {tipos:db.tipos,marcas:db.marcas,modelos:db.modelos};
@@ -1309,7 +1384,7 @@ function rabisco(){const c=document.createElement('canvas');c.width=340;c.height
   x.beginPath();x.moveTo(70,88);x.quadraticCurveTo(170,70,270,86);x.stroke();return c.toDataURL();}
 function seed(){
   /* instalação nova: começa vazia — os dados reais vêm do Firestore após o login */
-  return {tipos:[...DEFAULT_TIPOS],marcas:[...DEFAULT_MARCAS],modelos:[],tecnicos:[],setores:[],equipamentos:[],emprestimos:[],guias:[],impressoras:[],switches:[],eqSnap:{}};
+  return {tipos:[...DEFAULT_TIPOS],marcas:[...DEFAULT_MARCAS],modelos:[],tecnicos:[],setores:[],equipamentos:[],emprestimos:[],guias:[],impressoras:[],switches:[],pontosRede:[],eqSnap:{}};
 }
 let db;
 try{const raw=localStorage.getItem(LS);db=raw?JSON.parse(raw):null;}catch(e){db=null;}
@@ -1336,6 +1411,7 @@ function normalizarSetores(list){
   if(!db.eqSnap||typeof db.eqSnap!=='object'){db.eqSnap={};mig=true;}
   if(!Array.isArray(db.impressoras)){db.impressoras=[];mig=true;}
   if(!Array.isArray(db.switches)){db.switches=[];mig=true;}
+  if(!Array.isArray(db.pontosRede)){db.pontosRede=[];mig=true;}
   (db.guias||[]).forEach(g=>{if(g&&!g.recebimento){g.recebimento={data:g.origemData||hojeISO(),hora:'',respNome:'',assinatura:null,atualizouSetor:false,ts:g.emitidaEm||Date.now()};mig=true;}});
   const antes=JSON.stringify(db.setores||[]);
   normalizarSetores(db.setores);
@@ -1363,7 +1439,7 @@ function persistir(){localStorage.setItem(LS,JSON.stringify(db));sincronizarComN
 window.addEventListener('storage',e=>{
   if(e.key===LS&&e.newValue){
     try{const d=JSON.parse(e.newValue);
-      if(d&&Array.isArray(d.equipamentos)&&Array.isArray(d.emprestimos)){db=d;if(!db.eqSnap)db.eqSnap={};if(!Array.isArray(db.modelos))db.modelos=[];if(!Array.isArray(db.impressoras))db.impressoras=[];if(!Array.isArray(db.switches))db.switches=[];normalizarSetores(db.setores);garantirModelos();garantirGuias();atualizarTudo();}
+      if(d&&Array.isArray(d.equipamentos)&&Array.isArray(d.emprestimos)){db=d;if(!db.eqSnap)db.eqSnap={};if(!Array.isArray(db.modelos))db.modelos=[];if(!Array.isArray(db.impressoras))db.impressoras=[];if(!Array.isArray(db.switches))db.switches=[];if(!Array.isArray(db.pontosRede))db.pontosRede=[];normalizarSetores(db.setores);garantirModelos();garantirGuias();atualizarTudo();}
     }catch(_){}
   }
 });
@@ -1489,7 +1565,7 @@ function preencherSelects(){
     selSig=sig;
     const optsTec=db.tecnicos.map(t=>`<option value="${t.id}">${esc(t.nome)}</option>`).join('');
     const optsSet=db.setores.map(s=>`<option value="${s.id}">${esc(s.nome)}</option>`).join('');
-    for(const id of ['eqSetor','empSetor','swLocal']){const el=$('#'+id);if(!el)continue;const v=el.value;
+    for(const id of ['eqSetor','empSetor','swLocal','prSetor']){const el=$('#'+id);if(!el)continue;const v=el.value;
       el.innerHTML=`<option value="">Selecione o setor…</option>`+optsSet;if(v&&setById(v))el.value=v;}
     {const el=$('#impLocal');if(el){const v=el.value;
       el.innerHTML=`<option value="">Selecione o local…</option>`+optsSet;if(v&&setById(v))el.value=v;}}
@@ -2623,6 +2699,98 @@ $('#swTbody').addEventListener('click',e=>{
   if(b.dataset.acao==='sw-del')excluirSwitch(s.id);
 });
 
+/* ================= PONTOS DE REDE ================= */
+let prEditId=null;
+$('#prBusca').addEventListener('input',renderPontosRede);
+
+let lastResetPr=0;
+$('#formPonto').addEventListener('reset',e=>{const n=Date.now();if(n-lastResetPr<400)return;lastResetPr=n;setTimeout(resetPontoForm,0);});
+function resetPontoForm(){
+  prEditId=null;
+  $('#prPonto').value='';$('#prObs').value='';
+  $('#prPatch').value='';$('#prTipo').value='';$('#prSwitch').value='';$('#prPorta').value='';$('#prSetor').value='';
+  $('#prFormTitle').textContent='Cadastro de ponto de rede';
+  $('#btnPrSubmit').textContent='✔ Salvar ponto';
+  $('#btnPrCancel').style.display='none';
+  $('#cardPrForm').classList.remove('editando');
+  $('#prEditBadge').style.display='none';
+}
+$('#btnPrCancel').addEventListener('click',resetPontoForm);
+
+$('#formPonto').addEventListener('submit',ev=>{
+  ev.preventDefault();
+  const patch=$('#prPatch').value,ponto=$('#prPonto').value.trim(),tipo=$('#prTipo').value,
+        sw=$('#prSwitch').value,porta=$('#prPorta').value,setor=$('#prSetor').value,obs=$('#prObs').value.trim(),
+        id=$('#prId').value;
+  if(!patch)return toast('Selecione o <b>Patch Panel</b>.','bad');
+  let salvoId=id;
+  if(id){
+    const p=db.pontosRede.find(x=>x.id===id);if(!p)return;
+    Object.assign(p,{patch,ponto,tipo,switchNum:sw,porta,setor,obs});
+    salvoId=id;
+    toast('Ponto de rede atualizado.');
+  }else{
+    const novo={id:uid(),patch,ponto,tipo,switchNum:sw,porta,setor,obs,criadoEm:Date.now()};
+    db.pontosRede.push(novo);salvoId=novo.id;
+    toast('Ponto de rede cadastrado.');
+  }
+  persistir();resetPontoForm();atualizarTudo();destacarLinha('#prTbody',salvoId);
+});
+
+function editarPontoRede(id){
+  const p=db.pontosRede.find(x=>x.id===id);if(!p)return;
+  prEditId=id;
+  $('#prId').value=p.id;
+  $('#prPatch').value=p.patch||'';
+  $('#prPonto').value=p.ponto||'';
+  $('#prTipo').value=p.tipo||'';
+  $('#prSwitch').value=p.switchNum||'';
+  $('#prPorta').value=p.porta||'';
+  $('#prSetor').value=p.setor||'';
+  $('#prObs').value=p.obs||'';
+  $('#prFormTitle').textContent='Editando ponto de rede';
+  $('#btnPrSubmit').textContent='✔ Atualizar ponto';
+  $('#btnPrCancel').style.display='inline-flex';
+  $('#cardPrForm').classList.add('editando');
+  $('#prEditBadge').style.display='inline-flex';
+  $('#prEditBadge').textContent='✎ EDITANDO '+(p.ponto||p.patch);
+  rolarTopo();$('#prPatch').focus();
+}
+
+function excluirPontoRede(id){
+  const p=db.pontosRede.find(x=>x.id===id);if(!p)return;
+  confirmar('Excluir ponto de rede','Excluir este ponto de rede? Esta ação não pode ser desfeita.',()=>{
+    db.pontosRede=db.pontosRede.filter(x=>x.id!==id);
+    persistir();if(prEditId===id)resetPontoForm();atualizarTudo();toast('Ponto de rede excluído.','warn');});
+}
+
+function renderPontosRede(){
+  const busca=($('#prBusca').value||'').toLowerCase();
+  let lista=[...db.pontosRede];
+  if(busca)lista=lista.filter(p=>((p.patch||'')+' '+(p.ponto||'')+' '+(p.tipo||'')+' '+(p.switchNum||'')+' '+(p.porta||'')+' '+(p.obs||'')+' '+setNome(p.setor)).toLowerCase().includes(busca));
+  $('#prTbody').innerHTML=lista.length?lista.map(p=>`
+    <tr data-id="${p.id}">
+      <td><b>${esc(p.patch||'—')}</b></td>
+      <td class="mono">${esc(p.ponto||'—')}</td>
+      <td>${esc(p.tipo||'—')}</td>
+      <td class="mono">${esc(p.switchNum||'—')}</td>
+      <td class="mono">${esc(p.porta||'—')}</td>
+      <td>${esc(setNome(p.setor))}</td>
+      <td class="subtle">${esc(p.obs||'—')}</td>
+      <td class="td-r"><div class="actions">
+        <button class="btn btn-ghost btn-sm" data-acao="pr-edit" data-id="${p.id}">✎ Editar</button>
+        <button class="ibtn bad" title="Excluir" data-acao="pr-del" data-id="${p.id}">${TRASH_SVG}</button>
+      </div></td>
+    </tr>`).join(''):'<tr><td colspan="8" class="empty"><span class="big">🔌</span>Nenhum ponto de rede cadastrado.</td></tr>';
+  $('#prResumo').textContent=`${db.pontosRede.length} ponto(s) de rede cadastrado(s)`;
+}
+$('#prTbody').addEventListener('click',e=>{
+  const b=e.target.closest('[data-acao]');if(!b)return;
+  const p=db.pontosRede.find(x=>x.id===b.dataset.id);if(!p)return;
+  if(b.dataset.acao==='pr-edit')editarPontoRede(p.id);
+  if(b.dataset.acao==='pr-del')excluirPontoRede(p.id);
+});
+
 /* ================= MODAIS GENÉRICOS ================= */
 let confCb=null;
 function confirmar(titulo,msg,cb){$('#confTitulo').textContent=titulo;$('#confMsg').innerHTML=msg;confCb=cb;$('#modalConf').classList.add('show');}
@@ -2740,7 +2908,7 @@ $('#fileImport').addEventListener('change',e=>{
     normalizarSetores(d.setores);
     db=d;persistir();garantirModelos();garantirGuias();
     selSig='';
-    resetFormEquip();resetTec();resetSet();resetEmpForm();resetModForm();resetGuiaForm();resetImpForm();resetSwitchForm();
+    resetFormEquip();resetTec();resetSet();resetEmpForm();resetModForm();resetGuiaForm();resetImpForm();resetSwitchForm();resetPontoForm();
     atualizarTudo();toast('Backup importado com sucesso.');
   }catch(_){toast('Arquivo de backup inválido.','bad');}};
   r.readAsText(f);e.target.value='';
@@ -2756,11 +2924,12 @@ function atualizarBadges(){
   $('#badge-gui').textContent=(db.guias||[]).length;
   $('#badge-imp').textContent=(db.impressoras||[]).length;
   $('#badge-sw').textContent=(db.switches||[]).length;
+  $('#badge-pr').textContent=(db.pontosRede||[]).length;
   $('#badge-tec').textContent=db.tecnicos.length;
   $('#badge-set').textContent=db.setores.length;
 }
 function atualizarTudo(){
-  [preencherSelects,renderModelos,renderEquipamentos,renderTecnicos,renderSetores,renderEmprestimos,renderGuias,renderImpressoras,renderSwitches,atualizarCartaoEmp,atualizarBadges]
+  [preencherSelects,renderModelos,renderEquipamentos,renderTecnicos,renderSetores,renderEmprestimos,renderGuias,renderImpressoras,renderSwitches,renderPontosRede,atualizarCartaoEmp,atualizarBadges]
     .forEach(f=>{try{f();}catch(err){console.error('NII render:',err);}});
   if(currentView==='dashboard'){try{renderDashboard();}catch(err){console.error('NII render:',err);}}
 }
