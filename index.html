@@ -322,6 +322,10 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
         Impressoras <span class="nav-badge" id="badge-imp">0</span>
       </button>
+      <button class="nav-item" data-view="switches">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="8" rx="1.5"/><path d="M6 18v2M10 18v2M14 18v2M18 18v2"/><circle cx="6" cy="10" r=".6" fill="currentColor" stroke="none"/><circle cx="9" cy="10" r=".6" fill="currentColor" stroke="none"/></svg>
+        Switchs NR e IARAS <span class="nav-badge" id="badge-sw">0</span>
+      </button>
       <div class="nav-sep">Cadastros auxiliares</div>
       <button class="nav-item" data-view="tecnicos">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5"/></svg>
@@ -842,6 +846,69 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
         </div>
       </section>
 
+      <!-- ========== SWITCHS NR E IARAS ========== -->
+      <section class="view" id="view-switches">
+        <div class="card" id="cardSwForm">
+          <div class="card-h">
+            <h3 id="swFormTitle">Cadastro de switch</h3>
+            <span class="pill warn" id="swEditBadge" style="display:none">✎ EDITANDO</span>
+            <span class="sub">Switchs NR e IARAS · dados para consulta de acesso</span>
+          </div>
+          <div class="card-b">
+            <form id="formSwitch" autocomplete="off">
+              <input type="hidden" id="swId">
+              <div class="fgrid">
+                <div class="field c4">
+                  <label>Identificação <span class="subtle" style="text-transform:none;font-weight:400">(opcional)</span></label>
+                  <input type="text" id="swNome" placeholder="Ex.: Switch Core NR">
+                </div>
+                <div class="field c4">
+                  <label>Local <b>*</b></label>
+                  <select id="swLocal"></select>
+                </div>
+                <div class="field c4">
+                  <label>IP <b>*</b></label>
+                  <input type="text" id="swIP" class="mono" placeholder="Ex.: 10.61.40.30">
+                </div>
+                <div class="field c4">
+                  <label>Login</label>
+                  <input type="text" id="swLogin" class="mono" placeholder="Ex.: admin">
+                </div>
+                <div class="field c4">
+                  <label>Senha</label>
+                  <input type="text" id="swSenha" class="mono" placeholder="Senha de acesso">
+                </div>
+                <div class="c12 form-actions">
+                  <button type="submit" class="btn btn-accent" id="btnSwSubmit">✔ Salvar switch</button>
+                  <button type="button" class="btn btn-ghost" id="btnSwCancel" style="display:none">Cancelar edição</button>
+                  <button type="reset" class="btn btn-ghost">Limpar</button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-h">
+            <h3>Switchs cadastrados</h3>
+            <div class="toolbar">
+              <input type="text" id="swBusca" placeholder="🔍 Buscar identificação, local, IP, login…">
+            </div>
+          </div>
+          <div class="card-b flush">
+            <div class="table-wrap">
+              <table>
+                <thead><tr>
+                  <th>Identificação</th><th>Local</th><th>IP</th><th>Login</th><th>Senha</th><th class="td-r">Ações</th>
+                </tr></thead>
+                <tbody id="swTbody"></tbody>
+              </table>
+            </div>
+          </div>
+          <div style="padding:10px 20px;border-top:1px solid var(--line)"><span class="subtle" id="swResumo"></span></div>
+        </div>
+      </section>
+
       <!-- ========== TÉCNICOS ========== -->
       <section class="view" id="view-tecnicos">
         <div class="card">
@@ -1076,7 +1143,7 @@ let unsubscribers=[];
 
 /* cada "seção" do sistema vira um documento próprio dentro da coleção "sistema",
    assim uma pessoa mexendo em Equipamentos não sobrescreve quem está mexendo em Empréstimos */
-const SECOES=['equipamentos','tecnicos','setores','emprestimos','guias','impressoras','listas','eqSnap'];
+const SECOES=['equipamentos','tecnicos','setores','emprestimos','guias','impressoras','switches','listas','eqSnap'];
 function docRefSecao(nome){return fsdb.collection('sistema').doc(nome);}
 function dadosDaSecao(nome){
   if(nome==='listas')return {tipos:db.tipos,marcas:db.marcas,modelos:db.modelos};
@@ -1242,7 +1309,7 @@ function rabisco(){const c=document.createElement('canvas');c.width=340;c.height
   x.beginPath();x.moveTo(70,88);x.quadraticCurveTo(170,70,270,86);x.stroke();return c.toDataURL();}
 function seed(){
   /* instalação nova: começa vazia — os dados reais vêm do Firestore após o login */
-  return {tipos:[...DEFAULT_TIPOS],marcas:[...DEFAULT_MARCAS],modelos:[],tecnicos:[],setores:[],equipamentos:[],emprestimos:[],guias:[],impressoras:[],eqSnap:{}};
+  return {tipos:[...DEFAULT_TIPOS],marcas:[...DEFAULT_MARCAS],modelos:[],tecnicos:[],setores:[],equipamentos:[],emprestimos:[],guias:[],impressoras:[],switches:[],eqSnap:{}};
 }
 let db;
 try{const raw=localStorage.getItem(LS);db=raw?JSON.parse(raw):null;}catch(e){db=null;}
@@ -1268,6 +1335,7 @@ function normalizarSetores(list){
   db.emprestimos.forEach(e=>{if(!Array.isArray(e.equipIds)){e.equipIds=e.equipId?[e.equipId]:[];delete e.equipId;mig=true;}});
   if(!db.eqSnap||typeof db.eqSnap!=='object'){db.eqSnap={};mig=true;}
   if(!Array.isArray(db.impressoras)){db.impressoras=[];mig=true;}
+  if(!Array.isArray(db.switches)){db.switches=[];mig=true;}
   (db.guias||[]).forEach(g=>{if(g&&!g.recebimento){g.recebimento={data:g.origemData||hojeISO(),hora:'',respNome:'',assinatura:null,atualizouSetor:false,ts:g.emitidaEm||Date.now()};mig=true;}});
   const antes=JSON.stringify(db.setores||[]);
   normalizarSetores(db.setores);
@@ -1295,7 +1363,7 @@ function persistir(){localStorage.setItem(LS,JSON.stringify(db));sincronizarComN
 window.addEventListener('storage',e=>{
   if(e.key===LS&&e.newValue){
     try{const d=JSON.parse(e.newValue);
-      if(d&&Array.isArray(d.equipamentos)&&Array.isArray(d.emprestimos)){db=d;if(!db.eqSnap)db.eqSnap={};if(!Array.isArray(db.modelos))db.modelos=[];if(!Array.isArray(db.impressoras))db.impressoras=[];normalizarSetores(db.setores);garantirModelos();garantirGuias();atualizarTudo();}
+      if(d&&Array.isArray(d.equipamentos)&&Array.isArray(d.emprestimos)){db=d;if(!db.eqSnap)db.eqSnap={};if(!Array.isArray(db.modelos))db.modelos=[];if(!Array.isArray(db.impressoras))db.impressoras=[];if(!Array.isArray(db.switches))db.switches=[];normalizarSetores(db.setores);garantirModelos();garantirGuias();atualizarTudo();}
     }catch(_){}
   }
 });
@@ -1421,7 +1489,7 @@ function preencherSelects(){
     selSig=sig;
     const optsTec=db.tecnicos.map(t=>`<option value="${t.id}">${esc(t.nome)}</option>`).join('');
     const optsSet=db.setores.map(s=>`<option value="${s.id}">${esc(s.nome)}</option>`).join('');
-    for(const id of ['eqSetor','empSetor']){const el=$('#'+id);if(!el)continue;const v=el.value;
+    for(const id of ['eqSetor','empSetor','swLocal']){const el=$('#'+id);if(!el)continue;const v=el.value;
       el.innerHTML=`<option value="">Selecione o setor…</option>`+optsSet;if(v&&setById(v))el.value=v;}
     {const el=$('#impLocal');if(el){const v=el.value;
       el.innerHTML=`<option value="">Selecione o local…</option>`+optsSet;if(v&&setById(v))el.value=v;}}
@@ -2465,6 +2533,96 @@ $('#impTbody').addEventListener('click',e=>{
   if(b.dataset.acao==='imp-del')excluirImpressora(p.id);
 });
 
+/* ================= SWITCHS NR E IARAS ================= */
+let swEditId=null;
+$('#swBusca').addEventListener('input',renderSwitches);
+
+let lastResetSw=0;
+$('#formSwitch').addEventListener('reset',e=>{const n=Date.now();if(n-lastResetSw<400)return;lastResetSw=n;setTimeout(resetSwitchForm,0);});
+function resetSwitchForm(){
+  swEditId=null;
+  ['swNome','swIP','swLogin','swSenha'].forEach(id=>{const el=$('#'+id);if(el)el.value='';});
+  $('#swLocal').value='';
+  $('#swFormTitle').textContent='Cadastro de switch';
+  $('#btnSwSubmit').textContent='✔ Salvar switch';
+  $('#btnSwCancel').style.display='none';
+  $('#cardSwForm').classList.remove('editando');
+  $('#swEditBadge').style.display='none';
+}
+$('#btnSwCancel').addEventListener('click',resetSwitchForm);
+
+$('#formSwitch').addEventListener('submit',ev=>{
+  ev.preventDefault();
+  const nome=$('#swNome').value.trim(),local=$('#swLocal').value,ip=$('#swIP').value.trim(),
+        login=$('#swLogin').value.trim(),senha=$('#swSenha').value.trim(),id=$('#swId').value;
+  if(!local)return toast('Selecione o <b>Local</b> (setor) do switch.','bad');
+  if(!ip)return toast('Informe o <b>IP</b> do switch.','bad');
+  if(!/^(\d{1,3}\.){3}\d{1,3}$/.test(ip))return toast('IP inválido. Use o formato <b>000.000.000.000</b>.','bad');
+  if(db.switches.some(s=>s.ip===ip&&s.id!==id))return toast('Já existe um switch cadastrado com o IP <b class="mono">'+esc(ip)+'</b>.','bad');
+  let salvoId=id;
+  if(id){
+    const s=db.switches.find(x=>x.id===id);if(!s)return;
+    Object.assign(s,{nome,local,ip,login,senha});
+    salvoId=id;
+    toast('Switch atualizado.');
+  }else{
+    const novo={id:uid(),nome,local,ip,login,senha,criadoEm:Date.now()};
+    db.switches.push(novo);salvoId=novo.id;
+    toast('Switch cadastrado com sucesso.');
+  }
+  persistir();resetSwitchForm();atualizarTudo();destacarLinha('#swTbody',salvoId);
+});
+
+function editarSwitch(id){
+  const s=db.switches.find(x=>x.id===id);if(!s)return;
+  swEditId=id;
+  $('#swId').value=s.id;
+  $('#swNome').value=s.nome||'';
+  $('#swLocal').value=s.local||'';
+  $('#swIP').value=s.ip||'';
+  $('#swLogin').value=s.login||'';
+  $('#swSenha').value=s.senha||'';
+  $('#swFormTitle').textContent='Editando switch';
+  $('#btnSwSubmit').textContent='✔ Atualizar switch';
+  $('#btnSwCancel').style.display='inline-flex';
+  $('#cardSwForm').classList.add('editando');
+  $('#swEditBadge').style.display='inline-flex';
+  $('#swEditBadge').textContent='✎ EDITANDO '+(s.nome||s.ip);
+  rolarTopo();$('#swNome').focus();
+}
+
+function excluirSwitch(id){
+  const s=db.switches.find(x=>x.id===id);if(!s)return;
+  confirmar('Excluir switch','Excluir o switch '+(s.nome?'<b>'+esc(s.nome)+'</b> ':'')+'(<span class="mono">'+esc(s.ip)+'</span>)? Esta ação não pode ser desfeita.',()=>{
+    db.switches=db.switches.filter(x=>x.id!==id);
+    persistir();if(swEditId===id)resetSwitchForm();atualizarTudo();toast('Switch excluído.','warn');});
+}
+
+function renderSwitches(){
+  const busca=($('#swBusca').value||'').toLowerCase();
+  let lista=[...db.switches].sort((a,b)=>String(setNome(a.local)).localeCompare(String(setNome(b.local))));
+  if(busca)lista=lista.filter(s=>((s.nome||'')+' '+(s.ip||'')+' '+(s.login||'')+' '+setNome(s.local)).toLowerCase().includes(busca));
+  $('#swTbody').innerHTML=lista.length?lista.map(s=>`
+    <tr data-id="${s.id}">
+      <td><b>🔀 ${esc(s.nome||'—')}</b></td>
+      <td>${esc(setNome(s.local))}</td>
+      <td class="mono">${s.ip?`<a href="http://${esc(s.ip)}" target="_blank" rel="noopener">${esc(s.ip)} ↗</a>`:'—'}</td>
+      <td class="mono subtle">${esc(s.login||'—')}</td>
+      <td class="mono subtle">${esc(s.senha||'—')}</td>
+      <td class="td-r"><div class="actions">
+        <button class="btn btn-ghost btn-sm" data-acao="sw-edit" data-id="${s.id}">✎ Editar</button>
+        <button class="ibtn bad" title="Excluir" data-acao="sw-del" data-id="${s.id}">${TRASH_SVG}</button>
+      </div></td>
+    </tr>`).join(''):'<tr><td colspan="6" class="empty"><span class="big">🔀</span>Nenhum switch cadastrado.</td></tr>';
+  $('#swResumo').textContent=`${db.switches.length} switch(es) cadastrado(s)`;
+}
+$('#swTbody').addEventListener('click',e=>{
+  const b=e.target.closest('[data-acao]');if(!b)return;
+  const s=db.switches.find(x=>x.id===b.dataset.id);if(!s)return;
+  if(b.dataset.acao==='sw-edit')editarSwitch(s.id);
+  if(b.dataset.acao==='sw-del')excluirSwitch(s.id);
+});
+
 /* ================= MODAIS GENÉRICOS ================= */
 let confCb=null;
 function confirmar(titulo,msg,cb){$('#confTitulo').textContent=titulo;$('#confMsg').innerHTML=msg;confCb=cb;$('#modalConf').classList.add('show');}
@@ -2582,7 +2740,7 @@ $('#fileImport').addEventListener('change',e=>{
     normalizarSetores(d.setores);
     db=d;persistir();garantirModelos();garantirGuias();
     selSig='';
-    resetFormEquip();resetTec();resetSet();resetEmpForm();resetModForm();resetGuiaForm();resetImpForm();
+    resetFormEquip();resetTec();resetSet();resetEmpForm();resetModForm();resetGuiaForm();resetImpForm();resetSwitchForm();
     atualizarTudo();toast('Backup importado com sucesso.');
   }catch(_){toast('Arquivo de backup inválido.','bad');}};
   r.readAsText(f);e.target.value='';
@@ -2597,11 +2755,12 @@ function atualizarBadges(){
   $('#badge-emp').textContent=db.emprestimos.filter(e=>!e.devolucao).length;
   $('#badge-gui').textContent=(db.guias||[]).length;
   $('#badge-imp').textContent=(db.impressoras||[]).length;
+  $('#badge-sw').textContent=(db.switches||[]).length;
   $('#badge-tec').textContent=db.tecnicos.length;
   $('#badge-set').textContent=db.setores.length;
 }
 function atualizarTudo(){
-  [preencherSelects,renderModelos,renderEquipamentos,renderTecnicos,renderSetores,renderEmprestimos,renderGuias,renderImpressoras,atualizarCartaoEmp,atualizarBadges]
+  [preencherSelects,renderModelos,renderEquipamentos,renderTecnicos,renderSetores,renderEmprestimos,renderGuias,renderImpressoras,renderSwitches,atualizarCartaoEmp,atualizarBadges]
     .forEach(f=>{try{f();}catch(err){console.error('NII render:',err);}});
   if(currentView==='dashboard'){try{renderDashboard();}catch(err){console.error('NII render:',err);}}
 }
