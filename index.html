@@ -339,6 +339,10 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="2.2"/><path d="M12 7.2V12M12 12H5v3M12 12h7v3M5 15v3M19 15v3"/><circle cx="5" cy="19.5" r="1.6"/><circle cx="19" cy="19.5" r="1.6"/></svg>
         Pontos de Rede <span class="nav-badge" id="badge-pr">0</span>
       </button>
+      <button class="nav-item" data-view="licencas">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 10h5M7 14h3"/><circle cx="17" cy="11" r="2"/><path d="M17 13v3l-1.2-.9-1.2.9v-3"/></svg>
+        Licenças Office 2024 <span class="nav-badge" id="badge-lic">0</span>
+      </button>
       <div class="nav-sep">Cadastros auxiliares</div>
       <button class="nav-item" data-view="tecnicos">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5"/></svg>
@@ -1002,6 +1006,65 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
         </div>
       </section>
 
+      <!-- ========== LICENÇAS OFFICE 2024 ========== -->
+      <section class="view" id="view-licencas">
+        <div class="card" id="cardLicForm">
+          <div class="card-h">
+            <h3 id="licFormTitle">Cadastro de licença</h3>
+            <span class="pill warn" id="licEditBadge" style="display:none">✎ EDITANDO</span>
+            <span class="sub">Controle de chaves do Office 2024 e contas vinculadas</span>
+          </div>
+          <div class="card-b">
+            <form id="formLicenca" autocomplete="off">
+              <input type="hidden" id="licId">
+              <div class="fgrid">
+                <div class="field c4">
+                  <label>Hostname <b>*</b></label>
+                  <input type="text" id="licHost" class="mono" placeholder="Ex.: SEDEF-NII-07">
+                </div>
+                <div class="field c4">
+                  <label>Chave</label>
+                  <input type="text" id="licChave" class="mono" placeholder="XXXXX-XXXXX-XXXXX-XXXXX-XXXXX">
+                </div>
+                <div class="field c4">
+                  <label>E-mail vinculado</label>
+                  <input type="text" id="licEmail" placeholder="conta@dominio.gov.br">
+                </div>
+                <div class="field c12">
+                  <label>Observação</label>
+                  <input type="text" id="licObs" placeholder="Observações gerais">
+                </div>
+                <div class="c12 form-actions">
+                  <button type="submit" class="btn btn-accent" id="btnLicSubmit">✔ Salvar licença</button>
+                  <button type="button" class="btn btn-ghost" id="btnLicCancel" style="display:none">Cancelar edição</button>
+                  <button type="reset" class="btn btn-ghost">Limpar</button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-h">
+            <h3>Licenças cadastradas</h3>
+            <div class="toolbar">
+              <input type="text" id="licBusca" placeholder="🔍 Buscar hostname, chave, e-mail, observação…">
+            </div>
+          </div>
+          <div class="card-b flush">
+            <div class="table-wrap">
+              <table>
+                <thead><tr>
+                  <th>Hostname</th><th>Chave</th><th>E-mail vinculado</th><th>Observação</th><th class="td-r">Ações</th>
+                </tr></thead>
+                <tbody id="licTbody"></tbody>
+              </table>
+            </div>
+          </div>
+          <div style="padding:10px 20px;border-top:1px solid var(--line)"><span class="subtle" id="licResumo"></span></div>
+        </div>
+      </section>
+
       <!-- ========== TÉCNICOS ========== -->
       <section class="view" id="view-tecnicos">
         <div class="card">
@@ -1266,7 +1329,7 @@ let unsubscribers=[];
 
 /* cada "seção" do sistema vira um documento próprio dentro da coleção "sistema",
    assim uma pessoa mexendo em Equipamentos não sobrescreve quem está mexendo em Empréstimos */
-const SECOES=['equipamentos','tecnicos','setores','emprestimos','guias','impressoras','switches','pontosRede','listas','eqSnap'];
+const SECOES=['equipamentos','tecnicos','setores','emprestimos','guias','impressoras','switches','pontosRede','licencas','listas','eqSnap'];
 function docRefSecao(nome){return fsdb.collection('sistema').doc(nome);}
 function dadosDaSecao(nome){
   if(nome==='listas')return {tipos:db.tipos,marcas:db.marcas,modelos:db.modelos};
@@ -1434,7 +1497,7 @@ function rabisco(){const c=document.createElement('canvas');c.width=340;c.height
   x.beginPath();x.moveTo(70,88);x.quadraticCurveTo(170,70,270,86);x.stroke();return c.toDataURL();}
 function seed(){
   /* instalação nova: começa vazia — os dados reais vêm do Firestore após o login */
-  return {tipos:[...DEFAULT_TIPOS],marcas:[...DEFAULT_MARCAS],modelos:[],tecnicos:[],setores:[],equipamentos:[],emprestimos:[],guias:[],impressoras:[],switches:[],pontosRede:[],eqSnap:{}};
+  return {tipos:[...DEFAULT_TIPOS],marcas:[...DEFAULT_MARCAS],modelos:[],tecnicos:[],setores:[],equipamentos:[],emprestimos:[],guias:[],impressoras:[],switches:[],pontosRede:[],licencas:[],eqSnap:{}};
 }
 let db;
 try{const raw=localStorage.getItem(LS);db=raw?JSON.parse(raw):null;}catch(e){db=null;}
@@ -1462,6 +1525,7 @@ function normalizarSetores(list){
   if(!Array.isArray(db.impressoras)){db.impressoras=[];mig=true;}
   if(!Array.isArray(db.switches)){db.switches=[];mig=true;}
   if(!Array.isArray(db.pontosRede)){db.pontosRede=[];mig=true;}
+  if(!Array.isArray(db.licencas)){db.licencas=[];mig=true;}
   (db.guias||[]).forEach(g=>{if(g&&!g.recebimento){g.recebimento={data:g.origemData||hojeISO(),hora:'',respNome:'',assinatura:null,atualizouSetor:false,ts:g.emitidaEm||Date.now()};mig=true;}});
   const antes=JSON.stringify(db.setores||[]);
   normalizarSetores(db.setores);
@@ -1489,7 +1553,7 @@ function persistir(){localStorage.setItem(LS,JSON.stringify(db));sincronizarComN
 window.addEventListener('storage',e=>{
   if(e.key===LS&&e.newValue){
     try{const d=JSON.parse(e.newValue);
-      if(d&&Array.isArray(d.equipamentos)&&Array.isArray(d.emprestimos)){db=d;if(!db.eqSnap)db.eqSnap={};if(!Array.isArray(db.modelos))db.modelos=[];if(!Array.isArray(db.impressoras))db.impressoras=[];if(!Array.isArray(db.switches))db.switches=[];if(!Array.isArray(db.pontosRede))db.pontosRede=[];normalizarSetores(db.setores);garantirModelos();garantirGuias();atualizarTudo();}
+      if(d&&Array.isArray(d.equipamentos)&&Array.isArray(d.emprestimos)){db=d;if(!db.eqSnap)db.eqSnap={};if(!Array.isArray(db.modelos))db.modelos=[];if(!Array.isArray(db.impressoras))db.impressoras=[];if(!Array.isArray(db.switches))db.switches=[];if(!Array.isArray(db.pontosRede))db.pontosRede=[];if(!Array.isArray(db.licencas))db.licencas=[];normalizarSetores(db.setores);garantirModelos();garantirGuias();atualizarTudo();}
     }catch(_){}
   }
 });
@@ -1544,7 +1608,7 @@ function temEmprestimoAtivo(id){
 }
 
 /* ================= NAVEGAÇÃO ================= */
-const TITULOS={dashboard:['Painel','Visão geral do inventário e movimentações'],equipamentos:['Equipamentos','Catálogo de modelos + unidades patrimoniais'],emprestimos:['Empréstimos','Reservas, retiradas e devoluções com assinatura'],guias:['Guias de Transferência','Transferência de bens patrimoniais entre unidades'],impressoras:['Impressoras','Parque de impressões — modelo, host, IP e acesso web'],switches:['Switchs NR e IARAS','Dados de acesso aos switches — local, IP, login e senha'],pontosrede:['Pontos de Rede','Mapeamento de patch panel, portas de switch e setor'],tecnicos:['Técnicos','Equipe técnica — alimenta os demais módulos'],setores:['Setores','Estrutura de setores — alimenta os demais módulos'],planilhas:['Importar/Exportar','Baixe modelos, exporte dados atuais ou importe planilhas de cada módulo']};
+const TITULOS={dashboard:['Painel','Visão geral do inventário e movimentações'],equipamentos:['Equipamentos','Catálogo de modelos + unidades patrimoniais'],emprestimos:['Empréstimos','Reservas, retiradas e devoluções com assinatura'],guias:['Guias de Transferência','Transferência de bens patrimoniais entre unidades'],impressoras:['Impressoras','Parque de impressões — modelo, host, IP e acesso web'],switches:['Switchs NR e IARAS','Dados de acesso aos switches — local, IP, login e senha'],pontosrede:['Pontos de Rede','Mapeamento de patch panel, portas de switch e setor'],tecnicos:['Técnicos','Equipe técnica — alimenta os demais módulos'],licencas:['Licenças Office 2024','Controle de chaves do Office 2024 e contas vinculadas'],setores:['Setores','Estrutura de setores — alimenta os demais módulos'],planilhas:['Importar/Exportar','Baixe modelos, exporte dados atuais ou importe planilhas de cada módulo']};
 let currentView='dashboard';
 function showView(v){
   currentView=v;
@@ -2187,6 +2251,15 @@ const PLANILHA_MODULOS={
       return o;
     },
     novo:o=>Object.assign({id:uid()},o)
+  },
+  licencas:{
+    label:'Licenças Office 2024',
+    campos:[{h:'Hostname *',f:'host'},{h:'Chave',f:'chave'},{h:'E-mail Vinculado',f:'email'},{h:'Observação',f:'obs'}],
+    lista:()=>db.licencas,
+    linhaExport:l=>({host:l.host,chave:l.chave,email:l.email,obs:l.obs}),
+    chave:o=>String(o.host||'').trim().toLowerCase(),
+    finalizar(o){if(!o.host)return null;return o;},
+    novo:o=>Object.assign({id:uid(),criadoEm:Date.now()},o)
   }
 };
 function nomeArquivoPlanilha(prefixo,label){return `${prefixo}_${label.replace(/[^\w]+/g,'_')}.xlsx`;}
@@ -3073,6 +3146,93 @@ $('#prTbody').addEventListener('click',e=>{
   if(b.dataset.acao==='pr-del')excluirPontoRede(p.id);
 });
 
+/* ================= LICENÇAS OFFICE 2024 ================= */
+let licEditId=null;
+$('#licBusca').addEventListener('input',renderLicencas);
+
+let lastResetLic=0;
+$('#formLicenca').addEventListener('reset',e=>{const n=Date.now();if(n-lastResetLic<400)return;lastResetLic=n;setTimeout(resetLicencaForm,0);});
+function resetLicencaForm(){
+  licEditId=null;
+  ['licId','licHost','licChave','licEmail','licObs'].forEach(id=>{const el=$('#'+id);if(el)el.value='';});
+  $('#licFormTitle').textContent='Cadastro de licença';
+  $('#btnLicSubmit').textContent='✔ Salvar licença';
+  $('#btnLicCancel').style.display='none';
+  $('#cardLicForm').classList.remove('editando');
+  $('#licEditBadge').style.display='none';
+}
+$('#btnLicCancel').addEventListener('click',resetLicencaForm);
+
+$('#formLicenca').addEventListener('submit',ev=>{
+  ev.preventDefault();
+  const host=$('#licHost').value.trim(),chave=$('#licChave').value.trim(),
+        email=$('#licEmail').value.trim(),obs=$('#licObs').value.trim(),id=$('#licId').value;
+  if(!host)return toast('Informe o <b>Hostname</b>.','bad');
+  if(db.licencas.some(l=>String(l.host||'').toLowerCase()===host.toLowerCase()&&l.id!==id))
+    return toast('Já existe uma licença cadastrada para o hostname <b class="mono">'+esc(host)+'</b>.','bad');
+  if(chave&&db.licencas.some(l=>String(l.chave||'').toLowerCase()===chave.toLowerCase()&&l.id!==id))
+    return toast('Esta <b>chave</b> já está cadastrada em outro hostname.','bad');
+  let salvoId=id;
+  if(id){
+    const l=db.licencas.find(x=>x.id===id);if(!l)return;
+    Object.assign(l,{host,chave,email,obs});
+    toast('Licença atualizada.');
+  }else{
+    const novo={id:uid(),host,chave,email,obs,criadoEm:Date.now()};
+    db.licencas.push(novo);salvoId=novo.id;
+    toast('Licença de <b class="mono">'+esc(host)+'</b> cadastrada.');
+  }
+  persistir();resetLicencaForm();atualizarTudo();destacarLinha('#licTbody',salvoId);
+});
+
+function editarLicenca(id){
+  const l=db.licencas.find(x=>x.id===id);if(!l)return;
+  licEditId=id;
+  $('#licId').value=l.id;
+  $('#licHost').value=l.host||'';
+  $('#licChave').value=l.chave||'';
+  $('#licEmail').value=l.email||'';
+  $('#licObs').value=l.obs||'';
+  $('#licFormTitle').textContent='Editando licença';
+  $('#btnLicSubmit').textContent='✔ Atualizar licença';
+  $('#btnLicCancel').style.display='inline-flex';
+  $('#cardLicForm').classList.add('editando');
+  $('#licEditBadge').style.display='inline-flex';
+  $('#licEditBadge').textContent='✎ EDITANDO '+(l.host||'');
+  rolarTopo();$('#licHost').focus();
+}
+
+function excluirLicenca(id){
+  const l=db.licencas.find(x=>x.id===id);if(!l)return;
+  confirmar('Excluir licença','Excluir a licença de <b class="mono">'+esc(l.host||'')+'</b>? Esta ação não pode ser desfeita.',()=>{
+    db.licencas=db.licencas.filter(x=>x.id!==id);
+    persistir();if(licEditId===id)resetLicencaForm();atualizarTudo();toast('Licença excluída.','warn');});
+}
+
+function renderLicencas(){
+  const busca=($('#licBusca').value||'').toLowerCase();
+  let lista=[...db.licencas].sort((a,b)=>String(a.host||'').localeCompare(String(b.host||'')));
+  if(busca)lista=lista.filter(l=>((l.host||'')+' '+(l.chave||'')+' '+(l.email||'')+' '+(l.obs||'')).toLowerCase().includes(busca));
+  $('#licTbody').innerHTML=lista.length?lista.map(l=>`
+    <tr data-id="${l.id}">
+      <td><b class="mono">${esc(l.host||'—')}</b></td>
+      <td class="mono">${esc(l.chave||'—')}</td>
+      <td>${esc(l.email||'—')}</td>
+      <td class="subtle">${esc(l.obs||'—')}</td>
+      <td class="td-r"><div class="actions">
+        <button class="btn btn-ghost btn-sm" data-acao="lic-edit" data-id="${l.id}">✎ Editar</button>
+        <button class="ibtn bad" title="Excluir" data-acao="lic-del" data-id="${l.id}">${TRASH_SVG}</button>
+      </div></td>
+    </tr>`).join(''):'<tr><td colspan="5" class="empty"><span class="big">🔑</span>Nenhuma licença cadastrada.</td></tr>';
+  $('#licResumo').textContent=`${db.licencas.length} licença(s) cadastrada(s)`;
+}
+$('#licTbody').addEventListener('click',e=>{
+  const b=e.target.closest('[data-acao]');if(!b)return;
+  const l=db.licencas.find(x=>x.id===b.dataset.id);if(!l)return;
+  if(b.dataset.acao==='lic-edit')editarLicenca(l.id);
+  if(b.dataset.acao==='lic-del')excluirLicenca(l.id);
+});
+
 /* ================= MODAIS GENÉRICOS ================= */
 let confCb=null;
 function confirmar(titulo,msg,cb){$('#confTitulo').textContent=titulo;$('#confMsg').innerHTML=msg;confCb=cb;$('#modalConf').classList.add('show');}
@@ -3190,7 +3350,7 @@ $('#fileImport').addEventListener('change',e=>{
     normalizarSetores(d.setores);
     db=d;persistir();garantirModelos();garantirGuias();
     selSig='';
-    resetFormEquip();resetTec();resetSet();resetEmpForm();resetModForm();resetGuiaForm();resetImpForm();resetSwitchForm();resetPontoForm();
+    resetFormEquip();resetTec();resetSet();resetEmpForm();resetModForm();resetGuiaForm();resetImpForm();resetSwitchForm();resetPontoForm();resetLicencaForm();
     atualizarTudo();toast('Backup importado com sucesso.');
   }catch(_){toast('Arquivo de backup inválido.','bad');}};
   r.readAsText(f);e.target.value='';
@@ -3207,11 +3367,12 @@ function atualizarBadges(){
   $('#badge-imp').textContent=(db.impressoras||[]).length;
   $('#badge-sw').textContent=(db.switches||[]).length;
   $('#badge-pr').textContent=(db.pontosRede||[]).length;
+  $('#badge-lic').textContent=(db.licencas||[]).length;
   $('#badge-tec').textContent=db.tecnicos.length;
   $('#badge-set').textContent=db.setores.length;
 }
 function atualizarTudo(){
-  [preencherSelects,renderModelos,renderEquipamentos,renderTecnicos,renderSetores,renderEmprestimos,renderGuias,renderImpressoras,renderSwitches,renderPontosRede,renderPlanilhasHub,atualizarCartaoEmp,atualizarBadges]
+  [preencherSelects,renderModelos,renderEquipamentos,renderTecnicos,renderSetores,renderEmprestimos,renderGuias,renderImpressoras,renderSwitches,renderPontosRede,renderLicencas,renderPlanilhasHub,atualizarCartaoEmp,atualizarBadges]
     .forEach(f=>{try{f();}catch(err){console.error('NII render:',err);}});
   if(currentView==='dashboard'){try{renderDashboard();}catch(err){console.error('NII render:',err);}}
 }
