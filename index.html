@@ -271,6 +271,13 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
   border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);color:#cfe0ec;cursor:pointer;flex:0 0 auto;padding:0}
 .mobile-menu-toggle svg{width:20px;height:20px}
 .sair-mobile{display:none}
+.set-row{cursor:pointer}
+.set-row:hover{background:#f7f9fb}
+.set-chevron{display:inline-block;width:14px;margin-right:6px;color:var(--muted);transition:transform .15s;font-size:11px}
+.set-row.aberto .set-chevron{transform:rotate(90deg)}
+.set-detalhe td{background:#f7f9fb;padding:14px 20px 18px}
+.set-detalhe-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px 20px;font-size:13px}
+.set-detalhe-grid .subtle{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase}
 @media(max-width:980px){
   body{overflow:auto}
   .app{flex-direction:column;height:auto}
@@ -1033,8 +1040,8 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
                 <div class="field c4"><label>Contato</label><input type="text" id="setContato" placeholder="Pessoa de contato"></div>
                 <div class="field c3"><label>E-mail</label><input type="text" id="setEmail" placeholder="setor@exemplo.gov.br"></div>
                 <div class="field c6"><label>Endereço</label><input type="text" id="setEndereco" placeholder="Local / sala / bloco"></div>
-                <div class="field c3"><label>Fone 1</label><input type="text" id="setFone1" class="mono" placeholder="opcional"></div>
-                <div class="field c3"><label>Fone 2</label><input type="text" id="setFone2" class="mono" placeholder="opcional"></div>
+                <div class="field c3"><label>Fone 1</label><input type="text" id="setFone1" class="mono" inputmode="tel" placeholder="(41) 99911-2855"></div>
+                <div class="field c3"><label>Fone 2</label><input type="text" id="setFone2" class="mono" inputmode="tel" placeholder="(41) 3388-4572"></div>
                 <div class="field c3"><label>Rede</label><input type="text" id="setRede" class="mono" placeholder="Ex.: 10.61.40.0"></div>
                 <div class="field c3"><label>Máscara</label><input type="text" id="setMascara" class="mono" placeholder="Ex.: 255.255.255.0"></div>
                 <div class="field c3"><label>Gateway</label><input type="text" id="setGateway" class="mono" placeholder="Ex.: 10.61.40.1"></div>
@@ -1058,7 +1065,7 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
           </div>
           <div class="card-b flush"><div class="table-wrap">
             <table><thead><tr>
-              <th>Nome</th><th>Contato</th><th>Fone 1</th><th>E-mail</th><th>Rede</th><th>Máscara</th><th>Gateway</th><th>Designação RPV</th><th>Designação Bel</th><th class="td-r">Ações</th>
+              <th>Nome</th><th>Endereço</th><th class="td-r">Ações</th>
             </tr></thead>
             <tbody id="setTbody"></tbody></table>
           </div></div>
@@ -1958,6 +1965,15 @@ $('#formSetor').addEventListener('submit',ev=>{
   else{db.setores.push(Object.assign({id:uid()},dados));toast('Setor <b>'+esc(dados.nome)+'</b> cadastrado.');}
   persistir();resetSet();atualizarTudo();
 });
+function mascararTelefone(v){
+  const d=(v||'').replace(/\D/g,'').slice(0,11);
+  if(!d)return '';
+  if(d.length<=2)return `(${d}`;
+  if(d.length<=6)return `(${d.slice(0,2)}) ${d.slice(2)}`;
+  if(d.length<=10)return `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
+  return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
+}
+['setFone1','setFone2'].forEach(id=>{const el=$('#'+id);if(el)el.addEventListener('input',()=>{el.value=mascararTelefone(el.value);});});
 function resetSet(){
   $('#setId').value='';
   ['setNome','setContato','setEmail','setEndereco','setFone1','setFone2','setRede','setMascara','setGateway','setRpv','setBel']
@@ -1968,33 +1984,48 @@ function resetSet(){
 }
 $('#btnSetCancel').addEventListener('click',resetSet);
 function renderSetores(){
-  $('#setTbody').innerHTML=db.setores.length?db.setores.map(s=>`
-    <tr data-id="${s.id}">
-      <td><b>${esc(s.nome)}</b>${s.endereco?'<div class="subtle">'+esc(s.endereco)+'</div>':''}</td>
-      <td>${esc(s.contato||'—')}</td>
-      <td class="mono subtle">${esc(s.fone1||'—')}${s.fone2?' / '+esc(s.fone2):''}</td>
-      <td class="subtle">${esc(s.email||'—')}</td>
-      <td class="mono subtle">${esc(s.rede||'—')}</td>
-      <td class="mono subtle">${esc(s.mascara||'—')}</td>
-      <td class="mono subtle">${esc(s.gateway||'—')}</td>
-      <td class="subtle">${esc(s.designacaoRpv||'—')}</td>
-      <td class="subtle">${esc(s.designacaoBel||'—')}</td>
+  $('#setTbody').innerHTML=db.setores.length?db.setores.map(s=>{
+    const campos=[
+      ['Contato',s.contato],['E-mail',s.email],
+      ['Fone 1',s.fone1],['Fone 2',s.fone2],['Rede',s.rede],['Máscara',s.mascara],
+      ['Gateway',s.gateway],['Designação RPV',s.designacaoRpv],['Designação Bel',s.designacaoBel]
+    ];
+    return `
+    <tr class="set-row" data-id="${s.id}">
+      <td><span class="set-chevron">▸</span><b>${esc(s.nome)}</b></td>
+      <td>${s.endereco?esc(s.endereco):'<span class="subtle">—</span>'}</td>
       <td class="td-r"><div class="actions">
         <button class="btn btn-ghost btn-sm" data-acao="set-edit" data-id="${s.id}">✎ Editar</button>
         <button class="ibtn bad" title="Excluir" data-acao="set-del" data-id="${s.id}">${TRASH_SVG}</button>
       </div></td>
-    </tr>`).join(''):'<tr><td colspan="10" class="empty"><span class="big">🏢</span>Nenhum setor cadastrado.</td></tr>';
+    </tr>
+    <tr class="set-detalhe" data-detalhe="${s.id}" style="display:none">
+      <td colspan="3">
+        <div class="set-detalhe-grid">
+          ${campos.map(([label,valor])=>`<div><span class="subtle">${label}</span><br>${valor?esc(valor):'<span class="subtle">—</span>'}</div>`).join('')}
+        </div>
+      </td>
+    </tr>`;}).join(''):'<tr><td colspan="3" class="empty"><span class="big">🏢</span>Nenhum setor cadastrado.</td></tr>';
 }
 $('#setTbody').addEventListener('click',e=>{
-  const b=e.target.closest('[data-acao]');if(!b)return;const s=setById(b.dataset.id);if(!s)return;
+  const b=e.target.closest('[data-acao]');
+  if(!b){
+    const row=e.target.closest('.set-row');
+    if(row){
+      const det=$('#setTbody').querySelector(`tr.set-detalhe[data-detalhe="${row.dataset.id}"]`);
+      if(det){const aberto=det.style.display!=='none';det.style.display=aberto?'none':'table-row';row.classList.toggle('aberto',!aberto);}
+    }
+    return;
+  }
+  const s=setById(b.dataset.id);if(!s)return;
   if(b.dataset.acao==='set-edit'){
     $('#setId').value=s.id;
     $('#setNome').value=s.nome||'';
     $('#setContato').value=s.contato||'';
     $('#setEmail').value=s.email||'';
     $('#setEndereco').value=s.endereco||'';
-    $('#setFone1').value=s.fone1||'';
-    $('#setFone2').value=s.fone2||'';
+    $('#setFone1').value=mascararTelefone(s.fone1||'');
+    $('#setFone2').value=mascararTelefone(s.fone2||'');
     $('#setRede').value=s.rede||'';
     $('#setMascara').value=s.mascara||'';
     $('#setGateway').value=s.gateway||'';
