@@ -348,6 +348,11 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21V8l7-5 7 5v13M3 21h18M9 21v-6h6v6"/><path d="M17 21V11h4v10"/></svg>
         Setores <span class="nav-badge" id="badge-set">0</span>
       </button>
+      <div class="nav-sep">Ferramentas</div>
+      <button class="nav-item" data-view="planilhas">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+        Importar/Exportar
+      </button>
       <button class="nav-item sair-mobile" id="btnSairMobile" type="button">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
         Sair
@@ -1040,7 +1045,7 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
                 <div class="field c4"><label>Contato</label><input type="text" id="setContato" placeholder="Pessoa de contato"></div>
                 <div class="field c3"><label>E-mail</label><input type="text" id="setEmail" placeholder="setor@exemplo.gov.br"></div>
                 <div class="field c6"><label>Endereço</label><input type="text" id="setEndereco" placeholder="Local / sala / bloco"></div>
-                <div class="field c3"><label>Fone 1</label><input type="text" id="setFone1" class="mono" inputmode="tel" placeholder="(41) 99911-2855"></div>
+                <div class="field c3"><label>Fone 1</label><input type="text" id="setFone1" class="mono" inputmode="tel" placeholder="(41) 99999-9999"></div>
                 <div class="field c3"><label>Fone 2</label><input type="text" id="setFone2" class="mono" inputmode="tel" placeholder="(41) 3388-4572"></div>
                 <div class="field c3"><label>Rede</label><input type="text" id="setRede" class="mono" placeholder="Ex.: 10.61.40.0"></div>
                 <div class="field c3"><label>Máscara</label><input type="text" id="setMascara" class="mono" placeholder="Ex.: 255.255.255.0"></div>
@@ -1059,6 +1064,7 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
           <div class="card-h">
             <h3>Setores cadastrados</h3>
             <div class="toolbar">
+              <input type="text" id="setBusca" placeholder="🔍 Buscar nome, contato, endereço, e-mail, rede…">
               <button type="button" class="btn btn-ghost btn-sm" id="btnImportarSetores">📥 Importar planilha</button>
               <input type="file" id="fileImportSetores" accept=".xlsx,.xls,.csv" style="display:none">
             </div>
@@ -1069,6 +1075,27 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
             </tr></thead>
             <tbody id="setTbody"></tbody></table>
           </div></div>
+        </div>
+      </section>
+
+      <!-- ========== IMPORTAR / EXPORTAR ========== -->
+      <section class="view" id="view-planilhas">
+        <div class="card">
+          <div class="card-h">
+            <h3>Planilhas por módulo</h3>
+            <span class="sub">Baixe o modelo vazio para migrar dados de outro sistema, exporte os dados atuais como backup, ou importe uma planilha preenchida</span>
+          </div>
+          <div class="card-b flush">
+            <div class="table-wrap">
+              <table><thead><tr>
+                <th>Módulo</th><th>Registros</th><th class="td-r">Ações</th>
+              </tr></thead>
+              <tbody id="planilhasTbody"></tbody></table>
+            </div>
+          </div>
+          <div style="padding:10px 20px;border-top:1px solid var(--line)">
+            <span class="subtle">Ao importar, um registro já existente (pela mesma chave — nome, IP ou patrimônio, conforme o módulo) é <b>atualizado</b>; se não existir, é <b>criado</b>. Nada é apagado automaticamente.</span>
+          </div>
         </div>
       </section>
 
@@ -1517,7 +1544,7 @@ function temEmprestimoAtivo(id){
 }
 
 /* ================= NAVEGAÇÃO ================= */
-const TITULOS={dashboard:['Painel','Visão geral do inventário e movimentações'],equipamentos:['Equipamentos','Catálogo de modelos + unidades patrimoniais'],emprestimos:['Empréstimos','Reservas, retiradas e devoluções com assinatura'],guias:['Guias de Transferência','Transferência de bens patrimoniais entre unidades'],impressoras:['Impressoras','Parque de impressões — modelo, host, IP e acesso web'],tecnicos:['Técnicos','Equipe técnica — alimenta os demais módulos'],setores:['Setores','Estrutura de setores — alimenta os demais módulos']};
+const TITULOS={dashboard:['Painel','Visão geral do inventário e movimentações'],equipamentos:['Equipamentos','Catálogo de modelos + unidades patrimoniais'],emprestimos:['Empréstimos','Reservas, retiradas e devoluções com assinatura'],guias:['Guias de Transferência','Transferência de bens patrimoniais entre unidades'],impressoras:['Impressoras','Parque de impressões — modelo, host, IP e acesso web'],switches:['Switchs NR e IARAS','Dados de acesso aos switches — local, IP, login e senha'],pontosrede:['Pontos de Rede','Mapeamento de patch panel, portas de switch e setor'],tecnicos:['Técnicos','Equipe técnica — alimenta os demais módulos'],setores:['Setores','Estrutura de setores — alimenta os demais módulos'],planilhas:['Importar/Exportar','Baixe modelos, exporte dados atuais ou importe planilhas de cada módulo']};
 let currentView='dashboard';
 function showView(v){
   currentView=v;
@@ -1983,8 +2010,12 @@ function resetSet(){
   $('#btnSetCancel').style.display='none';
 }
 $('#btnSetCancel').addEventListener('click',resetSet);
+$('#setBusca').addEventListener('input',renderSetores);
 function renderSetores(){
-  $('#setTbody').innerHTML=db.setores.length?db.setores.map(s=>{
+  const busca=($('#setBusca').value||'').toLowerCase();
+  let lista=[...db.setores];
+  if(busca)lista=lista.filter(s=>((s.nome||'')+' '+(s.contato||'')+' '+(s.endereco||'')+' '+(s.email||'')+' '+(s.rede||'')+' '+(s.fone1||'')+' '+(s.fone2||'')).toLowerCase().includes(busca));
+  $('#setTbody').innerHTML=lista.length?lista.map(s=>{
     const campos=[
       ['Contato',s.contato],['E-mail',s.email],
       ['Fone 1',s.fone1],['Fone 2',s.fone2],['Rede',s.rede],['Máscara',s.mascara],
@@ -2041,51 +2072,208 @@ $('#setTbody').addEventListener('click',e=>{
     confirmar('Excluir setor','Excluir <b>'+esc(s.nome)+'</b>?',()=>{db.setores=db.setores.filter(x=>x.id!==s.id);persistir();resetSet();atualizarTudo();toast('Setor excluído.','warn');});}
 });
 
-/* --------- Importar Setores de planilha (.xlsx/.csv) --------- */
-const MAPA_COLUNAS_SETOR={
-  'nome':'nome','nome *':'nome','contato':'contato','e-mail':'email','email':'email',
-  'endereço':'endereco','endereco':'endereco','fone 1':'fone1','fone1':'fone1',
-  'fone 2':'fone2','fone2':'fone2','rede':'rede','máscara':'mascara','mascara':'mascara',
-  'gateway':'gateway','designação rpv':'designacaoRpv','designacao rpv':'designacaoRpv',
-  'designação bel':'designacaoBel','designacao bel':'designacaoBel'
-};
+/* ================= IMPORTAR / EXPORTAR — MOTOR GENÉRICO (todos os módulos) ================= */
 function valorCelula(v){
   if(v===null||v===undefined)return '';
-  if(typeof v==='number')return Number.isInteger(v)?String(v):String(v);
+  if(typeof v==='number')return String(v);
   return String(v).trim();
 }
-$('#btnImportarSetores').addEventListener('click',()=>$('#fileImportSetores').click());
-$('#fileImportSetores').addEventListener('change',e=>{
-  const f=e.target.files[0];if(!f)return;
+function normalizarCabecalho(h){return String(h||'').trim().toLowerCase().replace(/\s*\*$/,'');}
+function paraSimNao(v){const s=valorCelula(v).toLowerCase();return s==='sim'||s==='true'||s==='1'||s==='x';}
+function resolverSetorPorNome(nome){
+  nome=(nome||'').trim();if(!nome)return '';
+  let s=db.setores.find(x=>String(x.nome||'').trim().toLowerCase()===nome.toLowerCase());
+  if(!s){s={id:uid(),nome,contato:'',email:'',endereco:'',fone1:'',fone2:'',rede:'',mascara:'',gateway:'',designacaoRpv:'',designacaoBel:''};db.setores.push(s);}
+  return s.id;
+}
+function resolverTecnicoPorNome(nome){
+  nome=(nome||'').trim();if(!nome)return '';
+  let t=db.tecnicos.find(x=>String(x.nome||'').trim().toLowerCase()===nome.toLowerCase());
+  if(!t){t={id:uid(),nome,matricula:proximaMatricula(),usuario:'',senha:''};db.tecnicos.push(t);}
+  return t.id;
+}
+function resolverModeloPorTipoMarca(tipo,marca){
+  tipo=(tipo||'').trim();marca=(marca||'').trim();
+  if(!Array.isArray(db.modelos))db.modelos=[];
+  if(tipo&&!db.tipos.includes(tipo))db.tipos.push(tipo);
+  if(marca&&!db.marcas.includes(marca))db.marcas.push(marca);
+  let m=db.modelos.find(x=>x.tipo===tipo&&x.marca===marca&&!x.descricao);
+  if(!m){m={id:uid(),tipo,marca,descricao:'',criadoEm:Date.now()};db.modelos.push(m);}
+  return m.id;
+}
+const PLANILHA_MODULOS={
+  setores:{
+    label:'Setores',
+    campos:[{h:'Nome *',f:'nome'},{h:'Contato',f:'contato'},{h:'E-mail',f:'email'},{h:'Endereço',f:'endereco'},
+      {h:'Fone 1',f:'fone1'},{h:'Fone 2',f:'fone2'},{h:'Rede',f:'rede'},{h:'Máscara',f:'mascara'},
+      {h:'Gateway',f:'gateway'},{h:'Designação RPV',f:'designacaoRpv'},{h:'Designação Bel',f:'designacaoBel'}],
+    lista:()=>db.setores,
+    linhaExport:s=>({nome:s.nome,contato:s.contato,email:s.email,endereco:s.endereco,fone1:s.fone1,fone2:s.fone2,
+      rede:s.rede,mascara:s.mascara,gateway:s.gateway,designacaoRpv:s.designacaoRpv,designacaoBel:s.designacaoBel}),
+    chave:o=>String(o.nome||'').trim().toLowerCase(),
+    finalizar(o){if(!o.nome)return null;return o;},
+    novo:o=>Object.assign({id:uid()},o)
+  },
+  tecnicos:{
+    label:'Técnicos',
+    campos:[{h:'Nome *',f:'nome'},{h:'Matrícula',f:'matricula'},{h:'Usuário de login',f:'usuario'},{h:'Senha de login',f:'senha'}],
+    lista:()=>db.tecnicos,
+    linhaExport:t=>({nome:t.nome,matricula:t.matricula,usuario:t.usuario,senha:t.senha}),
+    chave:o=>String(o.nome||'').trim().toLowerCase(),
+    finalizar(o){if(!o.nome)return null;if(!o.matricula)o.matricula=proximaMatricula();return o;},
+    novo:o=>Object.assign({id:uid()},o)
+  },
+  impressoras:{
+    label:'Impressoras',
+    campos:[{h:'Modelo *',f:'modelo'},{h:'Host',f:'host'},{h:'Setor',f:'setorNome'},{h:'IP',f:'ip'},
+      {h:'Patrimônio',f:'patrimonio'},{h:'Série',f:'serie'},{h:'Login Web',f:'loginWeb'}],
+    lista:()=>db.impressoras,
+    linhaExport:p=>({modelo:p.modelo,host:p.host,setorNome:setNome(p.localSetorId),ip:p.ip,patrimonio:p.patrimonio,serie:p.serie,loginWeb:p.loginWeb}),
+    chave:o=>String(o.patrimonio||o.host||'').trim().toLowerCase(),
+    finalizar(o){
+      if(!o.modelo)return null;
+      o.localSetorId=resolverSetorPorNome(o.setorNome);delete o.setorNome;
+      o.patrimonio=soDigitos(o.patrimonio||'');
+      return o;
+    },
+    novo:o=>Object.assign({id:uid(),criadoEm:Date.now()},o)
+  },
+  switches:{
+    label:'Switchs NR e IARAS',
+    campos:[{h:'Identificação',f:'nome'},{h:'Local',f:'localNome'},{h:'IP *',f:'ip'},{h:'Login',f:'login'},{h:'Senha',f:'senha'}],
+    lista:()=>db.switches,
+    linhaExport:s=>({nome:s.nome,localNome:setNome(s.local),ip:s.ip,login:s.login,senha:s.senha}),
+    chave:o=>String(o.ip||'').trim().toLowerCase(),
+    finalizar(o){
+      if(!o.ip)return null;
+      o.local=resolverSetorPorNome(o.localNome);delete o.localNome;
+      return o;
+    },
+    novo:o=>Object.assign({id:uid(),criadoEm:Date.now()},o)
+  },
+  pontosRede:{
+    label:'Pontos de Rede',
+    campos:[{h:'Patch Panel *',f:'patch'},{h:'Ponto',f:'ponto'},{h:'Tipo',f:'tipo'},{h:'Switch',f:'switchNum'},
+      {h:'Porta',f:'porta'},{h:'Setor',f:'setorNome'},{h:'Observação',f:'obs'}],
+    lista:()=>db.pontosRede,
+    linhaExport:p=>({patch:p.patch,ponto:p.ponto,tipo:p.tipo,switchNum:p.switchNum,porta:p.porta,setorNome:setNome(p.setor),obs:p.obs}),
+    chave:o=>String((o.patch||'')+'|'+(o.ponto||'')).trim().toLowerCase(),
+    finalizar(o){
+      if(!o.patch)return null;
+      o.setor=resolverSetorPorNome(o.setorNome);delete o.setorNome;
+      return o;
+    },
+    novo:o=>Object.assign({id:uid(),criadoEm:Date.now()},o)
+  },
+  equipamentos:{
+    label:'Equipamentos',
+    campos:[{h:'Patrimônio *',f:'patrimonio'},{h:'Série',f:'serie'},{h:'Tipo *',f:'tipo'},{h:'Marca *',f:'marca'},
+      {h:'Setor *',f:'setorNome'},{h:'Técnico *',f:'tecnicoNome'},{h:'Data de aquisição',f:'data'},
+      {h:'Observação',f:'obs'},{h:'Indisponível (Sim/Não)',f:'indisponivelTxt'},{h:'Emprestável (Sim/Não)',f:'emprestavelTxt'}],
+    lista:()=>db.equipamentos,
+    linhaExport:e=>({patrimonio:e.patrimonio,serie:e.serie,tipo:e.tipo,marca:e.marca,setorNome:setNome(e.setorId),
+      tecnicoNome:(db.tecnicos.find(t=>t.id===e.tecnicoId)||{}).nome||'',data:e.data,obs:e.obs,
+      indisponivelTxt:e.indisponivel?'Sim':'Não',emprestavelTxt:e.emprestavel===false?'Não':'Sim'}),
+    chave:o=>soDigitos(o.patrimonio||''),
+    finalizar(o){
+      o.patrimonio=soDigitos(o.patrimonio||'');
+      if(!o.patrimonio||!o.tipo||!o.marca||!o.setorNome||!o.tecnicoNome)return null;
+      o.modeloId=resolverModeloPorTipoMarca(o.tipo,o.marca);
+      o.setorId=resolverSetorPorNome(o.setorNome);delete o.setorNome;
+      o.tecnicoId=resolverTecnicoPorNome(o.tecnicoNome);delete o.tecnicoNome;
+      o.data=o.data||hojeISO();
+      o.indisponivel=paraSimNao(o.indisponivelTxt);delete o.indisponivelTxt;
+      o.emprestavel=o.emprestavelTxt?paraSimNao(o.emprestavelTxt):true;delete o.emprestavelTxt;
+      return o;
+    },
+    novo:o=>Object.assign({id:uid()},o)
+  }
+};
+function nomeArquivoPlanilha(prefixo,label){return `${prefixo}_${label.replace(/[^\w]+/g,'_')}.xlsx`;}
+function baixarModeloModulo(chave){
+  const mod=PLANILHA_MODULOS[chave];
+  const ws=XLSX.utils.aoa_to_sheet([mod.campos.map(c=>c.h)]);
+  ws['!cols']=mod.campos.map(()=>({wch:24}));
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,mod.label.slice(0,31));
+  XLSX.writeFile(wb,nomeArquivoPlanilha('Modelo',mod.label));
+}
+function exportarDadosModulo(chave){
+  const mod=PLANILHA_MODULOS[chave];
+  const linhas=mod.lista().map(mod.linhaExport);
+  const aoa=[mod.campos.map(c=>c.h)].concat(linhas.map(l=>mod.campos.map(c=>l[c.f]??'')));
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols']=mod.campos.map(()=>({wch:24}));
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,mod.label.slice(0,31));
+  XLSX.writeFile(wb,nomeArquivoPlanilha('Exportacao',mod.label));
+  toast(`${linhas.length} registro(s) de <b>${mod.label}</b> exportado(s).`);
+}
+function importarDadosModulo(chave,file){
+  const mod=PLANILHA_MODULOS[chave];
   const r=new FileReader();
   r.onload=ev=>{
     try{
       const wb=XLSX.read(ev.target.result,{type:'array'});
-      const abaNome=wb.SheetNames.includes('Setores')?'Setores':wb.SheetNames[0];
+      const nomeAba=mod.label.slice(0,31);
+      const abaNome=wb.SheetNames.includes(nomeAba)?nomeAba:wb.SheetNames[0];
       const linhas=XLSX.utils.sheet_to_json(wb.Sheets[abaNome],{defval:''});
       if(!linhas.length)return toast('A planilha está vazia.','bad');
+      const mapaCol={};mod.campos.forEach(c=>{mapaCol[normalizarCabecalho(c.h)]=c.f;});
       let novos=0,atualizados=0,ignorados=0;
-      linhas.forEach(linha=>{
+      linhas.forEach(linhaBruta=>{
         const obj={};
-        Object.keys(linha).forEach(col=>{
-          const chave=MAPA_COLUNAS_SETOR[String(col).trim().toLowerCase()];
-          if(chave)obj[chave]=valorCelula(linha[col]);
+        Object.keys(linhaBruta).forEach(col=>{
+          const campo=mapaCol[normalizarCabecalho(col)];
+          if(campo)obj[campo]=valorCelula(linhaBruta[col]);
         });
-        const nome=(obj.nome||'').trim();
-        if(!nome){ignorados++;return;}
-        const existente=db.setores.find(s=>String(s.nome||'').trim().toLowerCase()===nome.toLowerCase());
-        const dados={nome,contato:obj.contato||'',email:obj.email||'',endereco:obj.endereco||'',
-          fone1:obj.fone1||'',fone2:obj.fone2||'',rede:obj.rede||'',mascara:obj.mascara||'',
-          gateway:obj.gateway||'',designacaoRpv:obj.designacaoRpv||'',designacaoBel:obj.designacaoBel||''};
-        if(existente){Object.assign(existente,dados);atualizados++;}
-        else{db.setores.push(Object.assign({id:uid()},dados));novos++;}
+        const pronto=mod.finalizar(obj);
+        if(!pronto){ignorados++;return;}
+        const chaveVal=mod.chave(pronto);
+        const existente=chaveVal?mod.lista().find(x=>mod.chave(x)===chaveVal):null;
+        if(existente){Object.assign(existente,pronto);atualizados++;}
+        else{mod.lista().push(mod.novo(pronto));novos++;}
       });
       persistir();atualizarTudo();
-      toast(`Importação concluída: <b>${novos}</b> novo(s), <b>${atualizados}</b> atualizado(s)`+(ignorados?`, ${ignorados} ignorado(s) sem nome`:'')+'.');
-    }catch(err){console.error(err);toast('Não foi possível ler essa planilha. Verifique o formato do arquivo.','bad');}
-    e.target.value='';
+      toast(`Importação de <b>${mod.label}</b> concluída: <b>${novos}</b> novo(s), <b>${atualizados}</b> atualizado(s)`+(ignorados?`, ${ignorados} ignorado(s)`:'')+'.');
+    }catch(err){console.error(err);toast('Não foi possível ler essa planilha. Verifique se o cabeçalho das colunas não foi alterado.','bad');}
   };
-  r.readAsArrayBuffer(f);
+  r.readAsArrayBuffer(file);
+}
+function renderPlanilhasHub(){
+  const tb=$('#planilhasTbody');if(!tb)return;
+  tb.innerHTML=Object.keys(PLANILHA_MODULOS).map(chave=>{
+    const mod=PLANILHA_MODULOS[chave];
+    return `<tr>
+      <td><b>${esc(mod.label)}</b></td>
+      <td>${mod.lista().length}</td>
+      <td class="td-r"><div class="actions">
+        <button class="btn btn-ghost btn-sm" data-acao="ph-modelo" data-mod="${chave}">📄 Baixar modelo</button>
+        <button class="btn btn-ghost btn-sm" data-acao="ph-export" data-mod="${chave}">⬇ Exportar dados</button>
+        <button class="btn btn-accent btn-sm" data-acao="ph-import" data-mod="${chave}">📥 Importar</button>
+        <input type="file" class="ph-file" data-mod="${chave}" accept=".xlsx,.xls,.csv" style="display:none">
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-acao^="ph-"]');if(!b)return;
+  const chave=b.dataset.mod;if(!PLANILHA_MODULOS[chave])return;
+  if(b.dataset.acao==='ph-modelo')baixarModeloModulo(chave);
+  if(b.dataset.acao==='ph-export')exportarDadosModulo(chave);
+  if(b.dataset.acao==='ph-import'){
+    const input=b.parentElement.querySelector('.ph-file');
+    input.onchange=()=>{if(input.files[0])importarDadosModulo(chave,input.files[0]);input.value='';};
+    input.click();
+  }
+});
+
+/* --------- atalho de importação dentro da própria tela de Setores --------- */
+$('#btnImportarSetores').addEventListener('click',()=>$('#fileImportSetores').click());
+$('#fileImportSetores').addEventListener('change',e=>{
+  const f=e.target.files[0];if(!f)return;
+  importarDadosModulo('setores',f);
+  e.target.value='';
 });
 
 /* ================= EMPRÉSTIMOS ================= */
@@ -3023,7 +3211,7 @@ function atualizarBadges(){
   $('#badge-set').textContent=db.setores.length;
 }
 function atualizarTudo(){
-  [preencherSelects,renderModelos,renderEquipamentos,renderTecnicos,renderSetores,renderEmprestimos,renderGuias,renderImpressoras,renderSwitches,renderPontosRede,atualizarCartaoEmp,atualizarBadges]
+  [preencherSelects,renderModelos,renderEquipamentos,renderTecnicos,renderSetores,renderEmprestimos,renderGuias,renderImpressoras,renderSwitches,renderPontosRede,renderPlanilhasHub,atualizarCartaoEmp,atualizarBadges]
     .forEach(f=>{try{f();}catch(err){console.error('NII render:',err);}});
   if(currentView==='dashboard'){try{renderDashboard();}catch(err){console.error('NII render:',err);}}
 }
