@@ -1049,7 +1049,13 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
           </div>
         </div>
         <div class="card">
-          <div class="card-h"><h3>Setores cadastrados</h3></div>
+          <div class="card-h">
+            <h3>Setores cadastrados</h3>
+            <div class="toolbar">
+              <button type="button" class="btn btn-ghost btn-sm" id="btnImportarSetores">📥 Importar planilha</button>
+              <input type="file" id="fileImportSetores" accept=".xlsx,.xls,.csv" style="display:none">
+            </div>
+          </div>
           <div class="card-b flush"><div class="table-wrap">
             <table><thead><tr>
               <th>Nome</th><th>Contato</th><th>Fone 1</th><th>E-mail</th><th>Rede</th><th>Máscara</th><th>Gateway</th><th>Designação RPV</th><th>Designação Bel</th><th class="td-r">Ações</th>
@@ -1130,6 +1136,8 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
 <!-- ========== FIREBASE (login + sincronização em nuvem) ========== -->
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
+<!-- leitura de planilhas (.xlsx/.csv) para importação -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <style>
   #loginOverlay{position:fixed;inset:0;z-index:9999;background:linear-gradient(180deg,var(--side) 0%,#0a1620 100%);
@@ -2000,6 +2008,53 @@ $('#setTbody').addEventListener('click',e=>{
   if(b.dataset.acao==='set-del'){
     if(db.equipamentos.some(x=>x.setorId===s.id)||db.emprestimos.some(x=>x.setorId===s.id)||(db.guias||[]).some(g=>g.origemSetorId===s.id||g.destinoSetorId===s.id)||(db.impressoras||[]).some(p=>p.localSetorId===s.id))return toast('Não é possível excluir: há <b>registros vinculados</b> a este setor.','bad');
     confirmar('Excluir setor','Excluir <b>'+esc(s.nome)+'</b>?',()=>{db.setores=db.setores.filter(x=>x.id!==s.id);persistir();resetSet();atualizarTudo();toast('Setor excluído.','warn');});}
+});
+
+/* --------- Importar Setores de planilha (.xlsx/.csv) --------- */
+const MAPA_COLUNAS_SETOR={
+  'nome':'nome','nome *':'nome','contato':'contato','e-mail':'email','email':'email',
+  'endereço':'endereco','endereco':'endereco','fone 1':'fone1','fone1':'fone1',
+  'fone 2':'fone2','fone2':'fone2','rede':'rede','máscara':'mascara','mascara':'mascara',
+  'gateway':'gateway','designação rpv':'designacaoRpv','designacao rpv':'designacaoRpv',
+  'designação bel':'designacaoBel','designacao bel':'designacaoBel'
+};
+function valorCelula(v){
+  if(v===null||v===undefined)return '';
+  if(typeof v==='number')return Number.isInteger(v)?String(v):String(v);
+  return String(v).trim();
+}
+$('#btnImportarSetores').addEventListener('click',()=>$('#fileImportSetores').click());
+$('#fileImportSetores').addEventListener('change',e=>{
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=ev=>{
+    try{
+      const wb=XLSX.read(ev.target.result,{type:'array'});
+      const abaNome=wb.SheetNames.includes('Setores')?'Setores':wb.SheetNames[0];
+      const linhas=XLSX.utils.sheet_to_json(wb.Sheets[abaNome],{defval:''});
+      if(!linhas.length)return toast('A planilha está vazia.','bad');
+      let novos=0,atualizados=0,ignorados=0;
+      linhas.forEach(linha=>{
+        const obj={};
+        Object.keys(linha).forEach(col=>{
+          const chave=MAPA_COLUNAS_SETOR[String(col).trim().toLowerCase()];
+          if(chave)obj[chave]=valorCelula(linha[col]);
+        });
+        const nome=(obj.nome||'').trim();
+        if(!nome){ignorados++;return;}
+        const existente=db.setores.find(s=>String(s.nome||'').trim().toLowerCase()===nome.toLowerCase());
+        const dados={nome,contato:obj.contato||'',email:obj.email||'',endereco:obj.endereco||'',
+          fone1:obj.fone1||'',fone2:obj.fone2||'',rede:obj.rede||'',mascara:obj.mascara||'',
+          gateway:obj.gateway||'',designacaoRpv:obj.designacaoRpv||'',designacaoBel:obj.designacaoBel||''};
+        if(existente){Object.assign(existente,dados);atualizados++;}
+        else{db.setores.push(Object.assign({id:uid()},dados));novos++;}
+      });
+      persistir();atualizarTudo();
+      toast(`Importação concluída: <b>${novos}</b> novo(s), <b>${atualizados}</b> atualizado(s)`+(ignorados?`, ${ignorados} ignorado(s) sem nome`:'')+'.');
+    }catch(err){console.error(err);toast('Não foi possível ler essa planilha. Verifique o formato do arquivo.','bad');}
+    e.target.value='';
+  };
+  r.readAsArrayBuffer(f);
 });
 
 /* ================= EMPRÉSTIMOS ================= */
