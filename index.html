@@ -335,9 +335,9 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="8" rx="1.5"/><path d="M6 18v2M10 18v2M14 18v2M18 18v2"/><circle cx="6" cy="10" r=".6" fill="currentColor" stroke="none"/><circle cx="9" cy="10" r=".6" fill="currentColor" stroke="none"/></svg>
         Switchs NR e IARAS <span class="nav-badge" id="badge-sw">0</span>
       </button>
-      <button class="nav-item" data-view="pontosrede">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="2.2"/><path d="M12 7.2V12M12 12H5v3M12 12h7v3M5 15v3M19 15v3"/><circle cx="5" cy="19.5" r="1.6"/><circle cx="19" cy="19.5" r="1.6"/></svg>
-        Pontos de Rede <span class="nav-badge" id="badge-pr">0</span>
+      <button class="nav-item" data-view="racks">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="1.5"/><path d="M8 6h.01M8 10h.01M8 14h.01M8 18h.01M12 6h4M12 10h4M12 14h4M12 18h4"/></svg>
+        Racks de Redes <span class="nav-badge" id="badge-racks">0</span>
       </button>
       <button class="nav-item" data-view="licencas">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 10h5M7 14h3"/><circle cx="17" cy="11" r="2"/><path d="M17 13v3l-1.2-.9-1.2.9v-3"/></svg>
@@ -936,48 +936,52 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
       </section>
 
       <!-- ========== PONTOS DE REDE ========== -->
-      <section class="view" id="view-pontosrede">
-        <div class="card" id="cardPrForm">
+      <section class="view" id="view-racks">
+        <div class="card" id="cardRkForm">
           <div class="card-h">
-            <h3 id="prFormTitle">Cadastro de ponto de rede</h3>
-            <span class="pill warn" id="prEditBadge" style="display:none">✎ EDITANDO</span>
-            <span class="sub">Mapeamento de pontos, patch panel e portas de switch</span>
+            <h3 id="rkFormTitle">Cadastro de ponto de rack</h3>
+            <span class="pill warn" id="rkEditBadge" style="display:none">✎ EDITANDO</span>
+            <span class="sub">Mapeamento de racks, patch panel e portas de switch</span>
           </div>
           <div class="card-b">
-            <form id="formPonto" autocomplete="off">
-              <input type="hidden" id="prId">
+            <form id="formRack" autocomplete="off">
+              <input type="hidden" id="rkId">
               <div class="fgrid">
                 <div class="field c4">
+                  <label>Rack <b>*</b></label>
+                  <select id="rkRack"><option value="">Selecione…</option><option>5A</option><option>5B</option><option>5C</option><option>5D</option><option>6A</option><option>6B</option><option>6C</option><option>6D</option></select>
+                </div>
+                <div class="field c4">
                   <label>Patch Panel <b>*</b></label>
-                  <select id="prPatch"><option value="">Selecione…</option><option>Telefonia</option><option value="01">01</option><option value="02">02</option><option value="03">03</option><option value="04">04</option><option value="05">05</option><option value="06">06</option><option value="07">07</option><option value="08">08</option><option value="09">09</option><option value="10">10</option></select>
+                  <select id="rkPatch"><option value="">Selecione…</option><option>Telefonia</option><option value="01">01</option><option value="02">02</option><option value="03">03</option><option value="04">04</option><option value="05">05</option><option value="06">06</option><option value="07">07</option><option value="08">08</option><option value="09">09</option><option value="10">10</option></select>
                 </div>
                 <div class="field c4">
                   <label>Ponto</label>
-                  <input type="text" id="prPonto" class="mono" placeholder="Ex.: 12">
+                  <input type="text" id="rkPonto" class="mono" placeholder="Ex.: 12">
                 </div>
                 <div class="field c4">
                   <label>Tipo</label>
-                  <select id="prTipo"><option value="">Selecione…</option><option>Rede</option><option>Telefone</option><option>Não Identificado</option></select>
+                  <select id="rkTipo"><option value="">Selecione…</option><option>Rede</option><option>Telefone</option><option>Não Identificado</option></select>
                 </div>
                 <div class="field c4">
                   <label>Switch</label>
-                  <select id="prSwitch"><option value="">Selecione…</option><option value="01">01</option><option value="02">02</option><option value="03">03</option><option value="04">04</option><option value="05">05</option></select>
+                  <select id="rkSwitch"><option value="">Selecione…</option><option value="01">01</option><option value="02">02</option><option value="03">03</option><option value="04">04</option><option value="05">05</option></select>
                 </div>
                 <div class="field c4">
                   <label>Porta</label>
-                  <select id="prPorta"><option value="">Selecione…</option><option value="01">01</option><option value="02">02</option><option value="03">03</option><option value="04">04</option><option value="05">05</option><option value="06">06</option><option value="07">07</option><option value="08">08</option><option value="09">09</option><option value="10">10</option><option value="11">11</option><option value="12">12</option><option value="13">13</option><option value="14">14</option><option value="15">15</option><option value="16">16</option><option value="17">17</option><option value="18">18</option><option value="19">19</option><option value="20">20</option><option value="21">21</option><option value="22">22</option><option value="23">23</option><option value="24">24</option><option value="25">25</option><option value="26">26</option><option value="27">27</option><option value="28">28</option><option value="29">29</option><option value="30">30</option><option value="31">31</option><option value="32">32</option><option value="33">33</option><option value="34">34</option><option value="35">35</option><option value="36">36</option><option value="37">37</option><option value="38">38</option><option value="39">39</option><option value="40">40</option><option value="41">41</option><option value="42">42</option><option value="43">43</option><option value="44">44</option><option value="45">45</option><option value="46">46</option><option value="47">47</option><option value="48">48</option></select>
+                  <select id="rkPorta"><option value="">Selecione…</option><option value="01">01</option><option value="02">02</option><option value="03">03</option><option value="04">04</option><option value="05">05</option><option value="06">06</option><option value="07">07</option><option value="08">08</option><option value="09">09</option><option value="10">10</option><option value="11">11</option><option value="12">12</option><option value="13">13</option><option value="14">14</option><option value="15">15</option><option value="16">16</option><option value="17">17</option><option value="18">18</option><option value="19">19</option><option value="20">20</option><option value="21">21</option><option value="22">22</option><option value="23">23</option><option value="24">24</option><option value="25">25</option><option value="26">26</option><option value="27">27</option><option value="28">28</option><option value="29">29</option><option value="30">30</option><option value="31">31</option><option value="32">32</option><option value="33">33</option><option value="34">34</option><option value="35">35</option><option value="36">36</option><option value="37">37</option><option value="38">38</option><option value="39">39</option><option value="40">40</option><option value="41">41</option><option value="42">42</option><option value="43">43</option><option value="44">44</option><option value="45">45</option><option value="46">46</option><option value="47">47</option><option value="48">48</option></select>
                 </div>
-                <div class="field c4">
+                <div class="field c6">
                   <label>Setor</label>
-                  <select id="prSetor"></select>
+                  <select id="rkSetor"></select>
                 </div>
-                <div class="field c12">
+                <div class="field c6">
                   <label>Observação</label>
-                  <input type="text" id="prObs" placeholder="Observações gerais">
+                  <input type="text" id="rkObs" placeholder="Observações gerais">
                 </div>
                 <div class="c12 form-actions">
-                  <button type="submit" class="btn btn-accent" id="btnPrSubmit">✔ Salvar ponto</button>
-                  <button type="button" class="btn btn-ghost" id="btnPrCancel" style="display:none">Cancelar edição</button>
+                  <button type="submit" class="btn btn-accent" id="btnRkSubmit">✔ Salvar ponto</button>
+                  <button type="button" class="btn btn-ghost" id="btnRkCancel" style="display:none">Cancelar edição</button>
                   <button type="reset" class="btn btn-ghost">Limpar</button>
                 </div>
               </div>
@@ -987,22 +991,22 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
 
         <div class="card">
           <div class="card-h">
-            <h3>Pontos de rede cadastrados</h3>
+            <h3>Pontos cadastrados</h3>
             <div class="toolbar">
-              <input type="text" id="prBusca" placeholder="🔍 Buscar patch panel, ponto, tipo, switch, porta, setor…">
+              <input type="text" id="rkBusca" placeholder="🔍 Buscar rack, patch panel, ponto, tipo, switch, porta, setor…">
             </div>
           </div>
           <div class="card-b flush">
             <div class="table-wrap">
               <table>
                 <thead><tr>
-                  <th>Patch Panel</th><th>Ponto</th><th>Tipo</th><th>Switch</th><th>Porta</th><th>Setor</th><th>Observação</th><th class="td-r">Ações</th>
+                  <th>Rack</th><th>Patch Panel</th><th>Ponto</th><th>Tipo</th><th>Switch</th><th>Porta</th><th>Setor</th><th>Observação</th><th class="td-r">Ações</th>
                 </tr></thead>
-                <tbody id="prTbody"></tbody>
+                <tbody id="rkTbody"></tbody>
               </table>
             </div>
           </div>
-          <div style="padding:10px 20px;border-top:1px solid var(--line)"><span class="subtle" id="prResumo"></span></div>
+          <div style="padding:10px 20px;border-top:1px solid var(--line)"><span class="subtle" id="rkResumo"></span></div>
         </div>
       </section>
 
@@ -1128,8 +1132,6 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
             <h3>Setores cadastrados</h3>
             <div class="toolbar">
               <input type="text" id="setBusca" placeholder="🔍 Buscar nome, contato, endereço, e-mail, rede…">
-              <button type="button" class="btn btn-ghost btn-sm" id="btnImportarSetores">📥 Importar planilha</button>
-              <input type="file" id="fileImportSetores" accept=".xlsx,.xls,.csv" style="display:none">
             </div>
           </div>
           <div class="card-b flush"><div class="table-wrap">
@@ -1329,7 +1331,7 @@ let unsubscribers=[];
 
 /* cada "seção" do sistema vira um documento próprio dentro da coleção "sistema",
    assim uma pessoa mexendo em Equipamentos não sobrescreve quem está mexendo em Empréstimos */
-const SECOES=['equipamentos','tecnicos','setores','emprestimos','guias','impressoras','switches','pontosRede','licencas','listas','eqSnap'];
+const SECOES=['equipamentos','tecnicos','setores','emprestimos','guias','impressoras','switches','racks','licencas','listas','eqSnap'];
 function docRefSecao(nome){return fsdb.collection('sistema').doc(nome);}
 function dadosDaSecao(nome){
   if(nome==='listas')return {tipos:db.tipos,marcas:db.marcas,modelos:db.modelos};
@@ -1497,7 +1499,7 @@ function rabisco(){const c=document.createElement('canvas');c.width=340;c.height
   x.beginPath();x.moveTo(70,88);x.quadraticCurveTo(170,70,270,86);x.stroke();return c.toDataURL();}
 function seed(){
   /* instalação nova: começa vazia — os dados reais vêm do Firestore após o login */
-  return {tipos:[...DEFAULT_TIPOS],marcas:[...DEFAULT_MARCAS],modelos:[],tecnicos:[],setores:[],equipamentos:[],emprestimos:[],guias:[],impressoras:[],switches:[],pontosRede:[],licencas:[],eqSnap:{}};
+  return {tipos:[...DEFAULT_TIPOS],marcas:[...DEFAULT_MARCAS],modelos:[],tecnicos:[],setores:[],equipamentos:[],emprestimos:[],guias:[],impressoras:[],switches:[],racks:[],licencas:[],eqSnap:{}};
 }
 let db;
 try{const raw=localStorage.getItem(LS);db=raw?JSON.parse(raw):null;}catch(e){db=null;}
@@ -1524,7 +1526,7 @@ function normalizarSetores(list){
   if(!db.eqSnap||typeof db.eqSnap!=='object'){db.eqSnap={};mig=true;}
   if(!Array.isArray(db.impressoras)){db.impressoras=[];mig=true;}
   if(!Array.isArray(db.switches)){db.switches=[];mig=true;}
-  if(!Array.isArray(db.pontosRede)){db.pontosRede=[];mig=true;}
+  if(!Array.isArray(db.racks)){db.racks=[];mig=true;}
   if(!Array.isArray(db.licencas)){db.licencas=[];mig=true;}
   (db.guias||[]).forEach(g=>{if(g&&!g.recebimento){g.recebimento={data:g.origemData||hojeISO(),hora:'',respNome:'',assinatura:null,atualizouSetor:false,ts:g.emitidaEm||Date.now()};mig=true;}});
   const antes=JSON.stringify(db.setores||[]);
@@ -1553,7 +1555,7 @@ function persistir(){localStorage.setItem(LS,JSON.stringify(db));sincronizarComN
 window.addEventListener('storage',e=>{
   if(e.key===LS&&e.newValue){
     try{const d=JSON.parse(e.newValue);
-      if(d&&Array.isArray(d.equipamentos)&&Array.isArray(d.emprestimos)){db=d;if(!db.eqSnap)db.eqSnap={};if(!Array.isArray(db.modelos))db.modelos=[];if(!Array.isArray(db.impressoras))db.impressoras=[];if(!Array.isArray(db.switches))db.switches=[];if(!Array.isArray(db.pontosRede))db.pontosRede=[];if(!Array.isArray(db.licencas))db.licencas=[];normalizarSetores(db.setores);garantirModelos();garantirGuias();atualizarTudo();}
+      if(d&&Array.isArray(d.equipamentos)&&Array.isArray(d.emprestimos)){db=d;if(!db.eqSnap)db.eqSnap={};if(!Array.isArray(db.modelos))db.modelos=[];if(!Array.isArray(db.impressoras))db.impressoras=[];if(!Array.isArray(db.switches))db.switches=[];if(!Array.isArray(db.racks))db.racks=[];if(!Array.isArray(db.licencas))db.licencas=[];normalizarSetores(db.setores);garantirModelos();garantirGuias();atualizarTudo();}
     }catch(_){}
   }
 });
@@ -1608,7 +1610,7 @@ function temEmprestimoAtivo(id){
 }
 
 /* ================= NAVEGAÇÃO ================= */
-const TITULOS={dashboard:['Painel','Visão geral do inventário e movimentações'],equipamentos:['Equipamentos','Catálogo de modelos + unidades patrimoniais'],emprestimos:['Empréstimos','Reservas, retiradas e devoluções com assinatura'],guias:['Guias de Transferência','Transferência de bens patrimoniais entre unidades'],impressoras:['Impressoras','Parque de impressões — modelo, host, IP e acesso web'],switches:['Switchs NR e IARAS','Dados de acesso aos switches — local, IP, login e senha'],pontosrede:['Pontos de Rede','Mapeamento de patch panel, portas de switch e setor'],tecnicos:['Técnicos','Equipe técnica — alimenta os demais módulos'],licencas:['Licenças Office 2024','Controle de chaves do Office 2024 e contas vinculadas'],setores:['Setores','Estrutura de setores — alimenta os demais módulos'],planilhas:['Importar/Exportar','Baixe modelos, exporte dados atuais ou importe planilhas de cada módulo']};
+const TITULOS={dashboard:['Painel','Visão geral do inventário e movimentações'],equipamentos:['Equipamentos','Catálogo de modelos + unidades patrimoniais'],emprestimos:['Empréstimos','Reservas, retiradas e devoluções com assinatura'],guias:['Guias de Transferência','Transferência de bens patrimoniais entre unidades'],impressoras:['Impressoras','Parque de impressões — modelo, host, IP e acesso web'],switches:['Switchs NR e IARAS','Dados de acesso aos switches — local, IP, login e senha'],racks:['Racks de Redes','Mapeamento de racks, patch panel, portas de switch e setor'],tecnicos:['Técnicos','Equipe técnica — alimenta os demais módulos'],licencas:['Licenças Office 2024','Controle de chaves do Office 2024 e contas vinculadas'],setores:['Setores','Estrutura de setores — alimenta os demais módulos'],planilhas:['Importar/Exportar','Baixe modelos, exporte dados atuais ou importe planilhas de cada módulo']};
 let currentView='dashboard';
 function showView(v){
   currentView=v;
@@ -1679,7 +1681,7 @@ function preencherSelects(){
     selSig=sig;
     const optsTec=db.tecnicos.map(t=>`<option value="${t.id}">${esc(t.nome)}</option>`).join('');
     const optsSet=db.setores.map(s=>`<option value="${s.id}">${esc(s.nome)}</option>`).join('');
-    for(const id of ['eqSetor','empSetor','swLocal','prSetor']){const el=$('#'+id);if(!el)continue;const v=el.value;
+    for(const id of ['eqSetor','empSetor','swLocal','rkSetor']){const el=$('#'+id);if(!el)continue;const v=el.value;
       el.innerHTML=`<option value="">Selecione o setor…</option>`+optsSet;if(v&&setById(v))el.value=v;}
     {const el=$('#impLocal');if(el){const v=el.value;
       el.innerHTML=`<option value="">Selecione o local…</option>`+optsSet;if(v&&setById(v))el.value=v;}}
@@ -2215,15 +2217,15 @@ const PLANILHA_MODULOS={
     },
     novo:o=>Object.assign({id:uid(),criadoEm:Date.now()},o)
   },
-  pontosRede:{
-    label:'Pontos de Rede',
-    campos:[{h:'Patch Panel *',f:'patch'},{h:'Ponto',f:'ponto'},{h:'Tipo',f:'tipo'},{h:'Switch',f:'switchNum'},
+  racks:{
+    label:'Racks de Redes',
+    campos:[{h:'Rack *',f:'rack'},{h:'Patch Panel *',f:'patch'},{h:'Ponto',f:'ponto'},{h:'Tipo',f:'tipo'},{h:'Switch',f:'switchNum'},
       {h:'Porta',f:'porta'},{h:'Setor',f:'setorNome'},{h:'Observação',f:'obs'}],
-    lista:()=>db.pontosRede,
-    linhaExport:p=>({patch:p.patch,ponto:p.ponto,tipo:p.tipo,switchNum:p.switchNum,porta:p.porta,setorNome:setNome(p.setor),obs:p.obs}),
-    chave:o=>String((o.patch||'')+'|'+(o.ponto||'')).trim().toLowerCase(),
+    lista:()=>db.racks,
+    linhaExport:p=>({rack:p.rack,patch:p.patch,ponto:p.ponto,tipo:p.tipo,switchNum:p.switchNum,porta:p.porta,setorNome:setNome(p.setor),obs:p.obs}),
+    chave:o=>String((o.rack||'')+'|'+(o.patch||'')+'|'+(o.ponto||'')).trim().toLowerCase(),
     finalizar(o){
-      if(!o.patch)return null;
+      if(!o.rack||!o.patch)return null;
       o.setor=resolverSetorPorNome(o.setorNome);delete o.setorNome;
       return o;
     },
@@ -2339,14 +2341,6 @@ document.addEventListener('click',e=>{
     input.onchange=()=>{if(input.files[0])importarDadosModulo(chave,input.files[0]);input.value='';};
     input.click();
   }
-});
-
-/* --------- atalho de importação dentro da própria tela de Setores --------- */
-$('#btnImportarSetores').addEventListener('click',()=>$('#fileImportSetores').click());
-$('#fileImportSetores').addEventListener('change',e=>{
-  const f=e.target.files[0];if(!f)return;
-  importarDadosModulo('setores',f);
-  e.target.value='';
 });
 
 /* ================= EMPRÉSTIMOS ================= */
@@ -3054,78 +3048,81 @@ $('#swTbody').addEventListener('click',e=>{
   if(b.dataset.acao==='sw-del')excluirSwitch(s.id);
 });
 
-/* ================= PONTOS DE REDE ================= */
-let prEditId=null;
-$('#prBusca').addEventListener('input',renderPontosRede);
+/* ================= RACKS DE REDES ================= */
+let rkEditId=null;
+$('#rkBusca').addEventListener('input',renderRacks);
 
-let lastResetPr=0;
-$('#formPonto').addEventListener('reset',e=>{const n=Date.now();if(n-lastResetPr<400)return;lastResetPr=n;setTimeout(resetPontoForm,0);});
-function resetPontoForm(){
-  prEditId=null;
-  $('#prPonto').value='';$('#prObs').value='';
-  $('#prPatch').value='';$('#prTipo').value='';$('#prSwitch').value='';$('#prPorta').value='';$('#prSetor').value='';
-  $('#prFormTitle').textContent='Cadastro de ponto de rede';
-  $('#btnPrSubmit').textContent='✔ Salvar ponto';
-  $('#btnPrCancel').style.display='none';
-  $('#cardPrForm').classList.remove('editando');
-  $('#prEditBadge').style.display='none';
+let lastResetRk=0;
+$('#formRack').addEventListener('reset',e=>{const n=Date.now();if(n-lastResetRk<400)return;lastResetRk=n;setTimeout(resetRackForm,0);});
+function resetRackForm(){
+  rkEditId=null;
+  $('#rkPonto').value='';$('#rkObs').value='';
+  $('#rkRack').value='';$('#rkPatch').value='';$('#rkTipo').value='';$('#rkSwitch').value='';$('#rkPorta').value='';$('#rkSetor').value='';
+  $('#rkFormTitle').textContent='Cadastro de ponto de rack';
+  $('#btnRkSubmit').textContent='✔ Salvar ponto';
+  $('#btnRkCancel').style.display='none';
+  $('#cardRkForm').classList.remove('editando');
+  $('#rkEditBadge').style.display='none';
 }
-$('#btnPrCancel').addEventListener('click',resetPontoForm);
+$('#btnRkCancel').addEventListener('click',resetRackForm);
 
-$('#formPonto').addEventListener('submit',ev=>{
+$('#formRack').addEventListener('submit',ev=>{
   ev.preventDefault();
-  const patch=$('#prPatch').value,ponto=$('#prPonto').value.trim(),tipo=$('#prTipo').value,
-        sw=$('#prSwitch').value,porta=$('#prPorta').value,setor=$('#prSetor').value,obs=$('#prObs').value.trim(),
-        id=$('#prId').value;
+  const rack=$('#rkRack').value,patch=$('#rkPatch').value,ponto=$('#rkPonto').value.trim(),tipo=$('#rkTipo').value,
+        sw=$('#rkSwitch').value,porta=$('#rkPorta').value,setor=$('#rkSetor').value,obs=$('#rkObs').value.trim(),
+        id=$('#rkId').value;
+  if(!rack)return toast('Selecione o <b>Rack</b>.','bad');
   if(!patch)return toast('Selecione o <b>Patch Panel</b>.','bad');
   let salvoId=id;
   if(id){
-    const p=db.pontosRede.find(x=>x.id===id);if(!p)return;
-    Object.assign(p,{patch,ponto,tipo,switchNum:sw,porta,setor,obs});
+    const p=db.racks.find(x=>x.id===id);if(!p)return;
+    Object.assign(p,{rack,patch,ponto,tipo,switchNum:sw,porta,setor,obs});
     salvoId=id;
-    toast('Ponto de rede atualizado.');
+    toast('Ponto atualizado.');
   }else{
-    const novo={id:uid(),patch,ponto,tipo,switchNum:sw,porta,setor,obs,criadoEm:Date.now()};
-    db.pontosRede.push(novo);salvoId=novo.id;
-    toast('Ponto de rede cadastrado.');
+    const novo={id:uid(),rack,patch,ponto,tipo,switchNum:sw,porta,setor,obs,criadoEm:Date.now()};
+    db.racks.push(novo);salvoId=novo.id;
+    toast('Ponto cadastrado.');
   }
-  persistir();resetPontoForm();atualizarTudo();destacarLinha('#prTbody',salvoId);
+  persistir();resetRackForm();atualizarTudo();destacarLinha('#rkTbody',salvoId);
 });
 
-function editarPontoRede(id){
-  const p=db.pontosRede.find(x=>x.id===id);if(!p)return;
-  prEditId=id;
-  $('#prId').value=p.id;
-  $('#prPatch').value=p.patch||'';
-  $('#prPonto').value=p.ponto||'';
-  $('#prTipo').value=p.tipo||'';
-  $('#prSwitch').value=p.switchNum||'';
-  $('#prPorta').value=p.porta||'';
-  $('#prSetor').value=p.setor||'';
-  $('#prObs').value=p.obs||'';
-  $('#prFormTitle').textContent='Editando ponto de rede';
-  $('#btnPrSubmit').textContent='✔ Atualizar ponto';
-  $('#btnPrCancel').style.display='inline-flex';
-  $('#cardPrForm').classList.add('editando');
-  $('#prEditBadge').style.display='inline-flex';
-  $('#prEditBadge').textContent='✎ EDITANDO '+(p.ponto||p.patch);
-  rolarTopo();$('#prPatch').focus();
+function editarRack(id){
+  const p=db.racks.find(x=>x.id===id);if(!p)return;
+  rkEditId=id;
+  $('#rkId').value=p.id;
+  $('#rkRack').value=p.rack||'';
+  $('#rkPatch').value=p.patch||'';
+  $('#rkPonto').value=p.ponto||'';
+  $('#rkTipo').value=p.tipo||'';
+  $('#rkSwitch').value=p.switchNum||'';
+  $('#rkPorta').value=p.porta||'';
+  $('#rkSetor').value=p.setor||'';
+  $('#rkObs').value=p.obs||'';
+  $('#rkFormTitle').textContent='Editando ponto';
+  $('#btnRkSubmit').textContent='✔ Atualizar ponto';
+  $('#btnRkCancel').style.display='inline-flex';
+  $('#cardRkForm').classList.add('editando');
+  $('#rkEditBadge').style.display='inline-flex';
+  $('#rkEditBadge').textContent='✎ EDITANDO '+(p.rack||'')+' / '+(p.ponto||p.patch||'');
+  rolarTopo();$('#rkRack').focus();
 }
 
-function excluirPontoRede(id){
-  const p=db.pontosRede.find(x=>x.id===id);if(!p)return;
-  confirmar('Excluir ponto de rede','Excluir este ponto de rede? Esta ação não pode ser desfeita.',()=>{
-    db.pontosRede=db.pontosRede.filter(x=>x.id!==id);
-    persistir();if(prEditId===id)resetPontoForm();atualizarTudo();toast('Ponto de rede excluído.','warn');});
+function excluirRack(id){
+  const p=db.racks.find(x=>x.id===id);if(!p)return;
+  confirmar('Excluir ponto','Excluir este ponto de rack? Esta ação não pode ser desfeita.',()=>{
+    db.racks=db.racks.filter(x=>x.id!==id);
+    persistir();if(rkEditId===id)resetRackForm();atualizarTudo();toast('Ponto excluído.','warn');});
 }
 
-function renderPontosRede(){
-  const busca=($('#prBusca').value||'').toLowerCase();
-  let lista=[...db.pontosRede];
-  if(busca)lista=lista.filter(p=>((p.patch||'')+' '+(p.ponto||'')+' '+(p.tipo||'')+' '+(p.switchNum||'')+' '+(p.porta||'')+' '+(p.obs||'')+' '+setNome(p.setor)).toLowerCase().includes(busca));
-  $('#prTbody').innerHTML=lista.length?lista.map(p=>`
+function renderRacks(){
+  const busca=($('#rkBusca').value||'').toLowerCase();
+  let lista=[...db.racks];
+  if(busca)lista=lista.filter(p=>((p.rack||'')+' '+(p.patch||'')+' '+(p.ponto||'')+' '+(p.tipo||'')+' '+(p.switchNum||'')+' '+(p.porta||'')+' '+(p.obs||'')+' '+setNome(p.setor)).toLowerCase().includes(busca));
+  $('#rkTbody').innerHTML=lista.length?lista.map(p=>`
     <tr data-id="${p.id}">
-      <td><b>${esc(p.patch||'—')}</b></td>
+      <td><b>${esc(p.rack||'—')}</b></td>
+      <td>${esc(p.patch||'—')}</td>
       <td class="mono">${esc(p.ponto||'—')}</td>
       <td>${esc(p.tipo||'—')}</td>
       <td class="mono">${esc(p.switchNum||'—')}</td>
@@ -3133,17 +3130,17 @@ function renderPontosRede(){
       <td>${esc(setNome(p.setor))}</td>
       <td class="subtle">${esc(p.obs||'—')}</td>
       <td class="td-r"><div class="actions">
-        <button class="btn btn-ghost btn-sm" data-acao="pr-edit" data-id="${p.id}">✎ Editar</button>
-        <button class="ibtn bad" title="Excluir" data-acao="pr-del" data-id="${p.id}">${TRASH_SVG}</button>
+        <button class="btn btn-ghost btn-sm" data-acao="rk-edit" data-id="${p.id}">✎ Editar</button>
+        <button class="ibtn bad" title="Excluir" data-acao="rk-del" data-id="${p.id}">${TRASH_SVG}</button>
       </div></td>
-    </tr>`).join(''):'<tr><td colspan="8" class="empty"><span class="big">🔌</span>Nenhum ponto de rede cadastrado.</td></tr>';
-  $('#prResumo').textContent=`${db.pontosRede.length} ponto(s) de rede cadastrado(s)`;
+    </tr>`).join(''):'<tr><td colspan="9" class="empty"><span class="big">🗄️</span>Nenhum ponto cadastrado.</td></tr>';
+  $('#rkResumo').textContent=`${db.racks.length} ponto(s) cadastrado(s)`;
 }
-$('#prTbody').addEventListener('click',e=>{
+$('#rkTbody').addEventListener('click',e=>{
   const b=e.target.closest('[data-acao]');if(!b)return;
-  const p=db.pontosRede.find(x=>x.id===b.dataset.id);if(!p)return;
-  if(b.dataset.acao==='pr-edit')editarPontoRede(p.id);
-  if(b.dataset.acao==='pr-del')excluirPontoRede(p.id);
+  const p=db.racks.find(x=>x.id===b.dataset.id);if(!p)return;
+  if(b.dataset.acao==='rk-edit')editarRack(p.id);
+  if(b.dataset.acao==='rk-del')excluirRack(p.id);
 });
 
 /* ================= LICENÇAS OFFICE 2024 ================= */
@@ -3350,7 +3347,7 @@ $('#fileImport').addEventListener('change',e=>{
     normalizarSetores(d.setores);
     db=d;persistir();garantirModelos();garantirGuias();
     selSig='';
-    resetFormEquip();resetTec();resetSet();resetEmpForm();resetModForm();resetGuiaForm();resetImpForm();resetSwitchForm();resetPontoForm();resetLicencaForm();
+    resetFormEquip();resetTec();resetSet();resetEmpForm();resetModForm();resetGuiaForm();resetImpForm();resetSwitchForm();resetRackForm();resetLicencaForm();
     atualizarTudo();toast('Backup importado com sucesso.');
   }catch(_){toast('Arquivo de backup inválido.','bad');}};
   r.readAsText(f);e.target.value='';
@@ -3366,13 +3363,13 @@ function atualizarBadges(){
   $('#badge-gui').textContent=(db.guias||[]).length;
   $('#badge-imp').textContent=(db.impressoras||[]).length;
   $('#badge-sw').textContent=(db.switches||[]).length;
-  $('#badge-pr').textContent=(db.pontosRede||[]).length;
+  $('#badge-racks').textContent=(db.racks||[]).length;
   $('#badge-lic').textContent=(db.licencas||[]).length;
   $('#badge-tec').textContent=db.tecnicos.length;
   $('#badge-set').textContent=db.setores.length;
 }
 function atualizarTudo(){
-  [preencherSelects,renderModelos,renderEquipamentos,renderTecnicos,renderSetores,renderEmprestimos,renderGuias,renderImpressoras,renderSwitches,renderPontosRede,renderLicencas,renderPlanilhasHub,atualizarCartaoEmp,atualizarBadges]
+  [preencherSelects,renderModelos,renderEquipamentos,renderTecnicos,renderSetores,renderEmprestimos,renderGuias,renderImpressoras,renderSwitches,renderRacks,renderLicencas,renderPlanilhasHub,atualizarCartaoEmp,atualizarBadges]
     .forEach(f=>{try{f();}catch(err){console.error('NII render:',err);}});
   if(currentView==='dashboard'){try{renderDashboard();}catch(err){console.error('NII render:',err);}}
 }
