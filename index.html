@@ -2148,8 +2148,9 @@ function valorCelula(v){
 }
 function normalizarCabecalho(h){return String(h||'').trim().toLowerCase().replace(/\s*\*$/,'');}
 function paraSimNao(v){const s=valorCelula(v).toLowerCase();return s==='sim'||s==='true'||s==='1'||s==='x';}
+function nomeSetorExport(id){const s=setById(id);return s?s.nome:'';}
 function resolverSetorPorNome(nome){
-  nome=(nome||'').trim();if(!nome)return '';
+  nome=(nome||'').trim();if(!nome||nome==='—')return '';
   let s=db.setores.find(x=>String(x.nome||'').trim().toLowerCase()===nome.toLowerCase());
   if(!s){s={id:uid(),nome,contato:'',email:'',endereco:'',fone1:'',fone2:'',rede:'',mascara:'',gateway:'',designacaoRpv:'',designacaoBel:''};db.setores.push(s);}
   return s.id;
@@ -2196,7 +2197,7 @@ const PLANILHA_MODULOS={
     campos:[{h:'Modelo *',f:'modelo'},{h:'Host',f:'host'},{h:'Setor',f:'setorNome'},{h:'IP',f:'ip'},
       {h:'Patrimônio',f:'patrimonio'},{h:'Série',f:'serie'},{h:'Login Web',f:'loginWeb'}],
     lista:()=>db.impressoras,
-    linhaExport:p=>({modelo:p.modelo,host:p.host,setorNome:setNome(p.localSetorId),ip:p.ip,patrimonio:p.patrimonio,serie:p.serie,loginWeb:p.loginWeb}),
+    linhaExport:p=>({modelo:p.modelo,host:p.host,setorNome:nomeSetorExport(p.localSetorId),ip:p.ip,patrimonio:p.patrimonio,serie:p.serie,loginWeb:p.loginWeb}),
     chave:o=>String(o.patrimonio||o.host||'').trim().toLowerCase(),
     finalizar(o){
       if(!o.modelo)return null;
@@ -2210,7 +2211,7 @@ const PLANILHA_MODULOS={
     label:'Switchs NR e IARAS',
     campos:[{h:'Identificação',f:'nome'},{h:'Local',f:'localNome'},{h:'IP *',f:'ip'},{h:'Login',f:'login'},{h:'Senha',f:'senha'}],
     lista:()=>db.switches,
-    linhaExport:s=>({nome:s.nome,localNome:setNome(s.local),ip:s.ip,login:s.login,senha:s.senha}),
+    linhaExport:s=>({nome:s.nome,localNome:nomeSetorExport(s.local),ip:s.ip,login:s.login,senha:s.senha}),
     chave:o=>String(o.ip||'').trim().toLowerCase(),
     finalizar(o){
       if(!o.ip)return null;
@@ -2224,7 +2225,7 @@ const PLANILHA_MODULOS={
     campos:[{h:'Rack *',f:'rack'},{h:'Patch Panel *',f:'patch'},{h:'Ponto',f:'ponto'},{h:'Tipo',f:'tipo'},{h:'Switch',f:'switchNum'},
       {h:'Porta',f:'porta'},{h:'Setor',f:'setorNome'},{h:'Observação',f:'obs'}],
     lista:()=>db.racks,
-    linhaExport:p=>({rack:p.rack,patch:p.patch,ponto:p.ponto,tipo:p.tipo,switchNum:p.switchNum,porta:p.porta,setorNome:setNome(p.setor),obs:p.obs}),
+    linhaExport:p=>({rack:p.rack,patch:p.patch,ponto:p.ponto,tipo:p.tipo,switchNum:p.switchNum,porta:p.porta,setorNome:nomeSetorExport(p.setor),obs:p.obs}),
     chave:o=>String((o.rack||'')+'|'+(o.patch||'')+'|'+(o.ponto||'')).trim().toLowerCase(),
     finalizar(o){
       if(!o.rack||!o.patch)return null;
@@ -2239,7 +2240,7 @@ const PLANILHA_MODULOS={
       {h:'Setor *',f:'setorNome'},{h:'Técnico *',f:'tecnicoNome'},{h:'Data de aquisição',f:'data'},
       {h:'Observação',f:'obs'},{h:'Indisponível (Sim/Não)',f:'indisponivelTxt'},{h:'Emprestável (Sim/Não)',f:'emprestavelTxt'}],
     lista:()=>db.equipamentos,
-    linhaExport:e=>({patrimonio:e.patrimonio,serie:e.serie,tipo:e.tipo,marca:e.marca,setorNome:setNome(e.setorId),
+    linhaExport:e=>({patrimonio:e.patrimonio,serie:e.serie,tipo:e.tipo,marca:e.marca,setorNome:nomeSetorExport(e.setorId),
       tecnicoNome:(db.tecnicos.find(t=>t.id===e.tecnicoId)||{}).nome||'',data:e.data,obs:e.obs,
       indisponivelTxt:e.indisponivel?'Sim':'Não',emprestavelTxt:e.emprestavel===false?'Não':'Sim'}),
     chave:o=>soDigitos(o.patrimonio||''),
