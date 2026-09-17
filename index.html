@@ -994,6 +994,8 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
             <h3>Pontos cadastrados</h3>
             <div class="toolbar">
               <input type="text" id="rkBusca" placeholder="🔍 Buscar rack, patch panel, ponto, tipo, switch, porta, setor…">
+              <button type="button" class="btn btn-ghost btn-sm" id="btnImportarRacksMulti">📥 Importar planilha (abas 5A–6D)</button>
+              <input type="file" id="fileImportRacksMulti" accept=".xlsx,.xls" style="display:none">
             </div>
           </div>
           <div class="card-b flush">
@@ -3141,6 +3143,71 @@ $('#rkTbody').addEventListener('click',e=>{
   const p=db.racks.find(x=>x.id===b.dataset.id);if(!p)return;
   if(b.dataset.acao==='rk-edit')editarRack(p.id);
   if(b.dataset.acao==='rk-del')excluirRack(p.id);
+});
+
+/* --------- Importação especial: planilha com uma aba por rack (5A, 5B, 5C, 5D, 6A, 6B, 6C, 6D) --------- */
+const RACKS_CONHECIDOS=['5A','5B','5C','5D','6A','6B','6C','6D'];
+function normalizarDoisDigitos(v){
+  v=valorCelula(v);if(!v)return '';
+  if(/^\d+$/.test(v))return pad(parseInt(v,10),2);
+  const n=parseFloat(v.replace(',','.'));
+  if(!isNaN(n))return pad(Math.round(n),2);
+  return v;
+}
+function normalizarPatchPanel(v){
+  v=valorCelula(v);if(!v)return '';
+  if(/^telef/i.test(v))return 'Telefonia';
+  return normalizarDoisDigitos(v);
+}
+function normalizarTipoRack(v){
+  const s=valorCelula(v).toLowerCase();
+  if(s.startsWith('rede'))return 'Rede';
+  if(s.startsWith('telef'))return 'Telefone';
+  if(s.startsWith('não')||s.startsWith('nao'))return 'Não Identificado';
+  return '';
+}
+$('#btnImportarRacksMulti').addEventListener('click',()=>$('#fileImportRacksMulti').click());
+$('#fileImportRacksMulti').addEventListener('change',e=>{
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=ev=>{
+    try{
+      const wb=XLSX.read(ev.target.result,{type:'array'});
+      let novos=0,atualizados=0,ignorados=0,abasLidas=0;
+      RACKS_CONHECIDOS.forEach(rackNome=>{
+        const abaReal=wb.SheetNames.find(n=>n.trim().toLowerCase()===rackNome.toLowerCase());
+        if(!abaReal)return;
+        abasLidas++;
+        const linhas=XLSX.utils.sheet_to_json(wb.Sheets[abaReal],{defval:''});
+        linhas.forEach(linha=>{
+          const ponto=valorCelula(linha['PONTO']);
+          const patch=normalizarPatchPanel(linha['PP']);
+          if(!ponto&&!patch){ignorados++;return;}
+          if(!patch){ignorados++;return;}
+          let obs=valorCelula(linha['OBS']);
+          const ppTel=valorCelula(linha['PP TELEFONIA']),fone=valorCelula(linha['FONE']);
+          if(ppTel||fone){const extra='Ramal: '+ppTel+(fone?' · Fone: '+fone:'');obs=obs?obs+' — '+extra:extra;}
+          const registro={
+            rack:rackNome,patch,ponto,
+            tipo:normalizarTipoRack(linha['TIPO']),
+            switchNum:normalizarDoisDigitos(linha['SW']),
+            porta:normalizarDoisDigitos(linha['PORTA']),
+            setor:resolverSetorPorNome(valorCelula(linha['SETOR'])),
+            obs
+          };
+          const chaveVal=String((registro.rack+'|'+registro.patch+'|'+registro.ponto)).toLowerCase();
+          const existente=db.racks.find(x=>String(((x.rack||'')+'|'+(x.patch||'')+'|'+(x.ponto||''))).toLowerCase()===chaveVal);
+          if(existente){Object.assign(existente,registro);atualizados++;}
+          else{db.racks.push(Object.assign({id:uid(),criadoEm:Date.now()},registro));novos++;}
+        });
+      });
+      if(!abasLidas){toast('Não encontrei nenhuma aba com nome de rack (5A, 5B, 5C, 5D, 6A, 6B, 6C ou 6D) nesse arquivo.','bad');return;}
+      persistir();atualizarTudo();
+      toast(`Importação de Racks concluída: <b>${abasLidas}</b> aba(s) lida(s), <b>${novos}</b> novo(s), <b>${atualizados}</b> atualizado(s)`+(ignorados?`, ${ignorados} ignorado(s)`:'')+'.');
+    }catch(err){console.error(err);toast('Não foi possível ler essa planilha. Verifique se as abas têm os nomes 5A, 5B, 5C, 5D, 6A, 6B, 6C ou 6D.','bad');}
+    e.target.value='';
+  };
+  r.readAsArrayBuffer(f);
 });
 
 /* ================= LICENÇAS OFFICE 2024 ================= */
