@@ -323,10 +323,9 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
           <span>Equipamentos</span> <span class="nav-badge" id="badge-eq">0</span><span class="nav-chevron">▸</span>
         </button>
         <div class="nav-submenu" id="equipamentosSubmenu">
+          <button class="nav-subitem" type="button" data-view="equipamentos" data-eq-tab="catalogo">Catálogo de Equipamentos</button>
           <button class="nav-subitem" type="button" data-view="equipamentos" data-eq-tab="cadastro">Cadastro de Equipamento</button>
           <button class="nav-subitem" type="button" data-view="equipamentos" data-eq-tab="cadastrados">Equipamentos Cadastrados</button>
-          <button class="nav-subitem" type="button" data-view="equipamentos" data-eq-tab="movimentacao">Movimentação de Equipamentos</button>
-          <button class="nav-subitem" type="button" data-view="equipamentos" data-eq-tab="manutencao">Manutenção / Histórico</button>
         </div>
       </div>
       <button class="nav-item" data-view="emprestimos">
@@ -1642,7 +1641,7 @@ function showView(v){
     if(!db.setores.length)toast('Cadastre ao menos um <b>setor</b> antes de emitir guias.','warn');
   }
   if(v==='licencas'&&!document.querySelector('.nav-subitem.active'))setLicTab('cadastro');
-  if(v==='equipamentos'){requestAnimationFrame(()=>{if(!$('#eqData').value)$('#eqData').value=hojeISO();});if(!document.querySelector('#navEquipamentosGroup .nav-subitem.active'))setEqTab('cadastro');}
+  if(v==='equipamentos'){requestAnimationFrame(()=>{if(!$('#eqData').value)$('#eqData').value=hojeISO();});if(!document.querySelector('#navEquipamentosGroup .nav-subitem.active'))setEqTab('catalogo');}
 }
 function setLicTab(tab){
   $$('.lic-panel').forEach(p=>p.style.display='none');
@@ -1651,11 +1650,13 @@ function setLicTab(tab){
   $$('.nav-subitem').forEach(b=>b.classList.toggle('active',b.dataset.licTab===tab));
 }
 function setEqTab(tab){
-  $$('.eq-panel').forEach(p=>p.style.display='none');
-  if(tab==='cadastro')$('#cardEqForm').style.display='block';
+  $$('#view-equipamentos .card').forEach(p=>p.style.display='none');
+  if(tab==='catalogo')$('#cardModForm').style.display='block';
   else if(tab==='cadastrados')$('#cardEqLista').style.display='block';
-  else { $('#cardEqLista').style.display='block'; toast(tab==='movimentacao'?'A movimentação será organizada nesta seção.':'O histórico de manutenção será organizado nesta seção.','warn'); }
+  else $('#cardEqForm').style.display='block';
   $$('#navEquipamentosGroup .nav-subitem').forEach(b=>b.classList.toggle('active',b.dataset.eqTab===tab));
+}
+$$('#navEquipamentosGroup .nav-subitem').forEach(b=>b.classList.toggle('active',b.dataset.eqTab===tab));
 }
 $$('#navEquipamentosGroup .nav-subitem').forEach(b=>b.addEventListener('click',()=>{
   const g=$('#navEquipamentosGroup');g.classList.add('aberto');g.querySelector('.nav-parent').setAttribute('aria-expanded','true');
