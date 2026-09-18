@@ -290,8 +290,6 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
   .sidebar nav.aberto{display:flex}
   .nav-item{border-left:3px solid transparent;border-bottom:none;white-space:normal;padding:13px 20px}
   .nav-item.active{border-left-color:var(--accent);background:linear-gradient(90deg,rgba(255,140,26,.16),rgba(255,140,26,.02))}
-.nav-group{display:block}.nav-parent{width:100%;display:flex;align-items:center;gap:10px}.nav-parent .nav-chevron{margin-left:auto;transition:transform .2s}.nav-group.aberto .nav-chevron{transform:rotate(90deg)}.nav-submenu{display:none;padding:0 0 6px 18px}.nav-group.aberto .nav-submenu{display:block}.nav-subitem{display:block;width:100%;text-align:left;background:none;border:0;color:var(--muted);padding:9px 12px;font-size:12px;cursor:pointer;border-left:2px solid transparent}.nav-subitem:hover,.nav-subitem.active{color:var(--text);border-left-color:var(--accent);background:rgba(255,140,26,.08)}
-
   .nav-sep{display:block}
   .side-foot{display:none}
   .sair-mobile{display:flex !important;margin-top:6px;border-top:1px solid rgba(255,255,255,.08);color:#ff9d9d}
@@ -317,17 +315,10 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
         Painel
       </button>
-      <div class="nav-group" id="navEquipamentosGroup">
-        <button class="nav-item nav-parent" type="button" aria-expanded="false" aria-controls="equipamentosSubmenu">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-          <span>Equipamentos</span> <span class="nav-badge" id="badge-eq">0</span><span class="nav-chevron">▸</span>
-        </button>
-        <div class="nav-submenu" id="equipamentosSubmenu">
-          <button class="nav-subitem" type="button" data-view="equipamentos" data-eq-tab="catalogo">Catálogo de Equipamentos</button>
-          <button class="nav-subitem" type="button" data-view="equipamentos" data-eq-tab="cadastro">Cadastro de Equipamento</button>
-          <button class="nav-subitem" type="button" data-view="equipamentos" data-eq-tab="cadastrados">Equipamentos Cadastrados</button>
-        </div>
-      </div>
+      <button class="nav-item" data-view="equipamentos">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+        Equipamentos <span class="nav-badge" id="badge-eq">0</span>
+      </button>
       <button class="nav-item" data-view="emprestimos">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 16V4M7 4L3 8M7 4l4 4M17 8v12M17 20l4-4M17 20l-4-4"/></svg>
         Empréstimos <span class="nav-badge" id="badge-emp">0</span>
@@ -498,7 +489,7 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
           </div>
         </div>
 
-        <div class="card eq-panel" id="cardEqForm">
+        <div class="card" id="cardEqForm">
           <div class="card-h">
             <h3 id="eqFormTitle">2 · Cadastro de unidade (patrimônio)</h3>
             <span class="pill warn" id="eqEditBadge" style="display:none">✎ EDITANDO</span>
@@ -556,7 +547,7 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
           </div>
         </div>
 
-        <div class="card eq-panel" id="cardEqLista">
+        <div class="card">
           <div class="card-h">
             <h3>Equipamentos cadastrados (unidades)</h3>
             <div class="toolbar">
@@ -1641,7 +1632,7 @@ function showView(v){
     if(!db.setores.length)toast('Cadastre ao menos um <b>setor</b> antes de emitir guias.','warn');
   }
   if(v==='licencas'&&!document.querySelector('.nav-subitem.active'))setLicTab('cadastro');
-  if(v==='equipamentos'){requestAnimationFrame(()=>{if(!$('#eqData').value)$('#eqData').value=hojeISO();});if(!document.querySelector('#navEquipamentosGroup .nav-subitem.active'))setEqTab('catalogo');}
+  if(v==='equipamentos')requestAnimationFrame(()=>{if(!$('#eqData').value)$('#eqData').value=hojeISO();});
 }
 function setLicTab(tab){
   $$('.lic-panel').forEach(p=>p.style.display='none');
@@ -1649,20 +1640,6 @@ function setLicTab(tab){
   $(alvo).style.display='block';
   $$('.nav-subitem').forEach(b=>b.classList.toggle('active',b.dataset.licTab===tab));
 }
-function setEqTab(tab){
-  $$('#view-equipamentos .card').forEach(p=>p.style.display='none');
-  if(tab==='catalogo')$('#cardModForm').style.display='block';
-  else if(tab==='cadastrados')$('#cardEqLista').style.display='block';
-  else $('#cardEqForm').style.display='block';
-  $$('#navEquipamentosGroup .nav-subitem').forEach(b=>b.classList.toggle('active',b.dataset.eqTab===tab));
-}
-$$('#navEquipamentosGroup .nav-subitem').forEach(b=>b.classList.toggle('active',b.dataset.eqTab===tab));
-}
-$$('#navEquipamentosGroup .nav-subitem').forEach(b=>b.addEventListener('click',()=>{
-  const g=$('#navEquipamentosGroup');g.classList.add('aberto');g.querySelector('.nav-parent').setAttribute('aria-expanded','true');
-  showView('equipamentos');setEqTab(b.dataset.eqTab);fecharMenuMobile();
-}));
-$('#navEquipamentosGroup .nav-parent').addEventListener('click',()=>{const g=$('#navEquipamentosGroup');const aberto=g.classList.toggle('aberto');g.querySelector('.nav-parent').setAttribute('aria-expanded',aberto?'true':'false');});
 $$('.nav-subitem').forEach(b=>b.addEventListener('click',()=>{
   const g=$('#navLicencasGroup'); g.classList.add('aberto'); g.querySelector('.nav-parent').setAttribute('aria-expanded','true');
   showView('licencas'); setLicTab(b.dataset.licTab); fecharMenuMobile();
