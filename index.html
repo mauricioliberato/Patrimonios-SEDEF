@@ -49,7 +49,7 @@ body.logado .app{display:flex}
 .nav-item svg{width:18px;height:18px;flex:0 0 18px;opacity:.85}
 .nav-item:hover{background:rgba(255,255,255,.05);color:#fff}
 .nav-item.active{background:linear-gradient(90deg,rgba(255,140,26,.16),rgba(255,140,26,.02));border-left-color:var(--accent);color:#fff}
-.nav-badge{margin-left:auto;font:600 11px var(--mono);background:rgba(255,255,255,.10);color:#cfe0ec;padding:2px 8px;border-radius:999px;min-width:26px;text-align:center}
+.nav-group{width:100%}.nav-parent{gap:10px}.nav-parent .nav-chevron{margin-left:auto;font-size:15px;transition:transform .16s}.nav-group.aberto .nav-chevron{transform:rotate(90deg)}.nav-submenu{display:none;padding:2px 0 6px 33px}.nav-group.aberto .nav-submenu{display:block}.nav-subitem{display:block;width:100%;padding:9px 18px;background:none;border:0;border-left:2px solid transparent;color:#9fb3c2;font:500 12.5px var(--body);text-align:left;cursor:pointer}.nav-subitem:hover{color:#fff;background:rgba(255,255,255,.05)}.nav-subitem.active{color:#fff;border-left-color:var(--accent);background:rgba(255,140,26,.10)}.nav-badge{margin-left:auto;font:600 11px var(--mono);background:rgba(255,255,255,.10);color:#cfe0ec;padding:2px 8px;border-radius:999px;min-width:26px;text-align:center}
 .side-foot{padding:14px 18px;border-top:1px solid rgba(255,255,255,.07);display:flex;flex-direction:column;gap:8px}
 .side-foot small{font-size:10.5px;color:#5d7891;line-height:1.5}
 .side-foot .row{display:flex;gap:8px}
@@ -339,10 +339,16 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="1.5"/><path d="M8 6h.01M8 10h.01M8 14h.01M8 18h.01M12 6h4M12 10h4M12 14h4M12 18h4"/></svg>
         Racks de Redes <span class="nav-badge" id="badge-racks">0</span>
       </button>
-      <button class="nav-item" data-view="licencas">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 10h5M7 14h3"/><circle cx="17" cy="11" r="2"/><path d="M17 13v3l-1.2-.9-1.2.9v-3"/></svg>
-        Licenças Office 2024 <span class="nav-badge" id="badge-lic">0</span>
-      </button>
+      <div class="nav-group" id="navLicencasGroup">
+        <button class="nav-item nav-parent" type="button" aria-expanded="false" aria-controls="licencasSubmenu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 10h5M7 14h3"/><circle cx="17" cy="11" r="2"/><path d="M17 13v3l-1.2-.9-1.2.9v-3"/></svg>
+          <span>Licenças Office 2024</span><span class="nav-badge" id="badge-lic">0</span><span class="nav-chevron">▸</span>
+        </button>
+        <div class="nav-submenu" id="licencasSubmenu">
+          <button class="nav-subitem" type="button" data-view="licencas" data-lic-tab="cadastro">Cadastro de Licença</button>
+          <button class="nav-subitem" type="button" data-view="licencas" data-lic-tab="cadastradas">Licenças Cadastradas</button>
+        </div>
+      </div>
       <div class="nav-sep">Cadastros auxiliares</div>
       <button class="nav-item" data-view="tecnicos">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5"/></svg>
@@ -1014,7 +1020,7 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
 
       <!-- ========== LICENÇAS OFFICE 2024 ========== -->
       <section class="view" id="view-licencas">
-        <div class="card" id="cardLicForm">
+        <div class="card lic-panel" id="cardLicForm">
           <div class="card-h">
             <h3 id="licFormTitle">Cadastro de licença</h3>
             <span class="pill warn" id="licEditBadge" style="display:none">✎ EDITANDO</span>
@@ -1025,7 +1031,7 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
               <input type="hidden" id="licId">
               <div class="fgrid">
                 <div class="field c4">
-                  <label>Hostname <b>*</b></label>
+                  <label>Hostname</label>
                   <input type="text" id="licHost" class="mono" placeholder="Ex.: SEDEF-NII-07">
                 </div>
                 <div class="field c4">
@@ -1050,7 +1056,7 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
           </div>
         </div>
 
-        <div class="card">
+        <div class="card lic-panel" id="cardLicLista">
           <div class="card-h">
             <h3>Licenças cadastradas</h3>
             <div class="toolbar">
@@ -1625,8 +1631,22 @@ function showView(v){
     requestAnimationFrame(()=>{sigGuia.resize();sigGuiaPat.resize();sigGuiaDest.resize();});
     if(!db.setores.length)toast('Cadastre ao menos um <b>setor</b> antes de emitir guias.','warn');
   }
+  if(v==='licencas'&&!document.querySelector('.nav-subitem.active'))setLicTab('cadastro');
   if(v==='equipamentos')requestAnimationFrame(()=>{if(!$('#eqData').value)$('#eqData').value=hojeISO();});
 }
+function setLicTab(tab){
+  $$('.lic-panel').forEach(p=>p.style.display='none');
+  const alvo=tab==='cadastradas'?'#cardLicLista':'#cardLicForm';
+  $(alvo).style.display='block';
+  $$('.nav-subitem').forEach(b=>b.classList.toggle('active',b.dataset.licTab===tab));
+}
+$$('.nav-subitem').forEach(b=>b.addEventListener('click',()=>{
+  const g=$('#navLicencasGroup'); g.classList.add('aberto'); g.querySelector('.nav-parent').setAttribute('aria-expanded','true');
+  showView('licencas'); setLicTab(b.dataset.licTab); fecharMenuMobile();
+}));
+$('#navLicencasGroup .nav-parent').addEventListener('click',()=>{
+  const g=$('#navLicencasGroup'); const aberto=g.classList.toggle('aberto'); g.querySelector('.nav-parent').setAttribute('aria-expanded',aberto?'true':'false');
+});
 $$('.nav-item:not(.sair-mobile)').forEach(b=>b.addEventListener('click',()=>{showView(b.dataset.view);fecharMenuMobile();}));
 $('#btnMenuMobile').addEventListener('click',()=>{
   const aberto=$('#navPrincipal').classList.toggle('aberto');
@@ -3232,7 +3252,7 @@ $('#formLicenca').addEventListener('submit',ev=>{
   ev.preventDefault();
   const host=$('#licHost').value.trim(),chave=$('#licChave').value.trim(),
         email=$('#licEmail').value.trim(),obs=$('#licObs').value.trim(),id=$('#licId').value;
-  if(!host)return toast('Informe o <b>Hostname</b>.','bad');
+  
   if(db.licencas.some(l=>String(l.host||'').toLowerCase()===host.toLowerCase()&&l.id!==id))
     return toast('Já existe uma licença cadastrada para o hostname <b class="mono">'+esc(host)+'</b>.','bad');
   if(chave&&db.licencas.some(l=>String(l.chave||'').toLowerCase()===chave.toLowerCase()&&l.id!==id))
