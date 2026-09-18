@@ -2279,11 +2279,18 @@ const PLANILHA_MODULOS={
   },
   licencas:{
     label:'Licenças Office 2024',
-    campos:[{h:'Hostname *',f:'host'},{h:'Chave',f:'chave'},{h:'E-mail Vinculado',f:'email'},{h:'Observação',f:'obs'}],
+    campos:[{h:'Hostname',f:'host'},{h:'Chave',f:'chave'},{h:'E-mail Vinculado',f:'email'},{h:'Observação',f:'obs'}],
     lista:()=>db.licencas,
     linhaExport:l=>({host:l.host,chave:l.chave,email:l.email,obs:l.obs}),
-    chave:o=>String(o.host||'').trim().toLowerCase(),
-    finalizar(o){if(!o.host)return null;return o;},
+    chave:o=>String(o.chave||'').trim().toLowerCase(),
+    finalizar(o){
+      o.host=valorCelula(o.host);
+      o.chave=valorCelula(o.chave);
+      o.email=valorCelula(o.email);
+      o.obs=valorCelula(o.obs);
+      if(!o.chave)return null;
+      return o;
+    },
     novo:o=>Object.assign({id:uid(),criadoEm:Date.now()},o)
   }
 };
