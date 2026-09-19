@@ -342,10 +342,16 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="8" rx="1.5"/><path d="M6 18v2M10 18v2M14 18v2M18 18v2"/><circle cx="6" cy="10" r=".6" fill="currentColor" stroke="none"/><circle cx="9" cy="10" r=".6" fill="currentColor" stroke="none"/></svg>
         Switchs NR e IARAS <span class="nav-badge" id="badge-sw">0</span>
       </button>
-      <button class="nav-item" data-view="racks">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="1.5"/><path d="M8 6h.01M8 10h.01M8 14h.01M8 18h.01M12 6h4M12 10h4M12 14h4M12 18h4"/></svg>
-        Racks de Redes <span class="nav-badge" id="badge-racks">0</span>
-      </button>
+      <div class="nav-group" id="navRacksGroup">
+        <button class="nav-item nav-parent" type="button" aria-expanded="false" aria-controls="racksSubmenu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="1.5"/><path d="M8 6h.01M8 10h.01M8 14h.01M8 18h.01M12 6h4M12 10h4M12 14h4M12 18h4"/></svg>
+          <span>Racks de Redes</span><span class="nav-badge" id="badge-racks">0</span><span class="nav-chevron">▸</span>
+        </button>
+        <div class="nav-submenu" id="racksSubmenu">
+          <button class="nav-subitem" type="button" data-view="racks" data-rk-tab="lista">Pontos cadastrados</button>
+          <button class="nav-subitem" type="button" data-view="racks" data-rk-tab="cadastro">Cadastro de ponto de rack</button>
+        </div>
+      </div>
       <div class="nav-group" id="navLicencasGroup">
         <button class="nav-item nav-parent" type="button" aria-expanded="false" aria-controls="licencasSubmenu">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 10h5M7 14h3"/><circle cx="17" cy="11" r="2"/><path d="M17 13v3l-1.2-.9-1.2.9v-3"/></svg>
@@ -950,7 +956,29 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
 
       <!-- ========== PONTOS DE REDE ========== -->
       <section class="view" id="view-racks">
-        <div class="card" id="cardRkForm">
+        <div class="card rk-panel" id="cardRkLista">
+          <div class="card-h">
+            <h3>Pontos cadastrados</h3>
+            <div class="toolbar">
+              <input type="text" id="rkBusca" placeholder="🔍 Buscar rack, patch panel, ponto, tipo, switch, porta, setor…">
+              <button type="button" class="btn btn-ghost btn-sm" id="btnImportarRacksMulti">📥 Importar planilha (abas 5A–6D)</button>
+              <input type="file" id="fileImportRacksMulti" accept=".xlsx,.xls" style="display:none">
+            </div>
+          </div>
+          <div class="card-b flush">
+            <div class="table-wrap">
+              <table>
+                <thead><tr>
+                  <th>Rack</th><th>Patch Panel</th><th>Ponto</th><th>Tipo</th><th>Switch</th><th>Porta</th><th>Setor</th><th>Observação</th><th class="td-r">Ações</th>
+                </tr></thead>
+                <tbody id="rkTbody"></tbody>
+              </table>
+            </div>
+          </div>
+          <div style="padding:10px 20px;border-top:1px solid var(--line)"><span class="subtle" id="rkResumo"></span></div>
+        </div>
+
+        <div class="card rk-panel" id="cardRkForm" style="display:none">
           <div class="card-h">
             <h3 id="rkFormTitle">Cadastro de ponto de rack</h3>
             <span class="pill warn" id="rkEditBadge" style="display:none">✎ EDITANDO</span>
@@ -1000,28 +1028,6 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
               </div>
             </form>
           </div>
-        </div>
-
-        <div class="card">
-          <div class="card-h">
-            <h3>Pontos cadastrados</h3>
-            <div class="toolbar">
-              <input type="text" id="rkBusca" placeholder="🔍 Buscar rack, patch panel, ponto, tipo, switch, porta, setor…">
-              <button type="button" class="btn btn-ghost btn-sm" id="btnImportarRacksMulti">📥 Importar planilha (abas 5A–6D)</button>
-              <input type="file" id="fileImportRacksMulti" accept=".xlsx,.xls" style="display:none">
-            </div>
-          </div>
-          <div class="card-b flush">
-            <div class="table-wrap">
-              <table>
-                <thead><tr>
-                  <th>Rack</th><th>Patch Panel</th><th>Ponto</th><th>Tipo</th><th>Switch</th><th>Porta</th><th>Setor</th><th>Observação</th><th class="td-r">Ações</th>
-                </tr></thead>
-                <tbody id="rkTbody"></tbody>
-              </table>
-            </div>
-          </div>
-          <div style="padding:10px 20px;border-top:1px solid var(--line)"><span class="subtle" id="rkResumo"></span></div>
         </div>
       </section>
 
@@ -1639,6 +1645,7 @@ function showView(v){
     if(!db.setores.length)toast('Cadastre ao menos um <b>setor</b> antes de emitir guias.','warn');
   }
   if(v==='licencas'&&!document.querySelector('#licencasSubmenu .nav-subitem.active'))setLicTab('cadastro');
+  if(v==='racks'&&!document.querySelector('#racksSubmenu .nav-subitem.active'))setRkTab('lista');
   if(v==='equipamentos'){
     if(!document.querySelector('#equipamentosSubmenu .nav-subitem.active'))setEqTab('lista');
     requestAnimationFrame(()=>{if(!$('#eqData').value)$('#eqData').value=hojeISO();});
@@ -1649,6 +1656,12 @@ function setLicTab(tab){
   const alvo=tab==='cadastradas'?'#cardLicLista':'#cardLicForm';
   $(alvo).style.display='block';
   $$('#licencasSubmenu .nav-subitem').forEach(b=>b.classList.toggle('active',b.dataset.licTab===tab));
+}
+function setRkTab(tab){
+  $$('.rk-panel').forEach(p=>p.style.display='none');
+  const alvo=tab==='cadastro'?'#cardRkForm':'#cardRkLista';
+  $(alvo).style.display='block';
+  $$('#racksSubmenu .nav-subitem').forEach(b=>b.classList.toggle('active',b.dataset.rkTab===tab));
 }
 function setEqTab(tab){
   $$('.eq-panel').forEach(p=>p.style.display='none');
@@ -1662,6 +1675,7 @@ $$('.nav-subitem').forEach(b=>b.addEventListener('click',()=>{
   showView(b.dataset.view);
   if(b.dataset.licTab)setLicTab(b.dataset.licTab);
   if(b.dataset.eqTab)setEqTab(b.dataset.eqTab);
+  if(b.dataset.rkTab)setRkTab(b.dataset.rkTab);
   fecharMenuMobile();
 }));
 $$('.nav-group .nav-parent').forEach(p=>p.addEventListener('click',()=>{
