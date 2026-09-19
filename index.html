@@ -315,10 +315,17 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
         Painel
       </button>
-      <button class="nav-item" data-view="equipamentos">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-        Equipamentos <span class="nav-badge" id="badge-eq">0</span>
-      </button>
+      <div class="nav-group" id="navEquipamentosGroup">
+        <button class="nav-item nav-parent" type="button" aria-expanded="false" aria-controls="equipamentosSubmenu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+          <span>Equipamentos</span><span class="nav-badge" id="badge-eq">0</span><span class="nav-chevron">▸</span>
+        </button>
+        <div class="nav-submenu" id="equipamentosSubmenu">
+          <button class="nav-subitem" type="button" data-view="equipamentos" data-eq-tab="lista">Equipamentos cadastrados (unidades)</button>
+          <button class="nav-subitem" type="button" data-view="equipamentos" data-eq-tab="catalogo">1 · Catálogo de equipamentos (modelo)</button>
+          <button class="nav-subitem" type="button" data-view="equipamentos" data-eq-tab="cadastro">2 · Cadastro de unidade (patrimônio)</button>
+        </div>
+      </div>
       <button class="nav-item" data-view="emprestimos">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 16V4M7 4L3 8M7 4l4 4M17 8v12M17 20l4-4M17 20l-4-4"/></svg>
         Empréstimos <span class="nav-badge" id="badge-emp">0</span>
@@ -450,7 +457,33 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
       <!-- ========== EQUIPAMENTOS ========== -->
       <section class="view" id="view-equipamentos">
 
-        <div class="card" id="cardModForm">
+        <div class="card eq-panel" id="cardEqLista">
+          <div class="card-h">
+            <h3>Equipamentos cadastrados (unidades)</h3>
+            <div class="toolbar">
+              <input type="text" id="eqBusca" placeholder="🔍 Buscar patrimônio, série, obs…">
+              <select id="eqFiltroTipo"></select>
+              <select id="eqFiltroStatus">
+                <option value="">Todos os status</option>
+                <option>Disponível</option><option>Reservado</option><option>Indisponível</option>
+                <option value="naoEmp">Não emprestáveis</option>
+              </select>
+            </div>
+          </div>
+          <div class="card-b flush">
+            <div class="table-wrap">
+              <table>
+                <thead><tr>
+                  <th>Patrimônio</th><th>Série</th><th>Equipamento</th><th>Setor</th><th>Técnico</th><th>Status</th><th>Data</th><th class="td-r">Ações</th>
+                </tr></thead>
+                <tbody id="eqTbody"></tbody>
+              </table>
+            </div>
+          </div>
+          <div style="padding:10px 20px;border-top:1px solid var(--line)"><span class="subtle" id="eqResumo"></span></div>
+        </div>
+
+        <div class="card eq-panel" id="cardModForm" style="display:none">
           <div class="card-h">
             <h3 id="modFormTitle">1 · Catálogo de equipamentos (modelo)</h3>
             <span class="pill warn" id="modEditBadge" style="display:none">✎ EDITANDO</span>
@@ -489,11 +522,11 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
           </div>
         </div>
 
-        <div class="card" id="cardEqForm">
+        <div class="card eq-panel" id="cardEqForm" style="display:none">
           <div class="card-h">
             <h3 id="eqFormTitle">2 · Cadastro de unidade (patrimônio)</h3>
             <span class="pill warn" id="eqEditBadge" style="display:none">✎ EDITANDO</span>
-            <span class="sub">Vincule o patrimônio a um modelo do catálogo · campos com <b style="color:var(--bad)">*</b> são obrigatórios</span>
+            <span class="sub">Vincule o patrimônio a um modelo do catálogo · apenas o <b style="color:var(--bad)">Nº de Patrimônio</b> é obrigatório</span>
           </div>
           <div class="card-b">
             <form id="formEquip" autocomplete="off">
@@ -509,20 +542,20 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
                   <input type="text" id="eqSerie" class="mono" placeholder="S/N">
                 </div>
                 <div class="field c4">
-                  <label>Modelo cadastrado <b>*</b></label>
+                  <label>Modelo cadastrado</label>
                   <select id="eqModelo"></select>
-                  <span class="hint"><span class="dot"></span>Não achou o modelo? Cadastre-o no catálogo acima.</span>
+                  <span class="hint"><span class="dot"></span>Não achou o modelo? Cadastre-o no catálogo.</span>
                 </div>
                 <div class="field c2">
                   <label>Data</label>
                   <input type="date" id="eqData">
                 </div>
                 <div class="field c5">
-                  <label>Setor <b>*</b></label>
+                  <label>Setor</label>
                   <select id="eqSetor"></select>
                 </div>
                 <div class="field c5">
-                  <label>Técnico responsável <b>*</b></label>
+                  <label>Técnico responsável</label>
                   <select id="eqTecnico"></select>
                 </div>
                 <div class="field c2">
@@ -545,32 +578,6 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
               </div>
             </form>
           </div>
-        </div>
-
-        <div class="card">
-          <div class="card-h">
-            <h3>Equipamentos cadastrados (unidades)</h3>
-            <div class="toolbar">
-              <input type="text" id="eqBusca" placeholder="🔍 Buscar patrimônio, série, obs…">
-              <select id="eqFiltroTipo"></select>
-              <select id="eqFiltroStatus">
-                <option value="">Todos os status</option>
-                <option>Disponível</option><option>Reservado</option><option>Indisponível</option>
-                <option value="naoEmp">Não emprestáveis</option>
-              </select>
-            </div>
-          </div>
-          <div class="card-b flush">
-            <div class="table-wrap">
-              <table>
-                <thead><tr>
-                  <th>Patrimônio</th><th>Série</th><th>Equipamento</th><th>Setor</th><th>Técnico</th><th>Status</th><th>Data</th><th class="td-r">Ações</th>
-                </tr></thead>
-                <tbody id="eqTbody"></tbody>
-              </table>
-            </div>
-          </div>
-          <div style="padding:10px 20px;border-top:1px solid var(--line)"><span class="subtle" id="eqResumo"></span></div>
         </div>
       </section>
 
@@ -1631,22 +1638,35 @@ function showView(v){
     requestAnimationFrame(()=>{sigGuia.resize();sigGuiaPat.resize();sigGuiaDest.resize();});
     if(!db.setores.length)toast('Cadastre ao menos um <b>setor</b> antes de emitir guias.','warn');
   }
-  if(v==='licencas'&&!document.querySelector('.nav-subitem.active'))setLicTab('cadastro');
-  if(v==='equipamentos')requestAnimationFrame(()=>{if(!$('#eqData').value)$('#eqData').value=hojeISO();});
+  if(v==='licencas'&&!document.querySelector('#licencasSubmenu .nav-subitem.active'))setLicTab('cadastro');
+  if(v==='equipamentos'){
+    if(!document.querySelector('#equipamentosSubmenu .nav-subitem.active'))setEqTab('lista');
+    requestAnimationFrame(()=>{if(!$('#eqData').value)$('#eqData').value=hojeISO();});
+  }
 }
 function setLicTab(tab){
   $$('.lic-panel').forEach(p=>p.style.display='none');
   const alvo=tab==='cadastradas'?'#cardLicLista':'#cardLicForm';
   $(alvo).style.display='block';
-  $$('.nav-subitem').forEach(b=>b.classList.toggle('active',b.dataset.licTab===tab));
+  $$('#licencasSubmenu .nav-subitem').forEach(b=>b.classList.toggle('active',b.dataset.licTab===tab));
+}
+function setEqTab(tab){
+  $$('.eq-panel').forEach(p=>p.style.display='none');
+  const mapa={lista:'#cardEqLista',catalogo:'#cardModForm',cadastro:'#cardEqForm'};
+  $(mapa[tab]||'#cardEqLista').style.display='block';
+  $$('#equipamentosSubmenu .nav-subitem').forEach(b=>b.classList.toggle('active',b.dataset.eqTab===tab));
 }
 $$('.nav-subitem').forEach(b=>b.addEventListener('click',()=>{
-  const g=$('#navLicencasGroup'); g.classList.add('aberto'); g.querySelector('.nav-parent').setAttribute('aria-expanded','true');
-  showView('licencas'); setLicTab(b.dataset.licTab); fecharMenuMobile();
+  const g=b.closest('.nav-group');
+  if(g){g.classList.add('aberto');g.querySelector('.nav-parent').setAttribute('aria-expanded','true');}
+  showView(b.dataset.view);
+  if(b.dataset.licTab)setLicTab(b.dataset.licTab);
+  if(b.dataset.eqTab)setEqTab(b.dataset.eqTab);
+  fecharMenuMobile();
 }));
-$('#navLicencasGroup .nav-parent').addEventListener('click',()=>{
-  const g=$('#navLicencasGroup'); const aberto=g.classList.toggle('aberto'); g.querySelector('.nav-parent').setAttribute('aria-expanded',aberto?'true':'false');
-});
+$$('.nav-group .nav-parent').forEach(p=>p.addEventListener('click',()=>{
+  const g=p.closest('.nav-group'); const aberto=g.classList.toggle('aberto'); p.setAttribute('aria-expanded',aberto?'true':'false');
+}));
 $$('.nav-item:not(.sair-mobile)').forEach(b=>b.addEventListener('click',()=>{showView(b.dataset.view);fecharMenuMobile();}));
 $('#btnMenuMobile').addEventListener('click',()=>{
   const aberto=$('#navPrincipal').classList.toggle('aberto');
@@ -1898,17 +1918,17 @@ $('#formEquip').addEventListener('submit',ev=>{
         modeloId=$('#eqModelo').value,mod=modeloId?modById(modeloId):null,
         setor=$('#eqSetor').value,tec=$('#eqTecnico').value,data=$('#eqData').value||hojeISO(),
         obs=$('#eqObs').value.trim(),emprestavel=$('#eqEmprestavel').checked,id=$('#eqId').value;
-  if(!pat||!mod||!setor||!tec)return toast('Preencha os obrigatórios: <b>Patrimônio, Modelo, Setor e Técnico</b>.','bad');
+  if(!pat)return toast('Preencha o <b>Nº de Patrimônio</b>.','bad');
   if(db.equipamentos.some(e=>soDigitos(e.patrimonio)===pat&&e.id!==id))return toast('Já existe um equipamento com o patrimônio <b class="mono">'+esc(pat)+'</b>.','bad');
   let salvoId=id;
   if(id){
     const eq=eqById(id);
-    Object.assign(eq,{patrimonio:pat,serie,modeloId,tipo:mod.tipo,marca:mod.marca,setorId:setor,tecnicoId:tec,data,obs,emprestavel});
+    Object.assign(eq,{patrimonio:pat,serie,modeloId,tipo:mod?mod.tipo:(eq.tipo||''),marca:mod?mod.marca:(eq.marca||''),setorId:setor,tecnicoId:tec,data,obs,emprestavel});
     toast('Unidade <b class="mono">'+esc(pat)+'</b> atualizada.');
   }else{
-    const novo={id:uid(),patrimonio:pat,serie,modeloId,tipo:mod.tipo,marca:mod.marca,setorId:setor,tecnicoId:tec,data,obs,indisponivel:false,emprestavel};
+    const novo={id:uid(),patrimonio:pat,serie,modeloId,tipo:mod?mod.tipo:'',marca:mod?mod.marca:'',setorId:setor,tecnicoId:tec,data,obs,indisponivel:false,emprestavel};
     db.equipamentos.push(novo);salvoId=novo.id;
-    toast('Unidade <b class="mono">'+esc(pat)+'</b> vinculada ao modelo <b>'+esc(mod.tipo)+' '+esc(mod.marca)+'</b>.');
+    toast('Unidade <b class="mono">'+esc(pat)+'</b> cadastrada'+(mod?' e vinculada ao modelo <b>'+esc(mod.tipo)+' '+esc(mod.marca)+'</b>':'')+'.');
   }
   persistir();resetFormEquip();atualizarTudo();destacarLinha('#eqTbody',salvoId);
 });
