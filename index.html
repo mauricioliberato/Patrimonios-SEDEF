@@ -334,14 +334,26 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h13M17 7l-3-3M17 7l-3 3M20 17H7M7 17l3-3M7 17l3 3"/></svg>
         Guias de Transferência <span class="nav-badge" id="badge-gui">0</span>
       </button>
-      <button class="nav-item" data-view="impressoras">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-        Impressoras <span class="nav-badge" id="badge-imp">0</span>
-      </button>
-      <button class="nav-item" data-view="switches">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="8" rx="1.5"/><path d="M6 18v2M10 18v2M14 18v2M18 18v2"/><circle cx="6" cy="10" r=".6" fill="currentColor" stroke="none"/><circle cx="9" cy="10" r=".6" fill="currentColor" stroke="none"/></svg>
-        Switchs NR e IARAS <span class="nav-badge" id="badge-sw">0</span>
-      </button>
+      <div class="nav-group" id="navImpressorasGroup">
+        <button class="nav-item nav-parent" type="button" aria-expanded="false" aria-controls="impressorasSubmenu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          <span>Impressoras</span><span class="nav-badge" id="badge-imp">0</span><span class="nav-chevron">▸</span>
+        </button>
+        <div class="nav-submenu" id="impressorasSubmenu">
+          <button class="nav-subitem" type="button" data-view="impressoras" data-imp-tab="lista">Impressoras cadastradas</button>
+          <button class="nav-subitem" type="button" data-view="impressoras" data-imp-tab="cadastro">Cadastro de impressora</button>
+        </div>
+      </div>
+      <div class="nav-group" id="navSwitchesGroup">
+        <button class="nav-item nav-parent" type="button" aria-expanded="false" aria-controls="switchesSubmenu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="8" rx="1.5"/><path d="M6 18v2M10 18v2M14 18v2M18 18v2"/><circle cx="6" cy="10" r=".6" fill="currentColor" stroke="none"/><circle cx="9" cy="10" r=".6" fill="currentColor" stroke="none"/></svg>
+          <span>Switchs NR e IARAS</span><span class="nav-badge" id="badge-sw">0</span><span class="nav-chevron">▸</span>
+        </button>
+        <div class="nav-submenu" id="switchesSubmenu">
+          <button class="nav-subitem" type="button" data-view="switches" data-sw-tab="lista">Switchs cadastrados</button>
+          <button class="nav-subitem" type="button" data-view="switches" data-sw-tab="cadastro">Cadastro de switch</button>
+        </div>
+      </div>
       <div class="nav-group" id="navRacksGroup">
         <button class="nav-item nav-parent" type="button" aria-expanded="false" aria-controls="racksSubmenu">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="1.5"/><path d="M8 6h.01M8 10h.01M8 14h.01M8 18h.01M12 6h4M12 10h4M12 14h4M12 18h4"/></svg>
@@ -822,7 +834,27 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
 
       <!-- ========== IMPRESSORAS ========== -->
       <section class="view" id="view-impressoras">
-        <div class="card" id="cardImpForm">
+        <div class="card imp-panel" id="cardImpLista">
+          <div class="card-h">
+            <h3>Impressoras cadastradas</h3>
+            <div class="toolbar">
+              <input type="text" id="impBusca" placeholder="🔍 Buscar modelo, host, IP, patrimônio…">
+            </div>
+          </div>
+          <div class="card-b flush">
+            <div class="table-wrap">
+              <table>
+                <thead><tr>
+                  <th>Modelo</th><th>Host</th><th>Local</th><th>IP</th><th>Patrimônio</th><th>Série</th><th>Login Web</th><th class="td-r">Ações</th>
+                </tr></thead>
+                <tbody id="impTbody"></tbody>
+              </table>
+            </div>
+          </div>
+          <div style="padding:10px 20px;border-top:1px solid var(--line)"><span class="subtle" id="impResumo"></span></div>
+        </div>
+
+        <div class="card imp-panel" id="cardImpForm" style="display:none">
           <div class="card-h">
             <h3 id="impFormTitle">Cadastro de impressora</h3>
             <span class="pill warn" id="impEditBadge" style="display:none">✎ EDITANDO</span>
@@ -869,31 +901,31 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
             </form>
           </div>
         </div>
+      </section>
 
-        <div class="card">
+      <!-- ========== SWITCHS NR E IARAS ========== -->
+      <section class="view" id="view-switches">
+        <div class="card sw-panel" id="cardSwLista">
           <div class="card-h">
-            <h3>Impressoras cadastradas</h3>
+            <h3>Switchs cadastrados</h3>
             <div class="toolbar">
-              <input type="text" id="impBusca" placeholder="🔍 Buscar modelo, host, IP, patrimônio…">
+              <input type="text" id="swBusca" placeholder="🔍 Buscar identificação, local, IP, login…">
             </div>
           </div>
           <div class="card-b flush">
             <div class="table-wrap">
               <table>
                 <thead><tr>
-                  <th>Modelo</th><th>Host</th><th>Local</th><th>IP</th><th>Patrimônio</th><th>Série</th><th>Login Web</th><th class="td-r">Ações</th>
+                  <th>Identificação</th><th>Local</th><th>IP</th><th>Login</th><th>Senha</th><th class="td-r">Ações</th>
                 </tr></thead>
-                <tbody id="impTbody"></tbody>
+                <tbody id="swTbody"></tbody>
               </table>
             </div>
           </div>
-          <div style="padding:10px 20px;border-top:1px solid var(--line)"><span class="subtle" id="impResumo"></span></div>
+          <div style="padding:10px 20px;border-top:1px solid var(--line)"><span class="subtle" id="swResumo"></span></div>
         </div>
-      </section>
 
-      <!-- ========== SWITCHS NR E IARAS ========== -->
-      <section class="view" id="view-switches">
-        <div class="card" id="cardSwForm">
+        <div class="card sw-panel" id="cardSwForm" style="display:none">
           <div class="card-h">
             <h3 id="swFormTitle">Cadastro de switch</h3>
             <span class="pill warn" id="swEditBadge" style="display:none">✎ EDITANDO</span>
@@ -923,34 +955,13 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
                   <label>Senha</label>
                   <input type="text" id="swSenha" class="mono" placeholder="Senha de acesso">
                 </div>
-                <div class="c12 form-actions">
+                <div class="field c12 form-actions">
                   <button type="submit" class="btn btn-accent" id="btnSwSubmit">✔ Salvar switch</button>
-                  <button type="button" class="btn btn-ghost" id="btnSwCancel" style="display:none">Cancelar edição</button>
-                  <button type="reset" class="btn btn-ghost">Limpar</button>
+                  <button type="button" class="btn btn-ghost" id="btnSwCancel" style="display:none">Cancelar</button>
                 </div>
               </div>
             </form>
           </div>
-        </div>
-
-        <div class="card">
-          <div class="card-h">
-            <h3>Switchs cadastrados</h3>
-            <div class="toolbar">
-              <input type="text" id="swBusca" placeholder="🔍 Buscar identificação, local, IP, login…">
-            </div>
-          </div>
-          <div class="card-b flush">
-            <div class="table-wrap">
-              <table>
-                <thead><tr>
-                  <th>Identificação</th><th>Local</th><th>IP</th><th>Login</th><th>Senha</th><th class="td-r">Ações</th>
-                </tr></thead>
-                <tbody id="swTbody"></tbody>
-              </table>
-            </div>
-          </div>
-          <div style="padding:10px 20px;border-top:1px solid var(--line)"><span class="subtle" id="swResumo"></span></div>
         </div>
       </section>
 
@@ -1646,6 +1657,8 @@ function showView(v){
   }
   if(v==='licencas'&&!document.querySelector('#licencasSubmenu .nav-subitem.active'))setLicTab('cadastro');
   if(v==='racks'&&!document.querySelector('#racksSubmenu .nav-subitem.active'))setRkTab('lista');
+  if(v==='impressoras'&&!document.querySelector('#impressorasSubmenu .nav-subitem.active'))setImpTab('lista');
+  if(v==='switches'&&!document.querySelector('#switchesSubmenu .nav-subitem.active'))setSwTab('lista');
   if(v==='equipamentos'){
     if(!document.querySelector('#equipamentosSubmenu .nav-subitem.active'))setEqTab('lista');
     requestAnimationFrame(()=>{if(!$('#eqData').value)$('#eqData').value=hojeISO();});
@@ -1663,6 +1676,18 @@ function setRkTab(tab){
   $(alvo).style.display='block';
   $$('#racksSubmenu .nav-subitem').forEach(b=>b.classList.toggle('active',b.dataset.rkTab===tab));
 }
+function setImpTab(tab){
+  $$('.imp-panel').forEach(p=>p.style.display='none');
+  const alvo=tab==='cadastro'?'#cardImpForm':'#cardImpLista';
+  $(alvo).style.display='block';
+  $$('#impressorasSubmenu .nav-subitem').forEach(b=>b.classList.toggle('active',b.dataset.impTab===tab));
+}
+function setSwTab(tab){
+  $$('.sw-panel').forEach(p=>p.style.display='none');
+  const alvo=tab==='cadastro'?'#cardSwForm':'#cardSwLista';
+  $(alvo).style.display='block';
+  $$('#switchesSubmenu .nav-subitem').forEach(b=>b.classList.toggle('active',b.dataset.swTab===tab));
+}
 function setEqTab(tab){
   $$('.eq-panel').forEach(p=>p.style.display='none');
   const mapa={lista:'#cardEqLista',catalogo:'#cardModForm',cadastro:'#cardEqForm'};
@@ -1676,6 +1701,8 @@ $$('.nav-subitem').forEach(b=>b.addEventListener('click',()=>{
   if(b.dataset.licTab)setLicTab(b.dataset.licTab);
   if(b.dataset.eqTab)setEqTab(b.dataset.eqTab);
   if(b.dataset.rkTab)setRkTab(b.dataset.rkTab);
+  if(b.dataset.impTab)setImpTab(b.dataset.impTab);
+  if(b.dataset.swTab)setSwTab(b.dataset.swTab);
   fecharMenuMobile();
 }));
 $$('.nav-group .nav-parent').forEach(p=>p.addEventListener('click',()=>{
@@ -1978,7 +2005,7 @@ function editarEquip(id){
   $('#cardEqForm').classList.add('editando');
   $('#eqEditBadge').style.display='inline-flex';
   $('#eqEditBadge').textContent='✎ EDITANDO '+eq.patrimonio;
-  rolarTopo();$('#eqPatrimonio').focus();
+  setEqTab('cadastro');rolarTopo();$('#eqPatrimonio').focus();
 }
 function excluirEquip(id){
   const eq=eqById(id);if(!eq)return;
@@ -2984,7 +3011,7 @@ function editarImpressora(id){
   $('#cardImpForm').classList.add('editando');
   $('#impEditBadge').style.display='inline-flex';
   $('#impEditBadge').textContent='✎ EDITANDO '+p.modelo;
-  rolarTopo();$('#impModelo').focus();
+  setImpTab('cadastro');rolarTopo();$('#impModelo').focus();
 }
 
 function excluirImpressora(id){
@@ -3077,7 +3104,7 @@ function editarSwitch(id){
   $('#cardSwForm').classList.add('editando');
   $('#swEditBadge').style.display='inline-flex';
   $('#swEditBadge').textContent='✎ EDITANDO '+(s.nome||s.ip);
-  rolarTopo();$('#swNome').focus();
+  setSwTab('cadastro');rolarTopo();$('#swNome').focus();
 }
 
 function excluirSwitch(id){
@@ -3169,7 +3196,7 @@ function editarRack(id){
   $('#cardRkForm').classList.add('editando');
   $('#rkEditBadge').style.display='inline-flex';
   $('#rkEditBadge').textContent='✎ EDITANDO '+(p.rack||'')+' / '+(p.ponto||p.patch||'');
-  rolarTopo();$('#rkRack').focus();
+  setRkTab('cadastro');rolarTopo();$('#rkRack').focus();
 }
 
 function excluirRack(id){
@@ -3325,7 +3352,7 @@ function editarLicenca(id){
   $('#cardLicForm').classList.add('editando');
   $('#licEditBadge').style.display='inline-flex';
   $('#licEditBadge').textContent='✎ EDITANDO '+(l.host||'');
-  rolarTopo();$('#licHost').focus();
+  setLicTab('cadastro');rolarTopo();$('#licHost').focus();
 }
 
 function excluirLicenca(id){
