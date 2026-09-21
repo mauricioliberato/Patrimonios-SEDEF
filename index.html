@@ -189,7 +189,13 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
 .q-actions{display:flex;gap:10px;padding:14px 2px 2px}
 
 /* assinatura */
-.sig-wrap{position:relative;border:1.5px dashed var(--line2);border-radius:8px;background:#fbfcfe;overflow:hidden}
+.sig-wrap{position:relative;border:1.5px dashed var(--line2);border-radius:8px;background:#fbfcfe;overflow:hidden;transition:max-height .22s ease;max-height:500px}
+.sig-wrap.recolhido{max-height:40px;cursor:pointer}
+.sig-wrap.recolhido:hover{background:#f2f6fa}
+.sig-wrap.recolhido .sig-hint{display:none}
+.sig-wrap.recolhido .sig-head{position:relative!important;padding:9px 12px!important}
+.sig-wrap.recolhido .sig-head::after{content:'clique para assinar';margin-left:auto;font:italic 11px var(--body);color:#9db0bf}
+.sig-wrap.recolhido .sig-head label{white-space:nowrap}
 .sig-canvas{display:block;width:100%;height:150px;touch-action:none;cursor:crosshair}
 .sig-hint{position:absolute;inset:0;display:grid;place-items:center;font:italic 13px var(--body);color:#b3c0cb;pointer-events:none;transition:opacity .2s}
 .sig-wrap:not(.vazia) .sig-hint{opacity:0}
@@ -729,13 +735,24 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
               <div class="fgrid">
                 <div class="field c6">
                   <label>Unid. administrativa — ORIGEM <b>*</b></label>
-                  <select id="guiaSetorOri"></select>
+                  <input type="text" id="guiaSetorOriTxt" list="dlSetoresGuia" placeholder="Digite para buscar o setor…" autocomplete="off">
+                  <input type="hidden" id="guiaSetorOri">
                   <span class="hint" id="guiaOriEcho"><span class="dot"></span>Ao escolher a origem, só os equipamentos lotados nela aparecem abaixo.</span>
                 </div>
                 <div class="field c6">
                   <label>Unid. administrativa — DESTINO <b>*</b></label>
-                  <select id="guiaSetorDes"></select>
+                  <input type="text" id="guiaSetorDesTxt" list="dlSetoresGuia" placeholder="Digite para buscar o setor…" autocomplete="off">
+                  <input type="hidden" id="guiaSetorDes">
                   <span class="hint" id="guiaDesEcho"><span class="dot"></span>Unidade que receberá os bens.</span>
+                </div>
+                <datalist id="dlSetoresGuia"></datalist>
+                <div class="field c3">
+                  <label>Nº da O.S.</label>
+                  <input type="text" id="guiaOS" class="mono" placeholder="3142390 → P-31423-90">
+                </div>
+                <div class="field c3">
+                  <label>Técnico responsável pelo registro</label>
+                  <div class="mono" id="guiaTecnicoLogado" style="padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:#f7f9fb;color:var(--ink-soft)">—</div>
                 </div>
                 <div class="field c3">
                   <label>Responsável pelo envio (ORIGEM)</label>
@@ -755,6 +772,7 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
                 </div>
                 <div class="field c5">
                   <label>Equipamentos transferidos <b>*</b></label>
+                  <input type="text" id="guiaEqBusca" placeholder="🔍 Buscar por patrimônio, tipo, marca, série…" style="margin-bottom:8px">
                   <div style="display:flex;gap:8px">
                     <select id="guiaEqSel" class="mono" style="flex:1"></select>
                     <button type="button" class="btn btn-dark btn-sm" id="btnAddGuiaEq">+ Adicionar</button>
@@ -770,7 +788,7 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
                 </div>
                 <div class="field c4">
                   <div class="sig-preview" id="sigGuiaPreview"></div>
-                  <div class="sig-wrap vazia" id="wrapSigGuia">
+                  <div class="sig-wrap vazia recolhido" id="wrapSigGuia">
                     <div class="sig-head" style="position:absolute;width:100%;padding:8px 12px;z-index:2">
                       <label style="font:600 10.5px var(--body);letter-spacing:.09em;text-transform:uppercase;color:var(--muted)">Assinatura — envio (ORIGEM)</label>
                       <button type="button" class="sig-clear" id="sigGuiaClear">✕ Limpar</button>
@@ -781,7 +799,7 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
                 </div>
                 <div class="field c4">
                   <div class="sig-preview" id="sigGuiaPatPreview"></div>
-                  <div class="sig-wrap vazia" id="wrapSigGuiaPat">
+                  <div class="sig-wrap vazia recolhido" id="wrapSigGuiaPat">
                     <div class="sig-head" style="position:absolute;width:100%;padding:8px 12px;z-index:2">
                       <label style="font:600 10.5px var(--body);letter-spacing:.09em;text-transform:uppercase;color:var(--muted)">Assinatura — Setor de Patrimônio</label>
                       <button type="button" class="sig-clear" id="sigGuiaPatClear">✕ Limpar</button>
@@ -792,7 +810,7 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
                 </div>
                 <div class="field c4">
                   <div class="sig-preview" id="sigGuiaDestPreview"></div>
-                  <div class="sig-wrap vazia" id="wrapSigGuiaDest">
+                  <div class="sig-wrap vazia recolhido" id="wrapSigGuiaDest">
                     <div class="sig-head" style="position:absolute;width:100%;padding:8px 12px;z-index:2">
                       <label style="font:600 10.5px var(--body);letter-spacing:.09em;text-transform:uppercase;color:var(--muted)">Assinatura — recebimento (DESTINO)</label>
                       <button type="button" class="sig-clear" id="sigGuiaDestClear">✕ Limpar</button>
@@ -822,7 +840,7 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
             <div class="table-wrap" style="max-height:70vh">
               <table>
                 <thead><tr>
-                  <th>Nº</th><th>Emissão</th><th>Origem → Destino</th><th>Itens</th><th>Resp. envio</th><th>Status</th><th class="td-r">Ações</th>
+                  <th>Nº</th><th>O.S.</th><th>Emissão</th><th>Origem → Destino</th><th>Itens</th><th>Resp. envio</th><th>Status</th><th class="td-r">Ações</th>
                 </tr></thead>
                 <tbody id="guiaTbody"></tbody>
               </table>
@@ -1768,12 +1786,11 @@ function preencherSelects(){
       el.innerHTML=`<option value="">Selecione o setor…</option>`+optsSet;if(v&&setById(v))el.value=v;}
     {const el=$('#impLocal');if(el){const v=el.value;
       el.innerHTML=`<option value="">Selecione o local…</option>`+optsSet;if(v&&setById(v))el.value=v;}}
-    {const el=$('#guiaSetorOri');if(el){const v=(guiaOriSel&&setById(guiaOriSel))?guiaOriSel:el.value;
-      el.innerHTML=`<option value="">Selecione o setor…</option>`+optsSet;
-      if(v&&setById(v))el.value=v; guiaOriSel=setById(el.value)?el.value:'';}}
-    {const el=$('#guiaSetorDes');if(el){const v=(guiaDesSel&&setById(guiaDesSel))?guiaDesSel:el.value;
-      el.innerHTML=`<option value="">Selecione o setor…</option>`+optsSet;
-      if(v&&setById(v))el.value=v; guiaDesSel=setById(el.value)?el.value:'';}}
+    {const dl=$('#dlSetoresGuia');if(dl)dl.innerHTML=db.setores.map(s=>`<option value="${esc(s.nome)}">`).join('');}
+    {const el=$('#guiaSetorOri');if(el&&guiaOriSel&&!setById(guiaOriSel))guiaOriSel='';
+      if(el&&guiaOriSel){el.value=guiaOriSel;const t=$('#guiaSetorOriTxt');if(t&&!t.value)t.value=setNome(guiaOriSel);}}
+    {const el=$('#guiaSetorDes');if(el&&guiaDesSel&&!setById(guiaDesSel))guiaDesSel='';
+      if(el&&guiaDesSel){el.value=guiaDesSel;const t=$('#guiaSetorDesTxt');if(t&&!t.value)t.value=setNome(guiaDesSel);}}
     for(const id of ['eqTecnico','empTecnico']){const el=$('#'+id);if(!el)continue;const v=el.value;
       el.innerHTML=`<option value="">Selecione o técnico…</option>`+optsTec;if(v&&tecById(v))el.value=v;}
     {const el=$('#modTipo');if(el){const v=el.value;
@@ -1819,7 +1836,7 @@ function renderDashboard(){
 }
 $('#qNovoEmp').addEventListener('click',()=>{showView('emprestimos');resetEmpForm();setTimeout(()=>$('#empEqSel').focus(),120);});
 $('#qNovoEq').addEventListener('click',()=>{showView('equipamentos');setTimeout(()=>$('#eqPatrimonio').focus(),120);});
-$('#qNovaGuia').addEventListener('click',()=>{showView('guias');resetGuiaForm();setTimeout(()=>$('#guiaSetorOri').focus(),120);});
+$('#qNovaGuia').addEventListener('click',()=>{showView('guias');resetGuiaForm();setTimeout(()=>$('#guiaSetorOriTxt').focus(),120);});
 
 /* ================= TIPOS E MARCAS (listas do catálogo) ================= */
 let listaAtual=null;
@@ -2718,9 +2735,11 @@ $('#guiaBusca').addEventListener('input',renderGuias);
 function preencherSelGuiaEq(){
   const sel=$('#guiaEqSel');if(!sel)return;
   const ori=origemGuiaSelecionada();
+  const busca=($('#guiaEqBusca')?$('#guiaEqBusca').value:'').toLowerCase();
   const antes=sel.value;
   let pool=[];
   if(ori)pool=[...db.equipamentos].filter(e=>e.setorId===ori);
+  if(busca)pool=pool.filter(e=>((e.patrimonio||'')+' '+(e.tipo||'')+' '+(e.marca||'')+' '+(e.serie||'')).toLowerCase().includes(busca));
   const opts=pool.sort((a,b)=>String(a.patrimonio).localeCompare(String(b.patrimonio),undefined,{numeric:true}))
     .filter(e=>!cartGuia.includes(e.id))
     .map(e=>`<option value="${e.id}">${esc(e.patrimonio)} — ${esc(e.tipo)} ${esc(e.marca)}${e.serie?' · S/N '+esc(e.serie):''}</option>`).join('');
@@ -2729,6 +2748,7 @@ function preencherSelGuiaEq(){
   const echo=$('#guiaEqEcho');
   if(echo)echo.innerHTML='<span class="dot"></span>'+(ori?('Listando equipamentos lotados em <b>'+esc(setNome(ori))+'</b> ('+pool.length+' no total).'):'Escolha primeiro a unidade de ORIGEM para listar os equipamentos.');
 }
+$('#guiaEqBusca').addEventListener('input',preencherSelGuiaEq);
 function renderGuiaCart(){
   $('#guiaCartCount').textContent=cartGuia.length;
   const box=$('#guiaCart');
@@ -2774,6 +2794,32 @@ function onGuiaDesChange(){
   const o=$('#guiaSetorOri');if(o)o.addEventListener(ev,onGuiaOriChange);
   const d=$('#guiaSetorDes');if(d)d.addEventListener(ev,onGuiaDesChange);
 });
+function resolverSetorDigitadoGuia(txtId,hiddenId,onChangeFn){
+  const nome=$('#'+txtId).value.trim();
+  const s=db.setores.find(x=>String(x.nome||'').trim().toLowerCase()===nome.toLowerCase());
+  $('#'+hiddenId).value=s?s.id:'';
+  onChangeFn();
+}
+$('#guiaSetorOriTxt').addEventListener('input',()=>resolverSetorDigitadoGuia('guiaSetorOriTxt','guiaSetorOri',onGuiaOriChange));
+$('#guiaSetorDesTxt').addEventListener('input',()=>resolverSetorDigitadoGuia('guiaSetorDesTxt','guiaSetorDes',onGuiaDesChange));
+/* formatação da O.S. da guia (mesmo padrão do O.S. de empréstimos) */
+$('#guiaOS').addEventListener('input',()=>{
+  const el=$('#guiaOS');
+  const digitosAntes=el.value.slice(0,el.selectionStart).replace(/\D/g,'').length;
+  const f=formatarOS(el.value);
+  el.value=f;
+  let cont=0,pos=digitosAntes===0?0:f.length;
+  for(let i=0;i<f.length;i++){if(/\d/.test(f[i])){cont++;if(cont===digitosAntes){pos=i+1;break;}}}
+  el.setSelectionRange(pos,pos);
+});
+$('#guiaOS').addEventListener('blur',()=>{$('#guiaOS').value=formatarOS($('#guiaOS').value);});
+/* assinaturas da guia: recolhidas por padrão, expandem ao clicar */
+[['#wrapSigGuia',()=>sigGuia],['#wrapSigGuiaPat',()=>sigGuiaPat],['#wrapSigGuiaDest',()=>sigGuiaDest]].forEach(([id,getSig])=>{
+  const el=$(id);if(!el)return;
+  el.addEventListener('click',()=>{
+    if(el.classList.contains('recolhido')){el.classList.remove('recolhido');requestAnimationFrame(()=>getSig().resize());}
+  });
+});
 
 $('#btnAddGuiaEq').addEventListener('click',()=>{
   const id=$('#guiaEqSel').value;
@@ -2805,10 +2851,10 @@ function renderSigGuiaPreview(){
         <button type="button" class="sig-clear" id="${d.btnId}">✕ Refazer assinatura</button>`;
       pv.style.display='flex';
       wrap.style.display='none';
-      $('#'+d.btnId).addEventListener('click',()=>{d.clear();pv.style.display='none';wrap.style.display='block';if(d.canvas)requestAnimationFrame(()=>d.canvas.resize());});
+      $('#'+d.btnId).addEventListener('click',()=>{d.clear();pv.style.display='none';wrap.style.display='block';wrap.classList.remove('recolhido');if(d.canvas)requestAnimationFrame(()=>d.canvas.resize());});
     }else{
       pv.style.display='none';pv.innerHTML='';
-      wrap.style.display='block';
+      wrap.style.display='block';wrap.classList.add('recolhido');
     }
   });
 }
@@ -2819,10 +2865,15 @@ $('#formGuia').addEventListener('reset',e=>{const n=Date.now();if(n-lastResetGui
 function resetGuiaForm(){
   guiaEditId=null;guiaEditSig=null;guiaEditSigPat=null;guiaEditSigDest=null;cartGuia=[];guiaOriSel='';guiaDesSel='';
   $('#guiaSetorOri').value='';$('#guiaSetorDes').value='';
+  $('#guiaSetorOriTxt').value='';$('#guiaSetorDesTxt').value='';
+  $('#guiaOS').value='';
+  $('#guiaTecnicoLogado').textContent=usuarioAtual?usuarioAtual.nome:'—';
   $('#guiaRespOri').value='';$('#guiaRespPat').value='';$('#guiaRespDest').value='';$('#guiaFoneOri').value='';
+  $('#guiaEqBusca').value='';
   $('#guiaEqSel').value='';
   $('#guiaChkSetor').checked=true;
   sigGuia.limpar();sigGuiaPat.limpar();sigGuiaDest.limpar();
+  ['#wrapSigGuia','#wrapSigGuiaPat','#wrapSigGuiaDest'].forEach(id=>$(id).classList.add('recolhido'));
   $('#guiaFormTitle').textContent='Guia de Transferência de Bens Patrimoniais';
   $('#btnGuiaSubmit').textContent='✔ Emitir guia (Concluída)';
   $('#btnGuiaCancel').style.display='none';
@@ -2843,6 +2894,7 @@ $('#formGuia').addEventListener('submit',ev=>{
   const so=origemGuiaSelecionada(),sd=destinoGuiaSelecionado(),
         ro=$('#guiaRespOri').value.trim(),rpat=$('#guiaRespPat').value.trim(),
         rdest=$('#guiaRespDest').value.trim(),fo=$('#guiaFoneOri').value.trim(),
+        os=formatarOS($('#guiaOS').value),
         chkSetor=$('#guiaChkSetor').checked;
   if(!so||!sd)return toast('Selecione as unidades de <b>ORIGEM</b> e <b>DESTINO</b>.','bad');
   if(so===sd)return toast('Origem e destino devem ser <b>unidades diferentes</b>.','bad');
@@ -2853,22 +2905,23 @@ $('#formGuia').addEventListener('submit',ev=>{
   const sigPatFinal=sigGuiaPat.vazia()?guiaEditSigPat:sigGuiaPat.dataURL();
   const sigDestFinal=sigGuiaDest.vazia()?guiaEditSigDest:sigGuiaDest.dataURL();
   const agora=Date.now();
+  const registradoPorNome=usuarioAtual?usuarioAtual.nome:'';
   const recebimento={data:hojeISO(),hora:horaAgora(),respNome:rdest,assinatura:sigDestFinal,atualizouSetor:chkSetor,ts:agora};
   let salvoId=null;
   if(guiaEditId){
     const g=guiaById(guiaEditId);if(!g)return;
-    Object.assign(g,{origemSetorId:so,origemRespNome:ro,origemRespFone:fo,patrimRespNome:rpat,
+    Object.assign(g,{os,origemSetorId:so,origemRespNome:ro,origemRespFone:fo,patrimRespNome:rpat,
       destinoSetorId:sd,equipIds:[...cartGuia],origemAssinatura:sigFinal,patrimAssinatura:sigPatFinal,
-      recebimento:recebimento,atualizadoEm:agora});
+      recebimento:recebimento,registradoPorNome,atualizadoEm:agora});
     if(chkSetor)cartGuia.forEach(id=>{const q=eqById(id);if(q)q.setorId=sd;});
     salvoId=g.id;
     toast('Guia nº <b class="mono">'+g.numero+'</b> atualizada.');
   }else{
-    const g={id:uid(),numero:proximaGuia(),emitidaEm:agora,
+    const g={id:uid(),numero:proximaGuia(),emitidaEm:agora,os,
       origemSetorId:so,origemRespNome:ro,origemRespFone:fo,patrimRespNome:rpat,
       destinoSetorId:sd,
       equipIds:[...cartGuia],origemAssinatura:sigFinal,patrimAssinatura:sigPatFinal,origemData:hojeISO(),
-      recebimento:recebimento,criadoEm:agora};
+      recebimento:recebimento,registradoPorNome,criadoEm:agora};
     db.guias.push(g);salvoId=g.id;
     if(chkSetor)cartGuia.forEach(id=>{const q=eqById(id);if(q)q.setorId=sd;});
     toast('Guia nº <b class="mono">'+g.numero+'</b> emitida como <b>Concluída</b>.'+(chkSetor?' Setor dos equipamentos atualizado para o DESTINO.':''));
@@ -2886,11 +2939,15 @@ function editarGuia(id){
   guiaOriSel=g.origemSetorId||'';guiaDesSel=g.destinoSetorId||'';
   cartGuia=[...(g.equipIds||[])].filter(idEq=>infoEq(idEq));
   $('#guiaSetorOri').value=guiaOriSel;
+  $('#guiaSetorOriTxt').value=setNome(guiaOriSel);
+  $('#guiaOS').value=g.os||'';
+  $('#guiaTecnicoLogado').textContent=usuarioAtual?usuarioAtual.nome:'—';
   $('#guiaRespOri').value=g.origemRespNome||'';
   $('#guiaRespPat').value=g.patrimRespNome||'';
   $('#guiaRespDest').value=(g.recebimento&&g.recebimento.respNome)||'';
   $('#guiaFoneOri').value=g.origemRespFone||'';
   $('#guiaSetorDes').value=guiaDesSel;
+  $('#guiaSetorDesTxt').value=setNome(guiaDesSel);
   $('#guiaChkSetor').checked=g.recebimento?g.recebimento.atualizouSetor!==false:true;
   sigGuia.limpar();sigGuiaPat.limpar();sigGuiaDest.limpar();
   renderSigGuiaPreview();
@@ -2914,12 +2971,13 @@ function renderGuias(){
   const busca=($('#guiaBusca').value||'').toLowerCase();
   let lista=[...(db.guias||[])].sort((a,b)=>(b.criadoEm||0)-(a.criadoEm||0));
   if(busca)lista=lista.filter(g=>{
-    const alvo=(String(g.numero)+' '+setNome(g.origemSetorId)+' '+setNome(g.destinoSetorId)+' '+(g.origemRespNome||'')+' '+(g.patrimRespNome||'')+' '+(g.recebimento?g.recebimento.respNome:'')+' '+(g.equipIds||[]).map(id=>{const i=infoEq(id);return i?i.patrimonio:'';}).join(' ')).toLowerCase();
+    const alvo=(String(g.numero)+' '+(g.os||'')+' '+setNome(g.origemSetorId)+' '+setNome(g.destinoSetorId)+' '+(g.origemRespNome||'')+' '+(g.patrimRespNome||'')+' '+(g.recebimento?g.recebimento.respNome:'')+' '+(g.equipIds||[]).map(id=>{const i=infoEq(id);return i?i.patrimonio:'';}).join(' ')).toLowerCase();
     return alvo.includes(busca);});
   $('#guiaTbody').innerHTML=lista.length?lista.map(g=>{
     const st=statusGuia(g);const n=(g.equipIds||[]).length;
     return `<tr data-id="${g.id}">
       <td class="mono" style="font-weight:600">${g.numero}</td>
+      <td class="mono subtle">${esc(g.os||'—')}</td>
       <td class="subtle">${fmtDataHora(g.emitidaEm)}</td>
       <td><b>${esc(setNome(g.origemSetorId))}</b> → <b>${esc(setNome(g.destinoSetorId))}</b></td>
       <td class="mono">${n}</td>
@@ -2930,7 +2988,7 @@ function renderGuias(){
         <button class="ibtn" title="Imprimir guia" data-acao="guia-print" data-id="${g.id}">${PRINT_SVG}</button>
         <button class="ibtn bad" title="Excluir" data-acao="guia-del" data-id="${g.id}">${TRASH_SVG}</button>
       </div></td>
-    </tr>`;}).join(''):`<tr><td colspan="7" class="empty"><span class="big">📄</span>Nenhuma guia emitida.</td></tr>`;
+    </tr>`;}).join(''):`<tr><td colspan="8" class="empty"><span class="big">📄</span>Nenhuma guia emitida.</td></tr>`;
   const tot=(db.guias||[]).length;
   $('#guiaResumo').textContent=`${tot} guia(s) · todas concluídas na emissão`;
 }
@@ -3445,7 +3503,7 @@ function imprimirGuia(g){
       <div><h2>${NOME_SISTEMA}</h2>
       <div style="font-size:12px;color:#555">${ORG}</div>
       <div style="font-size:13px;font-weight:600;margin-top:4px">GUIA DE TRANSFERÊNCIA DE BENS PATRIMONIAIS</div></div>
-      <div class="rec-right"><img src="${BRASAO_B64}" class="rec-brasao" alt="Brasão"><div class="rec-os">Nº ${g.numero}</div></div>
+      <div class="rec-right"><img src="${BRASAO_B64}" class="rec-brasao" alt="Brasão"><div class="rec-os">Nº ${g.numero}</div>${g.os?`<div class="subtle" style="font-size:11px">O.S. ${esc(g.os)}</div>`:''}</div>
     </div>
     <div style="font-size:12px;margin:-6px 0 14px">Data de emissão: <b>${fmtDataHora(g.emitidaEm)}</b> · Status: <b>Concluída</b></div>
     <div class="r-block" style="margin-bottom:12px">
