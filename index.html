@@ -512,11 +512,11 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
               <input type="hidden" id="modId">
               <div class="fgrid">
                 <div class="field c3">
-                  <div class="lbl-row"><label>Equipamento <b>*</b></label><button type="button" class="add-mini" id="btnAddTipo2" title="Cadastrar novo tipo">+ novo</button></div>
+                  <div class="lbl-row"><label>Equipamento</label><button type="button" class="add-mini" id="btnAddTipo2" title="Cadastrar novo tipo">+ novo</button></div>
                   <select id="modTipo"></select>
                 </div>
                 <div class="field c3">
-                  <div class="lbl-row"><label>Marca / Modelo <b>*</b></label><button type="button" class="add-mini" id="btnAddMarca2" title="Cadastrar nova marca">+ novo</button></div>
+                  <div class="lbl-row"><label>Marca / Modelo</label><button type="button" class="add-mini" id="btnAddMarca2" title="Cadastrar nova marca">+ novo</button></div>
                   <select id="modMarca"></select>
                 </div>
                 <div class="field c3">
@@ -544,14 +544,14 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
           <div class="card-h">
             <h3 id="eqFormTitle">2 · Cadastro de unidade (patrimônio)</h3>
             <span class="pill warn" id="eqEditBadge" style="display:none">✎ EDITANDO</span>
-            <span class="sub">Vincule o patrimônio a um modelo do catálogo · apenas o <b style="color:var(--bad)">Nº de Patrimônio</b> é obrigatório</span>
+            <span class="sub">Vincule o patrimônio a um modelo do catálogo · todos os campos são opcionais</span>
           </div>
           <div class="card-b">
             <form id="formEquip" autocomplete="off">
               <input type="hidden" id="eqId">
               <div class="fgrid">
                 <div class="field c3">
-                  <label>Nº de Patrimônio <b>*</b></label>
+                  <label>Nº de Patrimônio</label>
                   <input type="text" id="eqPatrimonio" class="mono" inputmode="numeric" placeholder="Somente números">
                   <span class="hint"><span class="dot"></span>Aceita apenas números: digite ou use o leitor de código de barras (Enter confirma e avança).</span>
                 </div>
@@ -1876,7 +1876,6 @@ $('#listaItens').addEventListener('click',e=>{
 $('#formModelo').addEventListener('submit',ev=>{
   ev.preventDefault();
   const tipo=$('#modTipo').value,marca=$('#modMarca').value,desc=$('#modDesc').value.trim(),id=$('#modId').value;
-  if(!tipo||!marca)return toast('Selecione <b>Equipamento</b> e <b>Marca/Modelo</b> para o catálogo.','bad');
   if(id){
     const m=modById(id);if(!m)return;
     Object.assign(m,{tipo,marca,descricao:desc});
@@ -1959,8 +1958,7 @@ $('#formEquip').addEventListener('submit',ev=>{
         modeloId=$('#eqModelo').value,mod=modeloId?modById(modeloId):null,
         setor=$('#eqSetor').value,tec=$('#eqTecnico').value,data=$('#eqData').value||hojeISO(),
         obs=$('#eqObs').value.trim(),emprestavel=$('#eqEmprestavel').checked,id=$('#eqId').value;
-  if(!pat)return toast('Preencha o <b>Nº de Patrimônio</b>.','bad');
-  if(db.equipamentos.some(e=>soDigitos(e.patrimonio)===pat&&e.id!==id))return toast('Já existe um equipamento com o patrimônio <b class="mono">'+esc(pat)+'</b>.','bad');
+  if(pat&&db.equipamentos.some(e=>soDigitos(e.patrimonio)===pat&&e.id!==id))return toast('Já existe um equipamento com o patrimônio <b class="mono">'+esc(pat)+'</b>.','bad');
   let salvoId=id;
   if(id){
     const eq=eqById(id);
