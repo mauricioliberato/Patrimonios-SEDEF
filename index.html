@@ -2315,18 +2315,22 @@ const PLANILHA_MODULOS={
   },
   equipamentos:{
     label:'Equipamentos',
-    campos:[{h:'Patrimônio *',f:'patrimonio'},{h:'Série',f:'serie'},{h:'Tipo *',f:'tipo'},{h:'Marca *',f:'marca'},
-      {h:'Setor *',f:'setorNome'},{h:'Técnico *',f:'tecnicoNome'},{h:'Data de aquisição',f:'data'},
+    campos:[{h:'Patrimônio',f:'patrimonio'},{h:'Série',f:'serie'},{h:'Tipo',f:'tipo'},{h:'Marca',f:'marca'},
+      {h:'Setor',f:'setorNome'},{h:'Técnico',f:'tecnicoNome'},{h:'Data de aquisição',f:'data'},
       {h:'Observação',f:'obs'},{h:'Indisponível (Sim/Não)',f:'indisponivelTxt'},{h:'Emprestável (Sim/Não)',f:'emprestavelTxt'}],
     lista:()=>db.equipamentos,
     linhaExport:e=>({patrimonio:e.patrimonio,serie:e.serie,tipo:e.tipo,marca:e.marca,setorNome:nomeSetorExport(e.setorId),
       tecnicoNome:(db.tecnicos.find(t=>t.id===e.tecnicoId)||{}).nome||'',data:e.data,obs:e.obs,
       indisponivelTxt:e.indisponivel?'Sim':'Não',emprestavelTxt:e.emprestavel===false?'Não':'Sim'}),
-    chave:o=>soDigitos(o.patrimonio||''),
+    chave:o=>{
+      const pat=soDigitos(o.patrimonio||'');if(pat)return 'pat:'+pat;
+      const serie=String(o.serie||'').trim().toLowerCase();if(serie)return 'serie:'+serie;
+      return '';
+    },
     finalizar(o){
       o.patrimonio=soDigitos(o.patrimonio||'');
-      if(!o.patrimonio||!o.tipo||!o.marca||!o.setorNome||!o.tecnicoNome)return null;
-      o.modeloId=resolverModeloPorTipoMarca(o.tipo,o.marca);
+      if(!o.patrimonio&&!o.serie&&!o.tipo&&!o.marca)return null; /* linha completamente vazia */
+      o.modeloId=(o.tipo||o.marca)?resolverModeloPorTipoMarca(o.tipo,o.marca):'';
       o.setorId=resolverSetorPorNome(o.setorNome);delete o.setorNome;
       o.tecnicoId=resolverTecnicoPorNome(o.tecnicoNome);delete o.tecnicoNome;
       o.data=o.data||hojeISO();
