@@ -772,7 +772,6 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
                 </div>
                 <div class="field c5">
                   <label>Equipamentos transferidos <b>*</b></label>
-                  <input type="text" id="guiaEqBusca" placeholder="🔍 Buscar por patrimônio, tipo, marca, série…" style="margin-bottom:8px">
                   <div style="display:flex;gap:8px">
                     <select id="guiaEqSel" class="mono" style="flex:1"></select>
                     <button type="button" class="btn btn-dark btn-sm" id="btnAddGuiaEq">+ Adicionar</button>
@@ -2735,11 +2734,9 @@ $('#guiaBusca').addEventListener('input',renderGuias);
 function preencherSelGuiaEq(){
   const sel=$('#guiaEqSel');if(!sel)return;
   const ori=origemGuiaSelecionada();
-  const busca=($('#guiaEqBusca')?$('#guiaEqBusca').value:'').toLowerCase();
   const antes=sel.value;
   let pool=[];
   if(ori)pool=[...db.equipamentos].filter(e=>e.setorId===ori);
-  if(busca)pool=pool.filter(e=>((e.patrimonio||'')+' '+(e.tipo||'')+' '+(e.marca||'')+' '+(e.serie||'')).toLowerCase().includes(busca));
   const opts=pool.sort((a,b)=>String(a.patrimonio).localeCompare(String(b.patrimonio),undefined,{numeric:true}))
     .filter(e=>!cartGuia.includes(e.id))
     .map(e=>`<option value="${e.id}">${esc(e.patrimonio)} — ${esc(e.tipo)} ${esc(e.marca)}${e.serie?' · S/N '+esc(e.serie):''}</option>`).join('');
@@ -2748,7 +2745,6 @@ function preencherSelGuiaEq(){
   const echo=$('#guiaEqEcho');
   if(echo)echo.innerHTML='<span class="dot"></span>'+(ori?('Listando equipamentos lotados em <b>'+esc(setNome(ori))+'</b> ('+pool.length+' no total).'):'Escolha primeiro a unidade de ORIGEM para listar os equipamentos.');
 }
-$('#guiaEqBusca').addEventListener('input',preencherSelGuiaEq);
 function renderGuiaCart(){
   $('#guiaCartCount').textContent=cartGuia.length;
   const box=$('#guiaCart');
@@ -2869,7 +2865,6 @@ function resetGuiaForm(){
   $('#guiaOS').value='';
   $('#guiaTecnicoLogado').textContent=usuarioAtual?usuarioAtual.nome:'—';
   $('#guiaRespOri').value='';$('#guiaRespPat').value='';$('#guiaRespDest').value='';$('#guiaFoneOri').value='';
-  $('#guiaEqBusca').value='';
   $('#guiaEqSel').value='';
   $('#guiaChkSetor').checked=true;
   sigGuia.limpar();sigGuiaPat.limpar();sigGuiaDest.limpar();
