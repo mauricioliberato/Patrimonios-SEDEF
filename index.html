@@ -230,12 +230,12 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
 .modal-h{padding:18px 22px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:10px}
 .modal-h h3{font:700 16px var(--disp);text-transform:uppercase;letter-spacing:.04em}
 .modal-b{padding:20px 22px;display:flex;flex-direction:column;gap:14px}
-.modal-f{padding:16px 22px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px}
+.modal-f{padding:16px 22px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap}
 .x-close{background:none;border:none;font-size:22px;color:var(--muted);cursor:pointer;line-height:1}
 .x-close:hover{color:var(--bad)}
 .info-chip{background:var(--info-bg);border:1px solid #bfe0ec;border-radius:8px;padding:10px 14px;font-size:12.5px;color:#0b5a77;line-height:1.55}
 
-#scanReader{width:100%;min-height:220px;background:#0a1620;border-radius:8px;overflow:hidden}
+#scanReader{width:100%;min-height:220px;background:#0a1620;border-radius:8px;overflow:hidden;display:grid;place-items:center;color:#8ba3b6;font-size:13px}
 #scanReader video{width:100%!important;height:auto!important;display:block}
 
 #toasts{position:fixed;right:20px;bottom:20px;z-index:300;display:flex;flex-direction:column;gap:10px}
@@ -1246,13 +1246,22 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
 </div>
 
 <div class="modal-overlay" id="modalScan">
-  <div class="modal" style="width:min(520px,100%)">
-    <div class="modal-h"><h3>📷 Ler código de barras</h3><button class="x-close" data-close>&times;</button></div>
-    <div class="modal-b">
-      <div id="scanReader"></div>
-      <p class="subtle">Aponte a câmera para o código de barras ou QR do equipamento. A leitura é automática.</p>
+  <div class="modal" style="width:min(560px,100%)">
+    <div class="modal-h">
+      <h3>📷 Ler código de barras</h3>
+      <button class="x-close" data-close>&times;</button>
     </div>
-    <div class="modal-f"><button class="btn btn-ghost" data-close>Cancelar</button></div>
+    <div class="modal-b">
+      <div id="scanReader" style="min-height:220px;background:#0a1620;border-radius:8px;overflow:hidden;display:grid;place-items:center;color:#8ba3b6;font-size:13px">
+        Iniciando câmera…
+      </div>
+      <p class="subtle" id="scanHint">Aponte a câmera para o código. A leitura é automática — só os <b>números</b> são aproveitados.</p>
+    </div>
+    <div class="modal-f">
+      <button class="btn btn-ghost" id="btnScanFoto" type="button">📸 Usar foto</button>
+      <button class="btn btn-ghost" data-close>Cancelar</button>
+    </div>
+    <input type="file" id="fileScanFoto" accept="image/*" capture="environment" style="display:none">
   </div>
 </div>
 
@@ -1382,7 +1391,7 @@ const firebaseConfig={
 firebase.initializeApp(firebaseConfig);
 const fsdb=firebase.firestore();
 const SESSAO_KEY='sget-usuario-v2';
-const SESSAO_TTL_MS=8*60*60*1000; /* 8 horas */
+const SESSAO_TTL_MS=8*60*60*1000;
 let usuarioAtual=null;
 let sincronizando=false;
 let unsubscribers=[];
@@ -1847,55 +1856,201 @@ $('#sigGuiaClear').addEventListener('click',()=>sigGuia.limpar());
 $('#sigGuiaPatClear').addEventListener('click',()=>sigGuiaPat.limpar());
 $('#sigGuiaDestClear').addEventListener('click',()=>sigGuiaDest.limpar());
 
-/* ============== SCANNER DE CÓDIGO DE BARRAS (CÂMERA) ============== */
-let scanInstance=null,scanTarget=null;
+/* ============== SCANNER v2 — BarcodeDetector nativo + html5-qrcode + foto ============== */
+let scanStream = null;
+let scanHtml5 = null;
+let scanAtivo = false;
+let scanTarget = null;
+
+const FORMATOS_1D = ['code_128','code_39','code_93','codabar','ean_13','ean_8','upc_a','upc_e','itf'];
+const FORMATOS_QR = ['qr_code','data_matrix','pdf417','aztec'];
+
+/* Extrai SOMENTE dígitos: "PR 100001179218" → "100001179218" */
+function normalizarCodigoLido(texto){
+  if(texto==null)return '';
+  return String(texto).replace(/\D/g,'');
+}
+
 async function abrirScanner(targetId){
-  scanTarget=targetId;
+  scanTarget = targetId;
   $('#modalScan').classList.add('show');
   await new Promise(r=>setTimeout(r,120));
-  try{
-    scanInstance=new Html5Qrcode('scanReader');
-    await scanInstance.start(
-      {facingMode:'environment'},
-      {fps:10,qrbox:{width:260,height:130},aspectRatio:2.0},
-      texto=>{
-        /* usa dígitos quando houver (patrimônio), senão o texto cru (série com letras) */
-        const dig=soDigitos(texto);
-        const valor=dig||String(texto||'').trim();
-        if(valor){
-          const el=$('#'+scanTarget);
-          if(el){
-            el.value=valor;
-            el.classList.remove('leitura-ok');void el.offsetWidth;el.classList.add('leitura-ok');
-            beep();
-            /* dispara 'input' para que listeners (busca com debounce, sanitização etc.) reajam sozinhos */
-            el.dispatchEvent(new Event('input',{bubbles:true}));
-            /* se for busca de equipamentos, aciona imediatamente sem esperar debounce */
-            if(el.id==='eqBusca'&&typeof renderEquipamentos==='function')renderEquipamentos();
-          }
-        }
+  $('#scanReader').innerHTML = '<div style="padding:16px">Iniciando câmera…</div>';
+
+  if('BarcodeDetector' in window){
+    try{
+      await iniciarScannerNativo();
+      return;
+    }catch(e){
+      console.warn('BarcodeDetector nativo indisponível, caindo para html5-qrcode:', e);
+      $('#scanReader').innerHTML = '';
+    }
+  }
+  await iniciarScannerHtml5();
+}
+
+async function iniciarScannerNativo(){
+  const suportados = await BarcodeDetector.getSupportedFormats();
+  const wanted = [...FORMATOS_1D, ...FORMATOS_QR].filter(f => suportados.includes(f));
+  const detector = new BarcodeDetector({ formats: wanted });
+  $('#scanHint').innerHTML = 'Decoder: <b>BarcodeDetector (nativo)</b> · só os números são aproveitados.';
+
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: {
+      facingMode: { ideal: 'environment' },
+      width:  { ideal: 1920 },
+      height: { ideal: 1080 }
+    },
+    audio: false
+  });
+
+  const video = document.createElement('video');
+  video.setAttribute('playsinline','true');
+  video.setAttribute('autoplay','true');
+  video.muted = true;
+  video.style.cssText = 'width:100%;height:auto;display:block;background:#000';
+  $('#scanReader').innerHTML = '';
+  $('#scanReader').appendChild(video);
+  video.srcObject = stream;
+  await video.play();
+
+  scanStream = stream;
+  scanAtivo = true;
+
+  const loop = async () => {
+    if(!scanAtivo)return;
+    try{
+      const codigos = await detector.detect(video);
+      if(codigos && codigos.length){
+        const bruto = codigos[0].rawValue;
         pararScanner();
+        aplicarLeitura(bruto);
+        return;
+      }
+    }catch(_){}
+    requestAnimationFrame(loop);
+  };
+  loop();
+}
+
+async function iniciarScannerHtml5(){
+  try{
+    const F = Html5QrcodeSupportedFormats;
+    scanHtml5 = new Html5Qrcode('scanReader', false);
+    $('#scanHint').innerHTML = 'Decoder: <b>html5-qrcode</b> · só os números são aproveitados.';
+    scanAtivo = true;
+    await scanHtml5.start(
+      { facingMode: 'environment' },
+      {
+        fps: 20,
+        qrbox: (w, h) => {
+          const larg = Math.floor(w * 0.92);
+          const alt  = Math.floor(Math.min(h * 0.65, larg * 0.6));
+          return { width: larg, height: alt };
+        },
+        aspectRatio: 1.777,
+        disableFlip: false,
+        formatsToSupport: [
+          F.CODE_128, F.CODE_39, F.CODE_93, F.CODABAR,
+          F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E, F.ITF,
+          F.QR_CODE, F.DATA_MATRIX, F.PDF_417, F.AZTEC
+        ],
+        experimentalFeatures: { useBarCodeDetectorIfSupported: true }
+      },
+      texto=>{
+        pararScanner();
+        aplicarLeitura(texto);
       },
       ()=>{}
     );
   }catch(e){
-    console.error('Erro ao abrir scanner:',e);
+    console.error('html5-qrcode falhou:', e);
     toast('Não foi possível acessar a câmera. Verifique as permissões do navegador.','bad');
     pararScanner();
   }
 }
-function pararScanner(){
-  if(scanInstance){
-    try{scanInstance.stop().then(()=>{try{scanInstance.clear();}catch(_){}}).catch(()=>{});}catch(_){}
-    scanInstance=null;
+
+function aplicarLeitura(bruto){
+  const digitos = normalizarCodigoLido(bruto);
+  if(!digitos){
+    toast('Código lido, mas sem números: <b class="mono">'+esc(String(bruto).slice(0,30))+'</b>','warn');
+    return;
   }
-  $('#modalScan').classList.remove('show');
-  scanTarget=null;
+  const el = $('#'+scanTarget);
+  if(el){
+    el.value = digitos;
+    el.classList.remove('leitura-ok'); void el.offsetWidth; el.classList.add('leitura-ok');
+    beep();
+    el.dispatchEvent(new Event('input',{bubbles:true}));
+    if(el.id==='eqBusca' && typeof renderEquipamentos==='function') renderEquipamentos();
+  }
 }
+
+function pararScanner(){
+  scanAtivo = false;
+  if(scanStream){
+    try{ scanStream.getTracks().forEach(t=>t.stop()); }catch(_){}
+    scanStream = null;
+  }
+  if(scanHtml5){
+    try{ scanHtml5.stop().then(()=>{ try{scanHtml5.clear();}catch(_){} }).catch(()=>{}); }catch(_){}
+    scanHtml5 = null;
+  }
+  const r = $('#scanReader'); if(r) r.innerHTML = '';
+  $('#modalScan').classList.remove('show');
+  scanTarget = null;
+}
+
+/* Abrir scanner em qualquer botão com data-scan-target */
 document.addEventListener('click',e=>{
-  const b=e.target.closest('[data-scan-target]');
-  if(b){e.preventDefault();abrirScanner(b.dataset.scanTarget);}
+  const b = e.target.closest('[data-scan-target]');
+  if(b){ e.preventDefault(); abrirScanner(b.dataset.scanTarget); }
 });
+
+/* Modo "Usar foto" — captura uma imagem e decodifica offline */
+document.addEventListener('click',e=>{
+  if(e.target.closest('#btnScanFoto')){
+    e.preventDefault();
+    const inp = $('#fileScanFoto');
+    inp.value = '';
+    inp.click();
+  }
+});
+document.addEventListener('change',async e=>{
+  if(e.target && e.target.id==='fileScanFoto'){
+    const f = e.target.files[0]; if(!f) return;
+    pararScanner();
+    await tentarLerFoto(f);
+  }
+});
+
+async function tentarLerFoto(file){
+  if('BarcodeDetector' in window){
+    try{
+      const bitmap = await createImageBitmap(file);
+      const suportados = await BarcodeDetector.getSupportedFormats();
+      const wanted = [...FORMATOS_1D, ...FORMATOS_QR].filter(f => suportados.includes(f));
+      const detector = new BarcodeDetector({ formats: wanted });
+      const codigos = await detector.detect(bitmap);
+      if(codigos && codigos.length){
+        aplicarLeitura(codigos[0].rawValue);
+        return;
+      }
+    }catch(err){ console.warn('detect(foto) falhou:', err); }
+  }
+  try{
+    const tmpId = 'scanFileTmp';
+    let tmp = document.getElementById(tmpId);
+    if(!tmp){ tmp = document.createElement('div'); tmp.id = tmpId; tmp.style.display='none'; document.body.appendChild(tmp); }
+    const html5 = new Html5Qrcode(tmpId, false);
+    const res = await html5.scanFile(file, false);
+    try{ html5.clear(); }catch(_){}
+    aplicarLeitura(res);
+  }catch(err){
+    console.error('scanFile falhou:', err);
+    toast('Não consegui ler o código nesta foto. Tente: (1) aproximar mais a câmera, (2) deixar o código ocupar boa parte do quadro, (3) evitar reflexos.','bad');
+  }
+}
 
 /* ============== SELECTS AUXILIARES ============== */
 let selSig='';
@@ -3677,7 +3832,7 @@ $('#btnConfOk').addEventListener('click',()=>{const cb=confCb;fecharModais();cb&
 function fecharModais(){
   $$('.modal-overlay').forEach(m=>m.classList.remove('show'));
   confCb=null;devId=null;
-  if(scanInstance)pararScanner();
+  pararScanner();
 }
 $$('.modal-overlay').forEach(m=>m.addEventListener('click',e=>{if(e.target===m||e.target.closest('[data-close]'))fecharModais();}));
 document.addEventListener('keydown',e=>{if(e.key==='Escape')fecharModais();});
