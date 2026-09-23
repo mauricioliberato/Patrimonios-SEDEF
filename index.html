@@ -35,7 +35,6 @@ body{
 button{font-family:inherit}
 ::selection{background:var(--accent);color:#201302}
 
-/* ============ LAYOUT ============ */
 .app{display:none;height:100vh}
 body.logado .app{display:flex}
 .sidebar{width:242px;flex:0 0 242px;background:linear-gradient(180deg,var(--side) 0%,#0a1620 100%);color:#9fb3c2;display:flex;flex-direction:column;border-right:1px solid #06101a}
@@ -73,7 +72,6 @@ body.logado .app{display:flex}
 .view.active{display:block;animation:viewIn .35s ease both}
 @keyframes viewIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 
-/* ============ COMPONENTES ============ */
 .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:0 1px 3px rgba(13,31,45,.06);margin-bottom:22px;transition:box-shadow .2s,border-color .2s}
 .card.editando{border-color:var(--accent);box-shadow:0 0 0 3px rgba(255,140,26,.22)}
 .card-h{padding:15px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
@@ -89,7 +87,7 @@ body.logado .app{display:flex}
 .lbl-row{display:flex;justify-content:space-between;align-items:center;gap:6px}
 .add-mini{background:none;border:1px dashed var(--line2);color:var(--accent-dk);font:600 10px var(--body);letter-spacing:.05em;text-transform:uppercase;cursor:pointer;padding:3px 8px;border-radius:999px;transition:.15s;white-space:nowrap}
 .add-mini:hover{background:var(--accent-soft);border-color:var(--accent)}
-input[type=text],input[type=date],input[type=time],select,textarea{
+input[type=text],input[type=date],input[type=time],input[type=tel],select,textarea{
   width:100%;padding:10px 12px;border:1px solid var(--line2);border-radius:6px;background:#fff;
   font:400 14px var(--body);color:var(--ink);transition:border-color .15s,box-shadow .15s;
 }
@@ -97,6 +95,8 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
 textarea{resize:vertical;min-height:64px}
 input.flash{animation:flash .5s}
 @keyframes flash{0%{box-shadow:0 0 0 4px rgba(255,140,26,.45)}100%{box-shadow:none}}
+input.leitura-ok{animation:leituraOk 1.1s ease}
+@keyframes leituraOk{0%{border-color:var(--ok);box-shadow:0 0 0 4px rgba(23,143,95,.35)}100%{border-color:var(--line2);box-shadow:none}}
 .fgrid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}
 .c2{grid-column:span 2}.c3{grid-column:span 3}.c4{grid-column:span 4}.c5{grid-column:span 5}
 .c6{grid-column:span 6}.c7{grid-column:span 7}.c8{grid-column:span 8}.c12{grid-column:span 12}
@@ -106,8 +106,13 @@ input.flash{animation:flash .5s}
 .dt-row{display:flex;gap:8px}
 .dt-row input[type=time]{width:112px;flex:0 0 112px}
 .form-actions{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+.input-with-cam{position:relative;display:flex;gap:6px}
+.input-with-cam input{flex:1}
+.btn-cam{flex:0 0 auto;width:40px;padding:0;display:grid;place-items:center;background:var(--ink);color:#fff;border:none;border-radius:6px;cursor:pointer;box-shadow:0 2px 0 #061220;transition:.15s}
+.btn-cam:hover{background:#1a3348;transform:translateY(-1px)}
+.btn-cam:active{transform:translateY(1px)}
+.btn-cam svg{width:20px;height:20px}
 
-/* interruptor sim/não */
 .switch{display:inline-flex;align-items:center;gap:8px;cursor:pointer;user-select:none;padding:7px 0}
 .switch input{position:absolute;opacity:0;width:0;height:0}
 .switch .sw{width:38px;height:22px;border-radius:999px;background:var(--line2);position:relative;transition:.2s;flex:0 0 38px}
@@ -138,7 +143,6 @@ tr:hover .ibtn,li:hover .ibtn,.cart-item:hover .ibtn{opacity:1}
 .ibtn svg{width:15px;height:15px}
 .actions{display:flex;gap:6px;justify-content:flex-end;align-items:center}
 
-/* tabelas */
 .table-wrap{overflow:auto;max-height:58vh}
 table{width:100%;border-collapse:collapse;font-size:13.5px}
 thead th{position:sticky;top:0;z-index:2;background:#f6f8fa;font:600 10.5px var(--body);letter-spacing:.09em;text-transform:uppercase;color:var(--muted);text-align:left;padding:11px 14px;border-bottom:2px solid var(--line)}
@@ -160,7 +164,6 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
 .pill.info{background:var(--info-bg);color:var(--info)}
 .subtle{font-size:11.5px;color:var(--muted)}
 
-/* KPIs */
 .kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-bottom:22px}
 .kpi{background:var(--card);border:1px solid var(--line);border-top:3px solid var(--ink);border-radius:var(--r);padding:16px 18px;box-shadow:0 1px 3px rgba(13,31,45,.06);transition:.18s}
 .kpi:hover{transform:translateY(-3px);box-shadow:0 8px 18px rgba(13,31,45,.10)}
@@ -186,9 +189,8 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
 .mini-list .who{flex:1;min-width:0}
 .mini-list .who b{display:block;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mini-list .who span{font-size:11.5px;color:var(--muted)}
-.q-actions{display:flex;gap:10px;padding:14px 2px 2px}
+.q-actions{display:flex;gap:10px;padding:14px 2px 2px;flex-wrap:wrap}
 
-/* assinatura */
 .sig-wrap{position:relative;border:1.5px dashed var(--line2);border-radius:8px;background:#fbfcfe;overflow:hidden;transition:max-height .22s ease;max-height:500px}
 .sig-wrap.recolhido{max-height:40px;cursor:pointer}
 .sig-wrap.recolhido:hover{background:#f2f6fa}
@@ -206,14 +208,12 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
 .sig-preview img{height:76px;border:1px solid var(--line);border-radius:6px;background:#fff;padding:4px 8px}
 .sig-preview .lbl{font:600 10.5px var(--body);letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
 
-/* carrinho de equipamentos */
 .cart-box{border:1px solid var(--line2);border-radius:6px;background:#fbfcfe;max-height:158px;overflow-y:auto}
 .cart-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-bottom:1px dashed var(--line);animation:viewIn .25s ease both}
 .cart-item:last-child{border-bottom:none}
 .cart-item .rm{width:24px;height:24px;font-size:13px}
 .cart-empty{padding:16px 12px;color:var(--muted);font-size:12.5px;text-align:center}
 
-/* filtros */
 .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .toolbar input[type=text]{max-width:280px}
 .toolbar select{width:auto}
@@ -223,7 +223,6 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
 .tab.active{background:var(--ink);border-color:var(--ink);color:#fff}
 .tab .n{font-family:var(--mono);font-size:10.5px;opacity:.7;margin-left:5px}
 
-/* modais */
 .modal-overlay{position:fixed;inset:0;background:rgba(10,22,32,.58);backdrop-filter:blur(2px);display:none;align-items:flex-start;justify-content:center;z-index:200;padding:6vh 16px;overflow-y:auto}
 .modal-overlay.show{display:flex}
 .modal{background:#fff;border-radius:12px;width:min(600px,100%);box-shadow:0 24px 60px rgba(0,0,0,.35);animation:modalIn .22s ease both;border-top:4px solid var(--accent)}
@@ -236,14 +235,15 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
 .x-close:hover{color:var(--bad)}
 .info-chip{background:var(--info-bg);border:1px solid #bfe0ec;border-radius:8px;padding:10px 14px;font-size:12.5px;color:#0b5a77;line-height:1.55}
 
-/* toasts */
+#scanReader{width:100%;min-height:220px;background:#0a1620;border-radius:8px;overflow:hidden}
+#scanReader video{width:100%!important;height:auto!important;display:block}
+
 #toasts{position:fixed;right:20px;bottom:20px;z-index:300;display:flex;flex-direction:column;gap:10px}
 .toast{background:var(--ink);color:#fff;padding:13px 18px 13px 14px;border-radius:8px;border-left:4px solid var(--ok);font-size:13px;box-shadow:0 10px 26px rgba(0,0,0,.28);animation:toastIn .28s ease both;max-width:360px;transition:opacity .35s,transform .35s}
 .toast.bad{border-left-color:var(--bad)} .toast.warn{border-left-color:var(--accent)}
 .toast.out{opacity:0;transform:translateX(14px)}
 @keyframes toastIn{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:none}}
 
-/* ============ IMPRESSÃO ============ */
 #printArea{display:none}
 @media print{
   @page{margin:14mm}
@@ -271,10 +271,9 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
   .r-foot{margin-top:34px;font-size:10.5px;color:#666;text-align:center}
 }
 
-/* responsivo */
 @media(max-width:1120px){.kpis{grid-template-columns:repeat(3,1fr)}.dash-grid{grid-template-columns:1fr}}
 .mobile-menu-toggle{display:none;align-items:center;justify-content:center;width:38px;height:38px;border-radius:8px;
-  border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);color:#cfe0ec;cursor:pointer;flex:0 0 auto;padding:0}
+  border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);color:#cfe0ec;cursor:pointer;flex:0 0 auto;padding:0;margin-left:auto}
 .mobile-menu-toggle svg{width:20px;height:20px}
 .sair-mobile{display:none}
 .set-row{cursor:pointer}
@@ -310,12 +309,16 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
 <body>
 
 <div class="app">
-  <!-- ================= SIDEBAR ================= -->
   <aside class="sidebar">
     <div class="brand">
       <div class="mark">NII</div>
       <div><b>Patrimonios</b><span>SEDEF · Núcleo de Informática e Informações</span></div>
     </div>
+
+    <button class="mobile-menu-toggle" id="btnMenuMobile" aria-label="Abrir menu" aria-expanded="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </button>
+
     <nav id="navPrincipal">
       <button class="nav-item active" data-view="dashboard">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
@@ -400,26 +403,6 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
       </button>
     </nav>
 
-    <button class="mobile-menu-toggle" id="btnMenuMobile" aria-label="Abrir menu" aria-expanded="false">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
-    </button>
-
-    <style>
-      .online-panel{padding:12px 18px;border-top:1px solid rgba(255,255,255,.07)}
-      .online-h{font:600 10px var(--body);letter-spacing:.16em;text-transform:uppercase;color:#54708a;
-        display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
-      .online-lista{display:flex;flex-direction:column;gap:5px;max-height:140px;overflow-y:auto}
-      .online-item{display:flex;align-items:center;gap:8px;font:500 12.5px var(--body);color:#cfe0ec}
-      .online-dot{width:7px;height:7px;border-radius:50%;background:var(--ok);flex:0 0 7px;
-        box-shadow:0 0 0 0 rgba(23,143,95,.5);animation:pulse 1.6s infinite}
-      .online-empty{font-size:11.5px;color:#5d7891}
-      .online-mini{display:none;align-items:center;gap:6px;flex:0 0 auto;padding:6px 12px;border-radius:20px;
-        background:rgba(255,255,255,.08);color:#cfe0ec;font:700 12.5px var(--body);white-space:nowrap}
-      @media(max-width:980px){
-        .online-panel{display:none}
-        .online-mini{display:flex}
-      }
-    </style>
     <div class="online-panel">
       <div class="online-h">Online agora <span class="nav-badge" id="onlineCount">0</span></div>
       <div class="online-lista" id="onlineLista"><div class="online-empty">Carregando…</div></div>
@@ -437,11 +420,10 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
         <button class="btn-side" id="btnExport">⬇ Exportar backup</button>
         <button class="btn-side" id="btnImport">⬆ Importar</button>
       </div>
-      <small>Dados sincronizados em nuvem (Firebase) entre todos os dispositivos.</small>
+      <small>Dados sincronizados em nuvem (Firebase).</small>
     </div>
   </aside>
 
-  <!-- ================= MAIN ================= -->
   <main class="main">
     <header class="topbar">
       <div><h1 id="topTitle">Painel</h1><p id="topSub">Visão geral do inventário e movimentações</p></div>
@@ -450,7 +432,6 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
 
     <div class="content"><div class="content-inner">
 
-      <!-- ========== PAINEL ========== -->
       <section class="view active" id="view-dashboard">
         <div class="kpis">
           <div class="kpi"><div class="v" id="kpiTotal">0</div><div class="l">Equipamentos</div><div class="s">no inventário</div></div>
@@ -478,9 +459,7 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
         </div>
       </section>
 
-      <!-- ========== EQUIPAMENTOS ========== -->
       <section class="view" id="view-equipamentos">
-
         <div class="card eq-panel" id="cardEqLista">
           <div class="card-h">
             <h3>Equipamentos cadastrados (unidades)</h3>
@@ -511,7 +490,7 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
           <div class="card-h">
             <h3 id="modFormTitle">1 · Catálogo de equipamentos (modelo)</h3>
             <span class="pill warn" id="modEditBadge" style="display:none">✎ EDITANDO</span>
-            <span class="sub">Chegou equipamento novo? Cadastre aqui o tipo e a marca/modelo — depois vincule os patrimônios abaixo.</span>
+            <span class="sub">Cadastre o tipo + marca/modelo — depois vincule os patrimônios.</span>
           </div>
           <div class="card-b">
             <form id="formModelo" autocomplete="off">
@@ -550,7 +529,7 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
           <div class="card-h">
             <h3 id="eqFormTitle">2 · Cadastro de unidade (patrimônio)</h3>
             <span class="pill warn" id="eqEditBadge" style="display:none">✎ EDITANDO</span>
-            <span class="sub">Vincule o patrimônio a um modelo do catálogo · todos os campos são opcionais</span>
+            <span class="sub">📷 use a câmera para ler o código de barras — leitor físico também funciona (Enter avança)</span>
           </div>
           <div class="card-b">
             <form id="formEquip" autocomplete="off">
@@ -558,17 +537,26 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
               <div class="fgrid">
                 <div class="field c3">
                   <label>Nº de Patrimônio</label>
-                  <input type="text" id="eqPatrimonio" class="mono" inputmode="numeric" placeholder="Somente números">
-                  <span class="hint"><span class="dot"></span>Aceita apenas números: digite ou use o leitor de código de barras (Enter confirma e avança).</span>
+                  <div class="input-with-cam">
+                    <input type="text" id="eqPatrimonio" class="mono" inputmode="numeric" placeholder="Somente números" autocomplete="off">
+                    <button type="button" class="btn-cam" data-scan-target="eqPatrimonio" title="Ler código de barras com a câmera">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8V5a2 2 0 012-2h3M21 8V5a2 2 0 00-2-2h-3M3 16v3a2 2 0 002 2h3M21 16v3a2 2 0 01-2 2h-3"/><circle cx="12" cy="12" r="3"/></svg>
+                    </button>
+                  </div>
+                  <span class="hint"><span class="dot"></span>Digite, use leitor físico ou a câmera 📷</span>
                 </div>
                 <div class="field c3">
                   <label>Número de Série</label>
-                  <input type="text" id="eqSerie" class="mono" placeholder="S/N">
+                  <div class="input-with-cam">
+                    <input type="text" id="eqSerie" class="mono" placeholder="S/N" autocomplete="off">
+                    <button type="button" class="btn-cam" data-scan-target="eqSerie" title="Ler código de barras com a câmera">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8V5a2 2 0 012-2h3M21 8V5a2 2 0 00-2-2h-3M3 16v3a2 2 0 002 2h3M21 16v3a2 2 0 01-2 2h-3"/><circle cx="12" cy="12" r="3"/></svg>
+                    </button>
+                  </div>
                 </div>
                 <div class="field c4">
                   <label>Modelo cadastrado</label>
                   <select id="eqModelo"></select>
-                  <span class="hint"><span class="dot"></span>Não achou o modelo? Cadastre-o no catálogo.</span>
                 </div>
                 <div class="field c2">
                   <label>Data</label>
@@ -605,13 +593,12 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
         </div>
       </section>
 
-      <!-- ========== EMPRÉSTIMOS ========== -->
       <section class="view" id="view-emprestimos">
         <div class="card" id="cardEmpForm">
           <div class="card-h">
             <h3 id="empFormTitle">Empréstimo de equipamento</h3>
             <span class="pill warn" id="empEditBadge" style="display:none">✎ EDITANDO</span>
-            <span class="sub">Obrigatórios: <b style="color:var(--bad)">Equipamentos, Técnico, Solicitante e Setor</b> · adicione quantos itens quiser</span>
+            <span class="sub">Obrigatórios: <b style="color:var(--bad)">Equipamentos, Técnico, Solicitante e Setor</b></span>
           </div>
           <div class="card-b">
             <form id="formEmp" autocomplete="off">
@@ -619,7 +606,7 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
                 <div class="field c3">
                   <label>Número da O.S.</label>
                   <input type="text" id="empOS" class="mono" placeholder="3142390 → P-31423-90">
-                  <span class="hint"><span class="dot"></span>Digite apenas os números — o sistema formata automaticamente (P-00000-00).</span>
+                  <span class="hint"><span class="dot"></span>Digite apenas os números — formatação automática.</span>
                 </div>
                 <div class="field c5">
                   <label>Equipamentos <b>*</b></label>
@@ -627,7 +614,6 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
                     <select id="empEqSel" class="mono" style="flex:1"></select>
                     <button type="button" class="btn btn-dark btn-sm" id="btnAddEq">+ Adicionar</button>
                   </div>
-                  <span class="hint"><span class="dot"></span>Aparecem aqui apenas equipamentos disponíveis e liberados para empréstimo.</span>
                 </div>
                 <div class="field c4">
                   <label>Neste empréstimo: <b id="empCartCount" style="color:var(--ink)">0</b> item(ns)</label>
@@ -722,13 +708,12 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
         </div>
       </section>
 
-      <!-- ========== GUIAS DE TRANSFERÊNCIA ========== -->
       <section class="view" id="view-guias">
         <div class="card" id="cardGuiaForm">
           <div class="card-h">
             <h3 id="guiaFormTitle">Guia de Transferência de Bens Patrimoniais</h3>
             <span class="pill warn" id="guiaEditBadge" style="display:none">✎ EDITANDO</span>
-            <span class="sub">Guia nº <b class="mono" id="guiaNumLbl">—</b> · emissão: <b class="mono" id="guiaEmisLbl">—</b> · obrigatórios: ORIGEM, DESTINO e ao menos 1 equipamento · a guia sai como <b>Concluída</b></span>
+            <span class="sub">Guia nº <b class="mono" id="guiaNumLbl">—</b> · emissão: <b class="mono" id="guiaEmisLbl">—</b></span>
           </div>
           <div class="card-b">
             <form id="formGuia" autocomplete="off">
@@ -849,7 +834,6 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
         </div>
       </section>
 
-      <!-- ========== IMPRESSORAS ========== -->
       <section class="view" id="view-impressoras">
         <div class="card imp-panel" id="cardImpLista">
           <div class="card-h">
@@ -875,7 +859,7 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
           <div class="card-h">
             <h3 id="impFormTitle">Cadastro de impressora</h3>
             <span class="pill warn" id="impEditBadge" style="display:none">✎ EDITANDO</span>
-            <span class="sub">Parque de impressões · campo com <b style="color:var(--bad)">*</b> é obrigatório</span>
+            <span class="sub">Campo com <b style="color:var(--bad)">*</b> é obrigatório</span>
           </div>
           <div class="card-b">
             <form id="formImpressora" autocomplete="off">
@@ -920,7 +904,6 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
         </div>
       </section>
 
-      <!-- ========== SWITCHS NR E IARAS ========== -->
       <section class="view" id="view-switches">
         <div class="card sw-panel" id="cardSwLista">
           <div class="card-h">
@@ -946,7 +929,6 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
           <div class="card-h">
             <h3 id="swFormTitle">Cadastro de switch</h3>
             <span class="pill warn" id="swEditBadge" style="display:none">✎ EDITANDO</span>
-            <span class="sub">Switchs NR e IARAS · dados para consulta de acesso</span>
           </div>
           <div class="card-b">
             <form id="formSwitch" autocomplete="off">
@@ -982,13 +964,12 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
         </div>
       </section>
 
-      <!-- ========== PONTOS DE REDE ========== -->
       <section class="view" id="view-racks">
         <div class="card rk-panel" id="cardRkLista">
           <div class="card-h">
             <h3>Pontos cadastrados</h3>
             <div class="toolbar">
-              <input type="text" id="rkBusca" placeholder="🔍 Buscar rack, patch panel, ponto, tipo, switch, porta, setor…">
+              <input type="text" id="rkBusca" placeholder="🔍 Buscar rack, patch panel, ponto…">
               <button type="button" class="btn btn-ghost btn-sm" id="btnImportarRacksMulti">📥 Importar planilha (abas 5A–6D)</button>
               <input type="file" id="fileImportRacksMulti" accept=".xlsx,.xls" style="display:none">
             </div>
@@ -1010,7 +991,6 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
           <div class="card-h">
             <h3 id="rkFormTitle">Cadastro de ponto de rack</h3>
             <span class="pill warn" id="rkEditBadge" style="display:none">✎ EDITANDO</span>
-            <span class="sub">Mapeamento de racks, patch panel e portas de switch</span>
           </div>
           <div class="card-b">
             <form id="formRack" autocomplete="off">
@@ -1059,13 +1039,11 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
         </div>
       </section>
 
-      <!-- ========== LICENÇAS OFFICE 2024 ========== -->
       <section class="view" id="view-licencas">
         <div class="card lic-panel" id="cardLicForm">
           <div class="card-h">
             <h3 id="licFormTitle">Cadastro de licença</h3>
             <span class="pill warn" id="licEditBadge" style="display:none">✎ EDITANDO</span>
-            <span class="sub">Controle de chaves do Office 2024 e contas vinculadas</span>
           </div>
           <div class="card-b">
             <form id="formLicenca" autocomplete="off">
@@ -1101,7 +1079,7 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
           <div class="card-h">
             <h3>Licenças cadastradas</h3>
             <div class="toolbar">
-              <input type="text" id="licBusca" placeholder="🔍 Buscar hostname, chave, e-mail, observação…">
+              <input type="text" id="licBusca" placeholder="🔍 Buscar hostname, chave, e-mail…">
             </div>
           </div>
           <div class="card-b flush">
@@ -1118,10 +1096,9 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
         </div>
       </section>
 
-      <!-- ========== TÉCNICOS ========== -->
       <section class="view" id="view-tecnicos">
         <div class="card">
-          <div class="card-h"><h3 id="tecFormTitle">Cadastro de técnico</h3><span class="sub">Os empréstimos e equipamentos usam esta lista</span></div>
+          <div class="card-h"><h3 id="tecFormTitle">Cadastro de técnico</h3><span class="sub">Os empréstimos usam esta lista</span></div>
           <div class="card-b">
             <form id="formTecnico" autocomplete="off">
               <input type="hidden" id="tecId">
@@ -1130,8 +1107,8 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
                 <div class="field c3"><label>Matrícula <span class="subtle" style="text-transform:none;font-weight:400">(automática)</span></label><input type="text" id="tecMatricula" class="mono" readonly style="background:#f2f5f8;color:var(--ink-soft)"></div>
                 <div class="field c4"></div>
                 <div class="field c4"><label>Usuário de login</label><input type="text" id="tecUsuario" class="mono" placeholder="opcional" autocomplete="off"></div>
-                <div class="field c4"><label>Senha de login</label><input type="text" id="tecSenha" class="mono" placeholder="opcional" autocomplete="new-password"></div>
-                <div class="field c4"><div class="hint"><span class="dot"></span>Preencha para esta pessoa poder entrar no sistema.</div></div>
+                <div class="field c4"><label>Senha de login</label><input type="password" id="tecSenha" class="mono" placeholder="opcional" autocomplete="new-password"></div>
+                <div class="field c4"><div class="hint"><span class="dot"></span>A senha é guardada como hash (SHA-256). Preencha usuário e senha juntos.</div></div>
                 <div class="field c12 form-actions">
                   <button type="submit" class="btn btn-accent" id="btnTecSubmit">✔ Salvar técnico</button>
                   <button type="button" class="btn btn-ghost" id="btnTecCancel" style="display:none">Cancelar</button>
@@ -1149,10 +1126,9 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
         </div>
       </section>
 
-      <!-- ========== SETORES ========== -->
       <section class="view" id="view-setores">
         <div class="card">
-          <div class="card-h"><h3 id="setFormTitle">Cadastro de setor</h3><span class="sub">Os empréstimos, equipamentos, guias e impressoras usam esta lista</span></div>
+          <div class="card-h"><h3 id="setFormTitle">Cadastro de setor</h3><span class="sub">Alimenta empréstimos, equipamentos, guias e impressoras</span></div>
           <div class="card-b">
             <form id="formSetor" autocomplete="off">
               <input type="hidden" id="setId">
@@ -1161,8 +1137,8 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
                 <div class="field c4"><label>Contato</label><input type="text" id="setContato" placeholder="Pessoa de contato"></div>
                 <div class="field c3"><label>E-mail</label><input type="text" id="setEmail" placeholder="setor@exemplo.gov.br"></div>
                 <div class="field c6"><label>Endereço</label><input type="text" id="setEndereco" placeholder="Local / sala / bloco"></div>
-                <div class="field c3"><label>Fone 1</label><input type="text" id="setFone1" class="mono" inputmode="tel" placeholder="(41) 99999-9999"></div>
-                <div class="field c3"><label>Fone 2</label><input type="text" id="setFone2" class="mono" inputmode="tel" placeholder="(41) 3388-4572"></div>
+                <div class="field c3"><label>Fone 1</label><input type="tel" id="setFone1" class="mono" placeholder="(41) 99999-9999"></div>
+                <div class="field c3"><label>Fone 2</label><input type="tel" id="setFone2" class="mono" placeholder="(41) 3388-4572"></div>
                 <div class="field c3"><label>Rede</label><input type="text" id="setRede" class="mono" placeholder="Ex.: 10.61.40.0"></div>
                 <div class="field c3"><label>Máscara</label><input type="text" id="setMascara" class="mono" placeholder="Ex.: 255.255.255.0"></div>
                 <div class="field c3"><label>Gateway</label><input type="text" id="setGateway" class="mono" placeholder="Ex.: 10.61.40.1"></div>
@@ -1180,7 +1156,7 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
           <div class="card-h">
             <h3>Setores cadastrados</h3>
             <div class="toolbar">
-              <input type="text" id="setBusca" placeholder="🔍 Buscar nome, contato, endereço, e-mail, rede…">
+              <input type="text" id="setBusca" placeholder="🔍 Buscar nome, contato, endereço…">
             </div>
           </div>
           <div class="card-b flush"><div class="table-wrap">
@@ -1192,12 +1168,11 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
         </div>
       </section>
 
-      <!-- ========== IMPORTAR / EXPORTAR ========== -->
       <section class="view" id="view-planilhas">
         <div class="card">
           <div class="card-h">
             <h3>Planilhas por módulo</h3>
-            <span class="sub">Baixe o modelo vazio para migrar dados de outro sistema, exporte os dados atuais como backup, ou importe uma planilha preenchida</span>
+            <span class="sub">Baixe o modelo vazio, exporte os dados atuais ou importe uma planilha preenchida</span>
           </div>
           <div class="card-b flush">
             <div class="table-wrap">
@@ -1208,7 +1183,7 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
             </div>
           </div>
           <div style="padding:10px 20px;border-top:1px solid var(--line)">
-            <span class="subtle">Ao importar, um registro já existente (pela mesma chave — nome, IP ou patrimônio, conforme o módulo) é <b>atualizado</b>; se não existir, é <b>criado</b>. Nada é apagado automaticamente.</span>
+            <span class="subtle">Ao importar, um registro já existente (pela mesma chave) é <b>atualizado</b>; senão, é <b>criado</b>. Nada é apagado.</span>
           </div>
         </div>
       </section>
@@ -1217,7 +1192,6 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
   </main>
 </div>
 
-<!-- ========== MODAL TIPOS / MARCAS ========== -->
 <div class="modal-overlay" id="modalLista">
   <div class="modal" style="width:min(470px,100%)">
     <div class="modal-h"><h3 id="listaTitulo">Gerenciar</h3><button class="x-close" data-close>&times;</button></div>
@@ -1227,20 +1201,19 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
         <button class="btn btn-accent" id="btnListaAdd">+ Adicionar</button>
       </div>
       <ul class="mini-list" id="listaItens" style="max-height:320px;overflow-y:auto"></ul>
-      <p class="subtle">Itens em uso por modelos/equipamentos não podem ser removidos. Novos itens já ficam disponíveis nos formulários.</p>
+      <p class="subtle">Itens em uso não podem ser removidos.</p>
     </div>
     <div class="modal-f"><button class="btn btn-ghost" data-close>Fechar</button></div>
   </div>
 </div>
 
-<!-- ========== MODAL DEVOLUÇÃO ========== -->
 <div class="modal-overlay" id="modalDev">
   <div class="modal">
     <div class="modal-h"><h3>Registrar devolução — <span class="mono" id="devOS"></span></h3><button class="x-close" data-close>&times;</button></div>
     <div class="modal-b">
       <div class="info-chip" id="devEquipInfo"></div>
       <div class="fgrid">
-        <div class="field c6"><label>Quem devolveu o equipamento</label><input type="text" id="devQuem" placeholder="Nome (opcional)"></div>
+        <div class="field c6"><label>Quem devolveu</label><input type="text" id="devQuem" placeholder="Nome (opcional)"></div>
         <div class="field c3"><label>Data da devolução <b>*</b></label><input type="date" id="devData"></div>
         <div class="field c3"><label>Hora da devolução <b>*</b></label><input type="time" id="devHora"></div>
         <div class="field c3"><label>Situação após devolução</label>
@@ -1265,7 +1238,17 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
   </div>
 </div>
 
-<!-- ========== MODAL CONFIRMAÇÃO ========== -->
+<div class="modal-overlay" id="modalScan">
+  <div class="modal" style="width:min(520px,100%)">
+    <div class="modal-h"><h3>📷 Ler código de barras</h3><button class="x-close" data-close>&times;</button></div>
+    <div class="modal-b">
+      <div id="scanReader"></div>
+      <p class="subtle">Aponte a câmera para o código de barras ou QR do equipamento. A leitura é automática.</p>
+    </div>
+    <div class="modal-f"><button class="btn btn-ghost" data-close>Cancelar</button></div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modalConf">
   <div class="modal" style="width:min(430px,100%)">
     <div class="modal-h"><h3 id="confTitulo">Confirmar</h3><button class="x-close" data-close>&times;</button></div>
@@ -1281,13 +1264,21 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
 <div id="toasts"></div>
 <input type="file" id="fileImport" accept=".json" style="display:none">
 
-<!-- ========== FIREBASE (login + sincronização em nuvem) ========== -->
-<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
-<!-- leitura de planilhas (.xlsx/.csv) para importação -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-
 <style>
+  .online-panel{padding:12px 18px;border-top:1px solid rgba(255,255,255,.07)}
+  .online-h{font:600 10px var(--body);letter-spacing:.16em;text-transform:uppercase;color:#54708a;
+    display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+  .online-lista{display:flex;flex-direction:column;gap:5px;max-height:140px;overflow-y:auto}
+  .online-item{display:flex;align-items:center;gap:8px;font:500 12.5px var(--body);color:#cfe0ec}
+  .online-dot{width:7px;height:7px;border-radius:50%;background:var(--ok);flex:0 0 7px;
+    box-shadow:0 0 0 0 rgba(23,143,95,.5);animation:pulse 1.6s infinite}
+  .online-empty{font-size:11.5px;color:#5d7891}
+  .online-mini{display:none;align-items:center;gap:6px;flex:0 0 auto;padding:6px 12px;border-radius:20px;
+    background:rgba(255,255,255,.08);color:#cfe0ec;font:700 12.5px var(--body);white-space:nowrap}
+  @media(max-width:980px){
+    .online-panel{display:none}
+    .online-mini{display:flex}
+  }
   #loginOverlay{position:fixed;inset:0;z-index:9999;background:linear-gradient(180deg,var(--side) 0%,#0a1620 100%);
     display:flex;align-items:center;justify-content:center;
     background-image:radial-gradient(900px 420px at 85% -8%, rgba(255,140,26,.14), transparent 60%);}
@@ -1319,19 +1310,23 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
   </div>
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
 <script>
 'use strict';
-/* ================= UTILITÁRIOS ================= */
+/* ============== UTILITÁRIOS ============== */
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 const pad=(n,l=4)=>String(n).padStart(l,'0');
 const hojeISO=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
-const horaAgora=()=>{const d=new Date();return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');};
-const somaDias=(iso,n)=>{const d=new Date((iso||hojeISO()).slice(0,10)+'T12:00:00');d.setDate(d.getDate()+n);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+const horaAgora=()=>{const d=new Date();return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')};
 const fmtData=iso=>{if(!iso)return '—';const p=String(iso).slice(0,10).split('-');return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:iso};
 const fmtDT=(d,h)=>d?fmtData(d)+(h?' '+h:''):'—';
-const fmtDataHora=ts=>{const d=new Date(ts);return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear()+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');};
-const horaRelogio=()=>{const d=new Date();return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0');};
+const fmtDataHora=ts=>{const d=new Date(ts);return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear()+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')};
+const horaRelogio=()=>{const d=new Date();return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0')};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const soDigitos=s=>String(s??'').replace(/\D/g,'');
 const NOME_SISTEMA='NII Patrimonios';
@@ -1345,24 +1340,30 @@ const BAN_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke
 const CHK_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/></svg>';
 const TRASH_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg>';
 const PRINT_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V3h12v6M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v7H6z"/></svg>';
+
 function rolarTopo(){
   try{const c=$('.content');if(c)c.scrollTo({top:0,behavior:'smooth'});}catch(_){}
   try{window.scrollTo({top:0,behavior:'smooth'});}catch(_){}
 }
-
 function formatarOS(raw){
   const d=soDigitos(raw);
   if(!d)return '';
   if(d.length<=5)return 'P-'+d;
   return 'P-'+d.slice(0,5)+'-'+d.slice(5);
 }
-
 function beep(){try{window.__ac=window.__ac||new (window.AudioContext||window.webkitAudioContext)();const c=window.__ac,o=c.createOscillator(),g=c.createGain();o.type='square';o.frequency.value=1180;g.gain.value=.05;o.connect(g);g.connect(c.destination);o.start();g.gain.exponentialRampToValueAtTime(.0001,c.currentTime+.09);o.stop(c.currentTime+.1);}catch(e){}}
 function toast(msg,tipo='ok'){const t=document.createElement('div');t.className='toast '+tipo;t.innerHTML=msg;$('#toasts').appendChild(t);setTimeout(()=>t.classList.add('out'),3300);setTimeout(()=>t.remove(),3750);}
+function debounce(fn,ms=150){let t;return(...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),ms);};}
 
-/* ================= FIREBASE (login + sincronização em nuvem) ================= */
-/* Preencha com os dados do seu app Web, em:
-   Firebase Console → Configurações do projeto (⚙) → Seus apps → SDK setup and configuration */
+/* ============== HASH DE SENHA ============== */
+async function sha256(str){
+  try{
+    const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
+    return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
+  }catch(e){ return null; }
+}
+
+/* ============== FIREBASE ============== */
 const firebaseConfig={
   apiKey:"AIzaSyA8c4t3QeMQimhh2H6-1R7pseJShj3XiHM",
   authDomain:"patrimonio-395c5.firebaseapp.com",
@@ -1373,13 +1374,13 @@ const firebaseConfig={
 };
 firebase.initializeApp(firebaseConfig);
 const fsdb=firebase.firestore();
-const SESSAO_KEY='sget-usuario-v1';
+const SESSAO_KEY='sget-usuario-v2';
+const SESSAO_TTL_MS=8*60*60*1000; /* 8 horas */
 let usuarioAtual=null;
 let sincronizando=false;
 let unsubscribers=[];
+let ultimaLeituraRemota={}; /* controla versão remota por seção para detectar sobrescrita */
 
-/* cada "seção" do sistema vira um documento próprio dentro da coleção "sistema",
-   assim uma pessoa mexendo em Equipamentos não sobrescreve quem está mexendo em Empréstimos */
 const SECOES=['equipamentos','tecnicos','setores','emprestimos','guias','impressoras','switches','racks','licencas','listas','eqSnap'];
 function docRefSecao(nome){return fsdb.collection('sistema').doc(nome);}
 function dadosDaSecao(nome){
@@ -1400,12 +1401,13 @@ function aplicarSecao(nome,dados){
   }
 }
 async function sincronizarComNuvem(){
-  if(!sincronizando)return; /* enquanto não fizer login, só grava localmente */
+  if(!sincronizando)return;
   try{
     const batch=fsdb.batch();
     SECOES.forEach(nome=>batch.set(docRefSecao(nome),dadosDaSecao(nome)));
     await batch.commit();
-  }catch(err){console.error('Falha ao sincronizar com o Firebase:',err);toast('Falha ao sincronizar com a nuvem — verifique a internet.','bad');}
+    SECOES.forEach(n=>ultimaLeituraRemota[n]=Date.now());
+  }catch(err){console.error('Falha ao sincronizar:',err);toast('Falha ao sincronizar com a nuvem — verifique a internet.','bad');}
 }
 async function iniciarSincronizacao(){
   sincronizando=true;
@@ -1421,44 +1423,67 @@ async function iniciarSincronizacao(){
   }
   unsubscribers.forEach(u=>u());
   const secoesRecebidas=new Set();
-  let reparoInicialFeito=false;
-  function revelarSeAindaNao(comAviso){
-    if(reparoInicialFeito)return;
-    reparoInicialFeito=true;
+  let appRevelado=false;
+  function revelar(){
+    if(appRevelado)return;
+    appRevelado=true;
     garantirModelos();garantirGuias();
     revelarApp();
-    if(comAviso)toast('A sincronização inicial demorou mais que o normal — verifique sua internet.','warn');
   }
-  setTimeout(()=>revelarSeAindaNao(true),12000); /* rede de segurança: nunca deixa o usuário preso na tela de carregamento */
+  setTimeout(()=>{if(!appRevelado){revelar();toast('A sincronização inicial demorou mais que o normal — verifique sua internet.','warn');}},12000);
   unsubscribers=SECOES.map(nome=>docRefSecao(nome).onSnapshot(snap=>{
     if(!snap.exists)return;
     aplicarSecao(nome,snap.data());
+    ultimaLeituraRemota[nome]=Date.now();
     secoesRecebidas.add(nome);
-    /* checagem de consistência (modelos/guias) roda só 1x, logo que todas as seções chegam —
-       nunca em resposta a atualizações em tempo real, senão dois usuários conectados ao mesmo
-       tempo entram num vai-e-volta de gravações que fica piscando a tela */
-    if(secoesRecebidas.size===SECOES.length)revelarSeAindaNao(false);
+    if(secoesRecebidas.size===SECOES.length)revelar();
     atualizarTudo();
   },err=>console.error('Erro no listener de',nome,err)));
 }
 async function tentarLogin(usuario,senha){
   usuario=(usuario||'').trim();
-  /* 1) tenta pelo cadastro de Técnicos */
+  const hash=await sha256(senha);
   try{
     const snap=await docRefSecao('tecnicos').get();
     const lista=(snap.exists&&Array.isArray(snap.data().items))?snap.data().items:[];
     const t=lista.find(x=>String(x.usuario||'').trim().toLowerCase()===usuario.toLowerCase());
-    if(t)return String(t.senha??'')===senha?{usuario:t.usuario,nome:t.nome||t.usuario,tecnicoId:t.id}:null;
+    if(t){
+      const ok=hash?(String(t.senhaHash||'')===hash||String(t.senha||'')===senha):(String(t.senha||'')===senha);
+      if(!ok)return null;
+      /* migra senha em texto para hash */
+      if(!t.senhaHash&&hash){
+        const restante=lista.filter(x=>x.id!==t.id).map(x=>({...x,senha:undefined}));
+        const atualizada=lista.map(x=>x.id===t.id?{...x,senhaHash:hash,senha:undefined}:x);
+        try{await docRefSecao('tecnicos').set({items:atualizada});}catch(e){console.warn('Falha ao migrar senha:',e);}
+      }
+      return {usuario:t.usuario,nome:t.nome||t.usuario,tecnicoId:t.id};
+    }
   }catch(err){console.error('Erro ao checar técnicos:',err);}
-  /* 2) rede de segurança: coleção "usuarios" original (evita ficar trancado para fora) */
   try{
     const q=await fsdb.collection('usuarios').where('usuario','==',usuario).limit(1).get();
     if(!q.empty){
       const doc=q.docs[0].data();
-      if(String(doc.senha??'')===senha)return {usuario:doc.usuario,nome:doc.nome||doc.usuario};
+      const ok=hash?(String(doc.senhaHash||'')===hash||String(doc.senha||'')===senha):(String(doc.senha||'')===senha);
+      if(ok)return {usuario:doc.usuario,nome:doc.nome||doc.usuario};
     }
   }catch(err){console.error('Erro ao checar usuarios:',err);}
   return null;
+}
+function salvarSessao(u){
+  const s={...u,expiraEm:Date.now()+SESSAO_TTL_MS};
+  sessionStorage.setItem(SESSAO_KEY,JSON.stringify(s));
+}
+function lerSessao(){
+  try{
+    const s=JSON.parse(sessionStorage.getItem(SESSAO_KEY)||'null');
+    if(!s||!s.usuario)return null;
+    if(s.expiraEm&&Date.now()>s.expiraEm){sessionStorage.removeItem(SESSAO_KEY);return null;}
+    return s;
+  }catch(_){return null;}
+}
+function renovarSessao(u){
+  const s={...u,expiraEm:Date.now()+SESSAO_TTL_MS};
+  sessionStorage.setItem(SESSAO_KEY,JSON.stringify(s));
 }
 function mostrarApp(u){
   usuarioAtual=u;
@@ -1476,9 +1501,9 @@ function revelarApp(){
   requestAnimationFrame(()=>{sigRet.resize();sigDev.resize();sigGuia.resize();sigGuiaPat.resize();sigGuiaDest.resize();});
 }
 
-/* ================= PRESENÇA (quem está online agora) ================= */
-const PRESENCA_INTERVALO_MS=25000; /* pulso a cada 25s */
-const PRESENCA_TIMEOUT_MS=90000;   /* some da lista se não pulsar por 90s (aba fechada, sem internet etc.) */
+/* ============== PRESENÇA ============== */
+const PRESENCA_INTERVALO_MS=25000;
+const PRESENCA_TIMEOUT_MS=90000;
 let presencaTimer=null,presencaUnsub=null;
 function presencaDocRef(){return (usuarioAtual&&usuarioAtual.usuario)?fsdb.collection('presenca').doc(usuarioAtual.usuario):null;}
 async function marcarPresenca(){
@@ -1520,11 +1545,11 @@ $('#formLogin').addEventListener('submit',async ev=>{
   try{
     const u=await tentarLogin(usuario,senha);
     if(!u){$('#loginErro').textContent='Usuário ou senha inválidos.';btn.disabled=false;btn.textContent='Entrar';return;}
-    sessionStorage.setItem(SESSAO_KEY,JSON.stringify(u));
+    salvarSessao(u);
     mostrarApp(u);
   }catch(err){
     console.error(err);
-    $('#loginErro').textContent='Não foi possível conectar ao Firebase. Verifique a internet e a configuração (firebaseConfig).';
+    $('#loginErro').textContent='Não foi possível conectar ao Firebase. Verifique a internet.';
     btn.disabled=false;btn.textContent='Entrar';
   }
 });
@@ -1537,17 +1562,13 @@ async function sair(){
 $('#btnSair').addEventListener('click',sair);
 $('#btnSairMobile').addEventListener('click',sair);
 (function autoLogin(){
-  try{const salvo=JSON.parse(sessionStorage.getItem(SESSAO_KEY)||'null');if(salvo&&salvo.usuario)mostrarApp(salvo);}catch(_){}
+  const salvo=lerSessao();
+  if(salvo)mostrarApp(salvo);
 })();
 
-/* ================= BANCO (localStorage) ================= */
-const LS='sget-db-v1'; /* chave mantida para preservar os dados já existentes */
-function rabisco(){const c=document.createElement('canvas');c.width=340;c.height=110;const x=c.getContext('2d');
-  x.strokeStyle='#1c3a52';x.lineWidth=2.3;x.lineCap='round';x.beginPath();
-  for(let i=0;i<=70;i++){const t=i/70,px=22+t*290,py=68+Math.sin(t*7.3)*16+Math.sin(t*19)*4; i?x.lineTo(px,py):x.moveTo(px,py);} x.stroke();
-  x.beginPath();x.moveTo(70,88);x.quadraticCurveTo(170,70,270,86);x.stroke();return c.toDataURL();}
+/* ============== BANCO LOCAL ============== */
+const LS='sget-db-v1';
 function seed(){
-  /* instalação nova: começa vazia — os dados reais vêm do Firestore após o login */
   return {tipos:[...DEFAULT_TIPOS],marcas:[...DEFAULT_MARCAS],modelos:[],tecnicos:[],setores:[],equipamentos:[],emprestimos:[],guias:[],impressoras:[],switches:[],racks:[],licencas:[],eqSnap:{}};
 }
 let db;
@@ -1555,7 +1576,6 @@ try{const raw=localStorage.getItem(LS);db=raw?JSON.parse(raw):null;}catch(e){db=
 if(!db||!Array.isArray(db.equipamentos)){db=seed();persistir();}
 if(!Array.isArray(db.tipos)){db.tipos=[...DEFAULT_TIPOS];persistir();}
 if(!Array.isArray(db.marcas)){db.marcas=[...DEFAULT_MARCAS];persistir();}
-/* Migração: empréstimos antigos, eqSnap, guias, impressoras e novos campos de SETORES */
 function normalizarSetores(list){
   (list||[]).forEach(s=>{
     if(s.contato===undefined)s.contato='';
@@ -1599,17 +1619,31 @@ function garantirGuias(){
   if(!Array.isArray(db.guias)){db.guias=[];persistir();}
 }
 garantirModelos();garantirGuias();
-function persistir(){localStorage.setItem(LS,JSON.stringify(db));sincronizarComNuvem();}
-
+function persistir(){
+  localStorage.setItem(LS,JSON.stringify(db));
+  sincronizarComNuvem();
+}
 window.addEventListener('storage',e=>{
   if(e.key===LS&&e.newValue){
-    try{const d=JSON.parse(e.newValue);
-      if(d&&Array.isArray(d.equipamentos)&&Array.isArray(d.emprestimos)){db=d;if(!db.eqSnap)db.eqSnap={};if(!Array.isArray(db.modelos))db.modelos=[];if(!Array.isArray(db.impressoras))db.impressoras=[];if(!Array.isArray(db.switches))db.switches=[];if(!Array.isArray(db.racks))db.racks=[];if(!Array.isArray(db.licencas))db.licencas=[];normalizarSetores(db.setores);garantirModelos();garantirGuias();atualizarTudo();}
+    try{
+      const d=JSON.parse(e.newValue);
+      if(d&&Array.isArray(d.equipamentos)&&Array.isArray(d.emprestimos)){
+        db=d;
+        if(!db.eqSnap)db.eqSnap={};
+        if(!Array.isArray(db.modelos))db.modelos=[];
+        if(!Array.isArray(db.impressoras))db.impressoras=[];
+        if(!Array.isArray(db.switches))db.switches=[];
+        if(!Array.isArray(db.racks))db.racks=[];
+        if(!Array.isArray(db.licencas))db.licencas=[];
+        normalizarSetores(db.setores);
+        garantirModelos();garantirGuias();
+        selSig='';atualizarTudo();
+      }
     }catch(_){}
   }
 });
 
-/* lookups */
+/* Lookups */
 const tecById=id=>db.tecnicos.find(t=>t.id===id);
 const setById=id=>db.setores.find(s=>s.id===id);
 const eqById =id=>db.equipamentos.find(e=>e.id===id);
@@ -1658,14 +1692,27 @@ function temEmprestimoAtivo(id){
   return db.emprestimos.some(e=>!e.devolucao&&(e.equipIds||[]).includes(id));
 }
 
-/* ================= NAVEGAÇÃO ================= */
-const TITULOS={dashboard:['Painel','Visão geral do inventário e movimentações'],equipamentos:['Equipamentos','Catálogo de modelos + unidades patrimoniais'],emprestimos:['Empréstimos','Reservas, retiradas e devoluções com assinatura'],guias:['Guias de Transferência','Transferência de bens patrimoniais entre unidades'],impressoras:['Impressoras','Parque de impressões — modelo, host, IP e acesso web'],switches:['Switchs NR e IARAS','Dados de acesso aos switches — local, IP, login e senha'],racks:['Racks de Redes','Mapeamento de racks, patch panel, portas de switch e setor'],tecnicos:['Técnicos','Equipe técnica — alimenta os demais módulos'],licencas:['Licenças Office 2024','Controle de chaves do Office 2024 e contas vinculadas'],setores:['Setores','Estrutura de setores — alimenta os demais módulos'],planilhas:['Importar/Exportar','Baixe modelos, exporte dados atuais ou importe planilhas de cada módulo']};
+/* ============== NAVEGAÇÃO ============== */
+const TITULOS={
+  dashboard:['Painel','Visão geral do inventário e movimentações'],
+  equipamentos:['Equipamentos','Catálogo de modelos + unidades patrimoniais'],
+  emprestimos:['Empréstimos','Reservas, retiradas e devoluções com assinatura'],
+  guias:['Guias de Transferência','Transferência de bens patrimoniais entre unidades'],
+  impressoras:['Impressoras','Parque de impressões'],
+  switches:['Switchs NR e IARAS','Dados de acesso aos switches'],
+  racks:['Racks de Redes','Mapeamento de racks, patch panel, portas de switch e setor'],
+  tecnicos:['Técnicos','Equipe técnica — alimenta os demais módulos'],
+  licencas:['Licenças Office 2024','Controle de chaves do Office 2024'],
+  setores:['Setores','Estrutura de setores — alimenta os demais módulos'],
+  planilhas:['Importar/Exportar','Baixe modelos, exporte dados ou importe planilhas']
+};
 let currentView='dashboard';
 function showView(v){
   currentView=v;
   $$('.view').forEach(x=>x.classList.toggle('active',x.id==='view-'+v));
   $$('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===v));
-  $('#topTitle').textContent=TITULOS[v][0]; $('#topSub').textContent=TITULOS[v][1];
+  $('#topTitle').textContent=TITULOS[v][0];
+  $('#topSub').textContent=TITULOS[v][1];
   if(v==='dashboard')renderDashboard();
   if(v==='emprestimos')requestAnimationFrame(()=>sigRet.resize());
   if(v==='guias'){
@@ -1723,7 +1770,9 @@ $$('.nav-subitem').forEach(b=>b.addEventListener('click',()=>{
   fecharMenuMobile();
 }));
 $$('.nav-group .nav-parent').forEach(p=>p.addEventListener('click',()=>{
-  const g=p.closest('.nav-group'); const aberto=g.classList.toggle('aberto'); p.setAttribute('aria-expanded',aberto?'true':'false');
+  const g=p.closest('.nav-group');
+  const aberto=g.classList.toggle('aberto');
+  p.setAttribute('aria-expanded',aberto?'true':'false');
 }));
 $$('.nav-item:not(.sair-mobile)').forEach(b=>b.addEventListener('click',()=>{showView(b.dataset.view);fecharMenuMobile();}));
 $('#btnMenuMobile').addEventListener('click',()=>{
@@ -1732,30 +1781,60 @@ $('#btnMenuMobile').addEventListener('click',()=>{
 });
 function fecharMenuMobile(){$('#navPrincipal').classList.remove('aberto');$('#btnMenuMobile').setAttribute('aria-expanded','false');}
 
-/* ================= ASSINATURA ================= */
+/* ============== ASSINATURA (JPEG comprimido) ============== */
 class Assinador{
-  constructor(canvas){this.c=canvas;this.ctx=canvas.getContext('2d');this.tracos=[];this.atual=null;
+  constructor(canvas){
+    this.c=canvas;
+    this.ctx=canvas.getContext('2d');
+    this.tracos=[];
+    this.atual=null;
     canvas.addEventListener('pointerdown',e=>{e.preventDefault();try{canvas.setPointerCapture(e.pointerId);}catch(_){}
       this.atual=[this.p(e)];this.tracos.push(this.atual);this.desenhar();});
     canvas.addEventListener('pointermove',e=>{if(!this.atual)return;this.atual.push(this.p(e));this.desenhar();});
     const fim=()=>{this.atual=null;};
-    canvas.addEventListener('pointerup',fim);canvas.addEventListener('pointercancel',fim);
+    canvas.addEventListener('pointerup',fim);
+    canvas.addEventListener('pointercancel',fim);
   }
   p(e){const r=this.c.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top};}
-  resize(){const r=this.c.getBoundingClientRect();if(!r.width)return;const d=window.devicePixelRatio||1;
-    this.c.width=Math.round(r.width*d);this.c.height=Math.round(r.height*d);
+  resize(){
+    const r=this.c.getBoundingClientRect();
+    if(!r.width)return;
+    const d=window.devicePixelRatio||1;
+    this.c.width=Math.round(r.width*d);
+    this.c.height=Math.round(r.height*d);
     this.ctx.setTransform(d,0,0,d,0,0);
     this.ctx.strokeStyle='#1c3a52';this.ctx.lineWidth=2.4;this.ctx.lineCap='round';this.ctx.lineJoin='round';
-    this.desenhar();}
-  desenhar(){const x=this.ctx;x.clearRect(0,0,this.c.width,this.c.height);
-    for(const t of this.tracos){if(!t.length)continue;x.beginPath();x.moveTo(t[0].x,t[0].y);
+    this.desenhar();
+  }
+  desenhar(){
+    const x=this.ctx;
+    x.clearRect(0,0,this.c.width,this.c.height);
+    for(const t of this.tracos){
+      if(!t.length)continue;
+      x.beginPath();x.moveTo(t[0].x,t[0].y);
       if(t.length===1)x.lineTo(t[0].x+.01,t[0].y+.01);
-      else{for(let i=1;i<t.length-1;i++){x.quadraticCurveTo(t[i].x,t[i].y,(t[i].x+t[i+1].x)/2,(t[i].y+t[i+1].y)/2);}x.lineTo(t[t.length-1].x,t[t.length-1].y);}
-      x.stroke();}
-    this.c.parentElement.classList.toggle('vazia',this.tracos.length===0);}
+      else{
+        for(let i=1;i<t.length-1;i++){x.quadraticCurveTo(t[i].x,t[i].y,(t[i].x+t[i+1].x)/2,(t[i].y+t[i+1].y)/2);}
+        x.lineTo(t[t.length-1].x,t[t.length-1].y);
+      }
+      x.stroke();
+    }
+    this.c.parentElement.classList.toggle('vazia',this.tracos.length===0);
+  }
   limpar(){this.tracos=[];this.atual=null;this.desenhar();}
   vazia(){return this.tracos.length===0;}
-  dataURL(){return this.vazia()?null:this.c.toDataURL('image/png');}
+  /* JPEG comprimido + fundo branco (evita PNG pesado) */
+  dataURL(){
+    if(this.vazia())return null;
+    try{
+      const tmp=document.createElement('canvas');
+      tmp.width=this.c.width;tmp.height=this.c.height;
+      const t=tmp.getContext('2d');
+      t.fillStyle='#fff';t.fillRect(0,0,tmp.width,tmp.height);
+      t.drawImage(this.c,0,0);
+      return tmp.toDataURL('image/jpeg',0.55);
+    }catch(_){return this.c.toDataURL('image/png');}
+  }
 }
 const sigRet=new Assinador($('#sigRetirada'));
 const sigDev=new Assinador($('#sigDev'));
@@ -1768,21 +1847,71 @@ $('#sigGuiaClear').addEventListener('click',()=>sigGuia.limpar());
 $('#sigGuiaPatClear').addEventListener('click',()=>sigGuiaPat.limpar());
 $('#sigGuiaDestClear').addEventListener('click',()=>sigGuiaDest.limpar());
 
-/* ================= SELECTS AUXILIARES (reconstrução inteligente) ================= */
+/* ============== SCANNER DE CÓDIGO DE BARRAS (CÂMERA) ============== */
+let scanInstance=null,scanTarget=null;
+async function abrirScanner(targetId){
+  scanTarget=targetId;
+  $('#modalScan').classList.add('show');
+  await new Promise(r=>setTimeout(r,120));
+  try{
+    scanInstance=new Html5Qrcode('scanReader');
+    await scanInstance.start(
+      {facingMode:'environment'},
+      {fps:10,qrbox:{width:260,height:130},aspectRatio:2.0},
+      texto=>{
+        const dig=soDigitos(texto);
+        if(dig){
+          const el=$('#'+scanTarget);
+          if(el){
+            el.value=dig;
+            el.classList.remove('leitura-ok');void el.offsetWidth;el.classList.add('leitura-ok');
+            beep();
+          }
+        }
+        pararScanner();
+      },
+      ()=>{}
+    );
+  }catch(e){
+    console.error('Erro ao abrir scanner:',e);
+    toast('Não foi possível acessar a câmera. Verifique as permissões do navegador.','bad');
+    pararScanner();
+  }
+}
+function pararScanner(){
+  if(scanInstance){
+    try{scanInstance.stop().then(()=>{try{scanInstance.clear();}catch(_){}}).catch(()=>{});}catch(_){}
+    scanInstance=null;
+  }
+  $('#modalScan').classList.remove('show');
+  scanTarget=null;
+}
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-scan-target]');
+  if(b){e.preventDefault();abrirScanner(b.dataset.scanTarget);}
+});
+
+/* ============== SELECTS AUXILIARES ============== */
 let selSig='';
+let guiaOriSel='';
+let guiaDesSel='';
 function preencherSelects(){
   const sig=[
     db.setores.map(s=>s.id+':'+s.nome).join(','),
     db.tecnicos.map(t=>t.id+':'+t.nome).join(','),
-    db.tipos.join(','), db.marcas.join(','),
+    db.tipos.join(','),db.marcas.join(','),
     (db.modelos||[]).map(m=>m.id+':'+m.tipo+':'+m.marca+':'+(m.descricao||'')).join(',')
   ].join('|');
   if(sig!==selSig){
     selSig=sig;
     const optsTec=db.tecnicos.map(t=>`<option value="${t.id}">${esc(t.nome)}</option>`).join('');
     const optsSet=db.setores.map(s=>`<option value="${s.id}">${esc(s.nome)}</option>`).join('');
-    for(const id of ['eqSetor','empSetor','swLocal','rkSetor']){const el=$('#'+id);if(!el)continue;const v=el.value;
-      el.innerHTML=`<option value="">Selecione o setor…</option>`+optsSet;if(v&&setById(v))el.value=v;}
+    for(const id of ['eqSetor','empSetor','swLocal','rkSetor']){
+      const el=$('#'+id);if(!el)continue;
+      const v=el.value;
+      el.innerHTML=`<option value="">Selecione o setor…</option>`+optsSet;
+      if(v&&setById(v))el.value=v;
+    }
     {const el=$('#impLocal');if(el){const v=el.value;
       el.innerHTML=`<option value="">Selecione o local…</option>`+optsSet;if(v&&setById(v))el.value=v;}}
     {const dl=$('#dlSetoresGuia');if(dl)dl.innerHTML=db.setores.map(s=>`<option value="${esc(s.nome)}">`).join('');}
@@ -1790,8 +1919,12 @@ function preencherSelects(){
       if(el&&guiaOriSel){el.value=guiaOriSel;const t=$('#guiaSetorOriTxt');if(t&&!t.value)t.value=setNome(guiaOriSel);}}
     {const el=$('#guiaSetorDes');if(el&&guiaDesSel&&!setById(guiaDesSel))guiaDesSel='';
       if(el&&guiaDesSel){el.value=guiaDesSel;const t=$('#guiaSetorDesTxt');if(t&&!t.value)t.value=setNome(guiaDesSel);}}
-    for(const id of ['eqTecnico','empTecnico']){const el=$('#'+id);if(!el)continue;const v=el.value;
-      el.innerHTML=`<option value="">Selecione o técnico…</option>`+optsTec;if(v&&tecById(v))el.value=v;}
+    for(const id of ['eqTecnico','empTecnico']){
+      const el=$('#'+id);if(!el)continue;
+      const v=el.value;
+      el.innerHTML=`<option value="">Selecione o técnico…</option>`+optsTec;
+      if(v&&tecById(v))el.value=v;
+    }
     {const el=$('#modTipo');if(el){const v=el.value;
       el.innerHTML=`<option value="">Selecione…</option>`+db.tipos.map(t=>`<option>${esc(t)}</option>`).join('');
       if(db.tipos.includes(v))el.value=v;}}
@@ -1809,17 +1942,21 @@ function preencherSelects(){
   preencherSelGuiaEq();
 }
 
-/* ================= PAINEL ================= */
+/* ============== PAINEL ============== */
 function countUp(el,val){const dur=650,st=performance.now();(function f(t){const p=Math.min(1,(t-st)/dur);el.textContent=Math.round(val*(1-Math.pow(1-p,3)));if(p<1)requestAnimationFrame(f);else el.textContent=val;})(performance.now());}
 function renderDashboard(){
-  const tot=db.equipamentos.length;let disp=0,res=0,ind=0;
+  const tot=db.equipamentos.length;
+  let disp=0,res=0,ind=0;
   db.equipamentos.forEach(e=>{const s=statusEquip(e).label;if(s==='Disponível')disp++;else if(s==='Reservado')res++;else ind++;});
   const ativos=db.emprestimos.filter(e=>!e.devolucao);
   const atras=ativos.filter(e=>e.periodoFim&&e.periodoFim<hojeISO());
   countUp($('#kpiTotal'),tot);countUp($('#kpiDisp'),disp);countUp($('#kpiRes'),res);countUp($('#kpiInd'),ind);countUp($('#kpiAtiv'),ativos.length);
-  $('#kpiAtras').textContent=atras.length+' em atraso';$('#kpiAtras').style.color=atras.length?'var(--bad)':'';
-  const porTipo={};db.equipamentos.forEach(e=>porTipo[e.tipo]=(porTipo[e.tipo]||0)+1);
-  const linhas=Object.entries(porTipo).sort((a,b)=>b[1]-a[1]);const max=Math.max(1,...linhas.map(l=>l[1]));
+  $('#kpiAtras').textContent=atras.length+' em atraso';
+  $('#kpiAtras').style.color=atras.length?'var(--bad)':'';
+  const porTipo={};
+  db.equipamentos.forEach(e=>porTipo[e.tipo]=(porTipo[e.tipo]||0)+1);
+  const linhas=Object.entries(porTipo).sort((a,b)=>b[1]-a[1]);
+  const max=Math.max(1,...linhas.map(l=>l[1]));
   $('#chartTotal').textContent=tot+' itens';
   $('#chartTipos').innerHTML=linhas.length?linhas.map(([t,n])=>`
     <div class="chart-row"><div class="cl">${icone(t)} ${esc(t)}</div>
@@ -1827,17 +1964,18 @@ function renderDashboard(){
     <div class="cv">${n}</div></div>`).join(''):'<div class="empty">Nenhum equipamento cadastrado.</div>';
   requestAnimationFrame(()=>requestAnimationFrame(()=>$$('#chartTipos .chart-bar').forEach(b=>b.style.width=b.dataset.w+'%')));
   const ult=[...db.emprestimos].sort((a,b)=>(b.criadoEm||0)-(a.criadoEm||0)).slice(0,6);
-  $('#ultimosEmp').innerHTML=ult.length?ult.map(e=>{const eqs=eqsEmp(e);const first=eqs[0];const st=statusEmp(e);return `
-    <li><span class="os">${esc(e.os||'—')}</span>
+  $('#ultimosEmp').innerHTML=ult.length?ult.map(e=>{
+    const eqs=eqsEmp(e),first=eqs[0],st=statusEmp(e);
+    return `<li><span class="os">${esc(e.os||'—')}</span>
     <div class="who"><b>${esc(first?first.patrimonio:'?')}${first&&first.excluido?' <span style="color:var(--bad)">(excl.)</span>':''}${eqs.length>1?` <span style="color:var(--muted)">(+${eqs.length-1})</span>`:''}</b>
     <span>${esc(e.solicitante)}${e.dataReserva?' · reserva '+fmtData(e.dataReserva):''}</span></div>
     <span class="pill ${st.k}">${st.label}</span></li>`;}).join(''):'<li class="empty">Nenhum empréstimo registrado.</li>';
 }
 $('#qNovoEmp').addEventListener('click',()=>{showView('emprestimos');resetEmpForm();setTimeout(()=>$('#empEqSel').focus(),120);});
-$('#qNovoEq').addEventListener('click',()=>{showView('equipamentos');setTimeout(()=>$('#eqPatrimonio').focus(),120);});
+$('#qNovoEq').addEventListener('click',()=>{showView('equipamentos');setEqTab('cadastro');setTimeout(()=>$('#eqPatrimonio').focus(),120);});
 $('#qNovaGuia').addEventListener('click',()=>{showView('guias');resetGuiaForm();setTimeout(()=>$('#guiaSetorOriTxt').focus(),120);});
 
-/* ================= TIPOS E MARCAS (listas do catálogo) ================= */
+/* ============== TIPOS E MARCAS ============== */
 let listaAtual=null;
 $('#btnAddTipo2').addEventListener('click',()=>abrirLista('tipos'));
 $('#btnAddMarca2').addEventListener('click',()=>abrirLista('marcas'));
@@ -1869,11 +2007,11 @@ function addLista(){
   const nome=$('#listaNovo').value.trim();
   if(!nome)return toast('Digite um nome para adicionar.','bad');
   const arr=db[listaAtual];
-  if(arr.some(x=>x.toLowerCase()===nome.toLowerCase()))return toast('Este item já existe na lista.','bad');
+  if(arr.some(x=>x.toLowerCase()===nome.toLowerCase()))return toast('Este item já existe.','bad');
   arr.push(nome);persistir();
   $('#listaNovo').value='';renderLista();preencherSelects();
   if(listaAtual==='tipos')$('#modTipo').value=nome;else $('#modMarca').value=nome;
-  toast('<b>'+esc(nome)+'</b> adicionado e selecionado no catálogo.');
+  toast('<b>'+esc(nome)+'</b> adicionado.');
   $('#listaNovo').focus();
 }
 $('#btnListaAdd').addEventListener('click',addLista);
@@ -1882,13 +2020,13 @@ $('#listaItens').addEventListener('click',e=>{
   const b=e.target.closest('[data-i]');if(!b)return;
   const nome=db[listaAtual][+b.dataset.i];if(nome===undefined)return;
   const uso=usoItem(nome);
-  if(uso)return toast('Não é possível remover: <b>'+esc(nome)+'</b> está em uso por '+uso+' registro(s).','bad');
+  if(uso)return toast('Não é possível remover: <b>'+esc(nome)+'</b> está em uso.','bad');
   db[listaAtual].splice(+b.dataset.i,1);persistir();
   renderLista();preencherSelects();
   toast('Item <b>'+esc(nome)+'</b> removido.','warn');
 });
 
-/* ================= CATÁLOGO DE MODELOS ================= */
+/* ============== CATÁLOGO DE MODELOS ============== */
 $('#formModelo').addEventListener('submit',ev=>{
   ev.preventDefault();
   const tipo=$('#modTipo').value,marca=$('#modMarca').value,desc=$('#modDesc').value.trim(),id=$('#modId').value;
@@ -1899,7 +2037,7 @@ $('#formModelo').addEventListener('submit',ev=>{
     toast('Modelo atualizado — unidades vinculadas também.');
   }else{
     db.modelos.push({id:uid(),tipo,marca,descricao:desc,criadoEm:Date.now()});
-    toast('Modelo <b>'+esc(tipo)+' '+esc(marca)+'</b> cadastrado no catálogo. Agora vincule os patrimônios.');
+    toast('Modelo <b>'+esc(tipo)+' '+esc(marca)+'</b> cadastrado.');
   }
   persistir();resetModForm();atualizarTudo();
 });
@@ -1942,14 +2080,14 @@ $('#modTbody').addEventListener('click',e=>{
   }
   if(b.dataset.acao==='mod-del'){
     const n=db.equipamentos.filter(eq=>eq.modeloId===m.id).length;
-    if(n)return toast('Não é possível excluir: existem <b>'+n+' unidade(s)</b> vinculadas a este modelo.','bad');
-    confirmar('Excluir modelo','Excluir <b>'+esc(m.tipo)+' '+esc(m.marca)+(m.descricao?' — '+esc(m.descricao):'')+'</b> do catálogo?',()=>{
+    if(n)return toast('Não é possível excluir: existem <b>'+n+' unidade(s)</b> vinculadas.','bad');
+    confirmar('Excluir modelo','Excluir <b>'+esc(m.tipo)+' '+esc(m.marca)+(m.descricao?' — '+esc(m.descricao):'')+'</b>?',()=>{
       db.modelos=db.modelos.filter(x=>x.id!==m.id);
       persistir();resetModForm();atualizarTudo();toast('Modelo excluído.','warn');});
   }
 });
 
-/* ================= UNIDADES (EQUIPAMENTOS) ================= */
+/* ============== UNIDADES ============== */
 function atualizaSwEmprestavel(){$('#eqEmprestavelTxt').textContent=$('#eqEmprestavel').checked?'Sim':'Não';}
 $('#eqEmprestavel').addEventListener('change',atualizaSwEmprestavel);
 
@@ -1968,6 +2106,9 @@ $('#eqPatrimonio').addEventListener('blur',sanitizarPatrimonio);
 $('#eqPatrimonio').addEventListener('keydown',e=>{
   if(e.key==='Enter'){e.preventDefault();beep();e.target.classList.remove('flash');void e.target.offsetWidth;e.target.classList.add('flash');$('#eqSerie').focus();}
 });
+$('#eqSerie').addEventListener('keydown',e=>{
+  if(e.key==='Enter'){e.preventDefault();$('#eqModelo').focus();}
+});
 $('#formEquip').addEventListener('submit',ev=>{
   ev.preventDefault();
   const pat=soDigitos($('#eqPatrimonio').value),serie=$('#eqSerie').value.trim(),
@@ -1983,11 +2124,12 @@ $('#formEquip').addEventListener('submit',ev=>{
   }else{
     const novo={id:uid(),patrimonio:pat,serie,modeloId,tipo:mod?mod.tipo:'',marca:mod?mod.marca:'',setorId:setor,tecnicoId:tec,data,obs,indisponivel:false,emprestavel};
     db.equipamentos.push(novo);salvoId=novo.id;
-    toast('Unidade <b class="mono">'+esc(pat)+'</b> cadastrada'+(mod?' e vinculada ao modelo <b>'+esc(mod.tipo)+' '+esc(mod.marca)+'</b>':'')+'.');
+    toast('Unidade <b class="mono">'+esc(pat)+'</b> cadastrada'+(mod?' ('+esc(mod.tipo)+' '+esc(mod.marca)+')':'')+'.');
   }
   persistir();resetFormEquip();atualizarTudo();destacarLinha('#eqTbody',salvoId);
+  /* prepara próximo cadastro automaticamente */
+  setTimeout(()=>{if(!$('#eqId').value)$('#eqPatrimonio').focus();},150);
 });
-/* LIMPEZA MANUAL (sem form.reset() → sem loop de reset) */
 let lastResetEq=0;
 $('#formEquip').addEventListener('reset',e=>{const n=Date.now();if(n-lastResetEq<400)return;lastResetEq=n;setTimeout(resetFormEquip,0);});
 function resetFormEquip(){
@@ -2023,7 +2165,7 @@ function editarEquip(id){
 }
 function excluirEquip(id){
   const eq=eqById(id);if(!eq)return;
-  if(temEmprestimoAtivo(id))return toast('Não é possível excluir: o equipamento está em um <b>empréstimo ativo</b> (registre a devolução antes).','bad');
+  if(temEmprestimoAtivo(id))return toast('Não é possível excluir: o equipamento está em um <b>empréstimo ativo</b>.','bad');
   const qtdHist=db.emprestimos.filter(e=>(e.equipIds||[]).includes(id)).length;
   confirmar('Excluir equipamento',
     'Excluir a unidade <b class="mono">'+esc(eq.patrimonio)+'</b> ('+esc(eq.tipo)+' '+esc(eq.marca)+')?<br>'+
@@ -2032,7 +2174,7 @@ function excluirEquip(id){
       db.eqSnap[id]={patrimonio:eq.patrimonio,serie:eq.serie,tipo:eq.tipo,marca:eq.marca};
       db.equipamentos=db.equipamentos.filter(e=>e.id!==id);
       persistir();atualizarTudo();
-      toast('Equipamento <b class="mono">'+esc(eq.patrimonio)+'</b> excluído do inventário.','warn');
+      toast('Equipamento <b class="mono">'+esc(eq.patrimonio)+'</b> excluído.','warn');
     });
 }
 function irParaEmprestimo(id){
@@ -2044,14 +2186,18 @@ function irParaEmprestimo(id){
   setTimeout(()=>$('#empDataReserva').focus(),120);
 }
 function renderEquipamentos(){
-  const busca=($('#eqBusca').value||'').toLowerCase(),ft=$('#eqFiltroTipo').value,fs=$('#eqFiltroStatus').value;
+  const busca=($('#eqBusca').value||'').toLowerCase();
+  const ft=$('#eqFiltroTipo').value;
+  const fs=$('#eqFiltroStatus').value;
   const lista=db.equipamentos.filter(eq=>{
     const st=statusEquip(eq).label;
     if(ft&&eq.tipo!==ft)return false;
     if(fs){if(fs==='naoEmp'){if(eq.emprestavel!==false)return false;}else if(st!==fs)return false;}
-    if(busca){const mod=eq.modeloId?modById(eq.modeloId):null;
+    if(busca){
+      const mod=eq.modeloId?modById(eq.modeloId):null;
       const alvo=(eq.patrimonio+' '+eq.serie+' '+eq.tipo+' '+eq.marca+' '+(mod?mod.descricao:'')+' '+(eq.obs||'')+' '+setNome(eq.setorId)+' '+tecNome(eq.tecnicoId)).toLowerCase();
-      if(!alvo.includes(busca))return false;}
+      if(!alvo.includes(busca))return false;
+    }
     return true;
   }).sort((a,b)=>String(a.patrimonio).localeCompare(String(b.patrimonio),undefined,{numeric:true}));
   $('#eqTbody').innerHTML=lista.length?lista.map(eq=>{
@@ -2077,7 +2223,9 @@ function renderEquipamentos(){
   const bloq=db.equipamentos.filter(e=>e.emprestavel===false).length;
   $('#eqResumo').textContent=`${db.equipamentos.length} unidade(s) · ${d} disponível(is) · ${bloq} bloqueada(s) p/ empréstimo · ${(db.modelos||[]).length} modelo(s) no catálogo`;
 }
-['eqBusca','eqFiltroTipo','eqFiltroStatus'].forEach(id=>$('#'+id).addEventListener('input',renderEquipamentos));
+$('#eqBusca').addEventListener('input',debounce(renderEquipamentos,150));
+$('#eqFiltroTipo').addEventListener('change',renderEquipamentos);
+$('#eqFiltroStatus').addEventListener('change',renderEquipamentos);
 $('#eqTbody').addEventListener('click',e=>{
   const b=e.target.closest('[data-acao]');if(!b)return;
   if(b.dataset.acao==='eq-edit')editarEquip(b.dataset.id);
@@ -2087,20 +2235,34 @@ $('#eqTbody').addEventListener('click',e=>{
     const eq=eqById(b.dataset.id);if(!eq)return;
     eq.emprestavel=(eq.emprestavel===false);
     persistir();atualizarTudo();destacarLinha('#eqTbody',eq.id);
-    toast(eq.emprestavel?'Equipamento <b class="mono">'+esc(eq.patrimonio)+'</b> <b>liberado</b> para empréstimo.':'Equipamento <b class="mono">'+esc(eq.patrimonio)+'</b> <b>bloqueado</b> para novos empréstimos.','warn');
+    toast(eq.emprestavel?'Equipamento <b class="mono">'+esc(eq.patrimonio)+'</b> <b>liberado</b>.':'Equipamento <b class="mono">'+esc(eq.patrimonio)+'</b> <b>bloqueado</b>.','warn');
   }
 });
 
-/* ================= TÉCNICOS ================= */
-$('#formTecnico').addEventListener('submit',ev=>{
+/* ============== TÉCNICOS ============== */
+$('#formTecnico').addEventListener('submit',async ev=>{
   ev.preventDefault();
   const nome=$('#tecNome').value.trim(),mat=$('#tecMatricula').value.trim(),id=$('#tecId').value,
         usuario=$('#tecUsuario').value.trim(),senha=$('#tecSenha').value;
   if(!nome)return toast('Informe o nome do técnico.','bad');
-  if((usuario&&!senha)||(!usuario&&senha))return toast('Preencha <b>usuário e senha</b> juntos, ou deixe os dois em branco.','bad');
+  if((usuario&&!senha)||(!usuario&&senha))return toast('Preencha <b>usuário e senha</b> juntos, ou deixe ambos em branco.','bad');
   if(usuario&&db.tecnicos.some(t=>t.id!==id&&String(t.usuario||'').toLowerCase()===usuario.toLowerCase()))return toast('Já existe um técnico com este <b>usuário de login</b>.','bad');
-  if(id){Object.assign(tecById(id),{nome,matricula:mat,usuario,senha});toast('Técnico atualizado.');}
-  else{db.tecnicos.push({id:uid(),nome,matricula:mat,usuario,senha});toast('Técnico <b>'+esc(nome)+'</b> cadastrado.');}
+  let senhaHash=undefined;
+  if(senha)senhaHash=await sha256(senha);
+  if(id){
+    const t=tecById(id);
+    const upd={nome,matricula:mat,usuario,senhaHash};
+    if(!senha){delete upd.senhaHash;delete upd.senha;}
+    Object.assign(t,upd);
+    if(!senha)delete t.senhaHash;
+    t.senha=undefined;
+    toast('Técnico atualizado.');
+  }else{
+    const novo={id:uid(),nome,matricula:mat,usuario};
+    if(senhaHash)novo.senhaHash=senhaHash;
+    db.tecnicos.push(novo);
+    toast('Técnico <b>'+esc(nome)+'</b> cadastrado.');
+  }
   persistir();resetTec();atualizarTudo();
 });
 function proximaMatricula(){
@@ -2111,13 +2273,20 @@ function proximaMatricula(){
   });
   return 'MAT-'+pad(max+1,4);
 }
-function resetTec(){$('#tecId').value='';$('#tecNome').value='';$('#tecMatricula').value=proximaMatricula();$('#tecUsuario').value='';$('#tecSenha').value='';$('#tecFormTitle').textContent='Cadastro de técnico';$('#btnTecSubmit').textContent='✔ Salvar técnico';$('#btnTecCancel').style.display='none';}
+function resetTec(){
+  $('#tecId').value='';$('#tecNome').value='';
+  $('#tecMatricula').value=proximaMatricula();
+  $('#tecUsuario').value='';$('#tecSenha').value='';
+  $('#tecFormTitle').textContent='Cadastro de técnico';
+  $('#btnTecSubmit').textContent='✔ Salvar técnico';
+  $('#btnTecCancel').style.display='none';
+}
 $('#btnTecCancel').addEventListener('click',resetTec);
 function renderTecnicos(){
   if(!$('#tecId').value)$('#tecMatricula').value=proximaMatricula();
   $('#tecTbody').innerHTML=db.tecnicos.length?db.tecnicos.map(t=>{
-    const n=db.equipamentos.filter(e=>e.tecnicoId===t.id).length;return `
-    <tr data-id="${t.id}"><td><b>${esc(t.nome)}</b></td><td class="mono subtle">${esc(t.matricula||'—')}</td>
+    const n=db.equipamentos.filter(e=>e.tecnicoId===t.id).length;
+    return `<tr data-id="${t.id}"><td><b>${esc(t.nome)}</b></td><td class="mono subtle">${esc(t.matricula||'—')}</td>
     <td class="mono subtle">${t.usuario?esc(t.usuario):'<span class="subtle">não configurado</span>'}</td>
     <td>${n} equipamento(s)</td>
     <td class="td-r"><div class="actions">
@@ -2126,14 +2295,25 @@ function renderTecnicos(){
     </div></td></tr>`;}).join(''):'<tr><td colspan="5" class="empty"><span class="big">👤</span>Nenhum técnico cadastrado.</td></tr>';
 }
 $('#tecTbody').addEventListener('click',e=>{
-  const b=e.target.closest('[data-acao]');if(!b)return;const t=tecById(b.dataset.id);if(!t)return;
-  if(b.dataset.acao==='tec-edit'){$('#tecId').value=t.id;$('#tecNome').value=t.nome;$('#tecMatricula').value=t.matricula||'';$('#tecUsuario').value=t.usuario||'';$('#tecSenha').value=t.senha||'';$('#tecFormTitle').textContent='Editando técnico';$('#btnTecSubmit').textContent='✔ Atualizar técnico';$('#btnTecCancel').style.display='inline-flex';$('#tecNome').focus();rolarTopo();}
+  const b=e.target.closest('[data-acao]');if(!b)return;
+  const t=tecById(b.dataset.id);if(!t)return;
+  if(b.dataset.acao==='tec-edit'){
+    $('#tecId').value=t.id;$('#tecNome').value=t.nome;$('#tecMatricula').value=t.matricula||'';
+    $('#tecUsuario').value=t.usuario||'';$('#tecSenha').value='';
+    $('#tecFormTitle').textContent='Editando técnico';
+    $('#btnTecSubmit').textContent='✔ Atualizar técnico';
+    $('#btnTecCancel').style.display='inline-flex';
+    $('#tecNome').focus();rolarTopo();
+  }
   if(b.dataset.acao==='tec-del'){
-    if(db.equipamentos.some(x=>x.tecnicoId===t.id)||db.emprestimos.some(x=>x.tecnicoId===t.id))return toast('Não é possível excluir: há <b>registros vinculados</b> a este técnico.','bad');
-    confirmar('Excluir técnico','Excluir <b>'+esc(t.nome)+'</b>?',()=>{db.tecnicos=db.tecnicos.filter(x=>x.id!==t.id);persistir();resetTec();atualizarTudo();toast('Técnico excluído.','warn');});}
+    if(db.equipamentos.some(x=>x.tecnicoId===t.id)||db.emprestimos.some(x=>x.tecnicoId===t.id))return toast('Não é possível excluir: há <b>registros vinculados</b>.','bad');
+    confirmar('Excluir técnico','Excluir <b>'+esc(t.nome)+'</b>?',()=>{
+      db.tecnicos=db.tecnicos.filter(x=>x.id!==t.id);
+      persistir();resetTec();atualizarTudo();toast('Técnico excluído.','warn');});
+  }
 });
 
-/* ================= SETORES ================= */
+/* ============== SETORES ============== */
 $('#formSetor').addEventListener('submit',ev=>{
   ev.preventDefault();
   const dados={
@@ -2163,7 +2343,10 @@ function mascararTelefone(v){
   if(d.length<=10)return `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
   return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
 }
-['setFone1','setFone2'].forEach(id=>{const el=$('#'+id);if(el)el.addEventListener('input',()=>{el.value=mascararTelefone(el.value);});});
+['setFone1','setFone2'].forEach(id=>{
+  const el=$('#'+id);
+  if(el)el.addEventListener('input',()=>{el.value=mascararTelefone(el.value);});
+});
 function resetSet(){
   $('#setId').value='';
   ['setNome','setContato','setEmail','setEndereco','setFone1','setFone2','setRede','setMascara','setGateway','setRpv','setBel']
@@ -2173,7 +2356,7 @@ function resetSet(){
   $('#btnSetCancel').style.display='none';
 }
 $('#btnSetCancel').addEventListener('click',resetSet);
-$('#setBusca').addEventListener('input',renderSetores);
+$('#setBusca').addEventListener('input',debounce(renderSetores,150));
 function renderSetores(){
   const busca=($('#setBusca').value||'').toLowerCase();
   let lista=[...db.setores];
@@ -2231,11 +2414,14 @@ $('#setTbody').addEventListener('click',e=>{
     $('#setNome').focus();rolarTopo();
   }
   if(b.dataset.acao==='set-del'){
-    if(db.equipamentos.some(x=>x.setorId===s.id)||db.emprestimos.some(x=>x.setorId===s.id)||(db.guias||[]).some(g=>g.origemSetorId===s.id||g.destinoSetorId===s.id)||(db.impressoras||[]).some(p=>p.localSetorId===s.id))return toast('Não é possível excluir: há <b>registros vinculados</b> a este setor.','bad');
-    confirmar('Excluir setor','Excluir <b>'+esc(s.nome)+'</b>?',()=>{db.setores=db.setores.filter(x=>x.id!==s.id);persistir();resetSet();atualizarTudo();toast('Setor excluído.','warn');});}
+    if(db.equipamentos.some(x=>x.setorId===s.id)||db.emprestimos.some(x=>x.setorId===s.id)||(db.guias||[]).some(g=>g.origemSetorId===s.id||g.destinoSetorId===s.id)||(db.impressoras||[]).some(p=>p.localSetorId===s.id))return toast('Não é possível excluir: há <b>registros vinculados</b>.','bad');
+    confirmar('Excluir setor','Excluir <b>'+esc(s.nome)+'</b>?',()=>{
+      db.setores=db.setores.filter(x=>x.id!==s.id);
+      persistir();resetSet();atualizarTudo();toast('Setor excluído.','warn');});
+  }
 });
 
-/* ================= IMPORTAR / EXPORTAR — MOTOR GENÉRICO (todos os módulos) ================= */
+/* ============== PLANILHAS ============== */
 function valorCelula(v){
   if(v===null||v===undefined)return '';
   if(typeof v==='number')return String(v);
@@ -2253,7 +2439,7 @@ function resolverSetorPorNome(nome){
 function resolverTecnicoPorNome(nome){
   nome=(nome||'').trim();if(!nome)return '';
   let t=db.tecnicos.find(x=>String(x.nome||'').trim().toLowerCase()===nome.toLowerCase());
-  if(!t){t={id:uid(),nome,matricula:proximaMatricula(),usuario:'',senha:''};db.tecnicos.push(t);}
+  if(!t){t={id:uid(),nome,matricula:proximaMatricula(),usuario:''};db.tecnicos.push(t);}
   return t.id;
 }
 function resolverModeloPorTipoMarca(tipo,marca){
@@ -2280,9 +2466,9 @@ const PLANILHA_MODULOS={
   },
   tecnicos:{
     label:'Técnicos',
-    campos:[{h:'Nome *',f:'nome'},{h:'Matrícula',f:'matricula'},{h:'Usuário de login',f:'usuario'},{h:'Senha de login',f:'senha'}],
+    campos:[{h:'Nome *',f:'nome'},{h:'Matrícula',f:'matricula'},{h:'Usuário de login',f:'usuario'}],
     lista:()=>db.tecnicos,
-    linhaExport:t=>({nome:t.nome,matricula:t.matricula,usuario:t.usuario,senha:t.senha}),
+    linhaExport:t=>({nome:t.nome,matricula:t.matricula,usuario:t.usuario}),
     chave:o=>String(o.nome||'').trim().toLowerCase(),
     finalizar(o){if(!o.nome)return null;if(!o.matricula)o.matricula=proximaMatricula();return o;},
     novo:o=>Object.assign({id:uid()},o)
@@ -2345,7 +2531,7 @@ const PLANILHA_MODULOS={
     },
     finalizar(o){
       o.patrimonio=soDigitos(o.patrimonio||'');
-      if(!o.patrimonio&&!o.serie&&!o.tipo&&!o.marca)return null; /* linha completamente vazia */
+      if(!o.patrimonio&&!o.serie&&!o.tipo&&!o.marca)return null;
       o.modeloId=(o.tipo||o.marca)?resolverModeloPorTipoMarca(o.tipo,o.marca):'';
       o.setorId=resolverSetorPorNome(o.setorNome);delete o.setorNome;
       o.tecnicoId=resolverTecnicoPorNome(o.tecnicoNome);delete o.tecnicoNome;
@@ -2419,8 +2605,8 @@ function importarDadosModulo(chave,file){
         else{mod.lista().push(mod.novo(pronto));novos++;}
       });
       persistir();atualizarTudo();
-      toast(`Importação de <b>${mod.label}</b> concluída: <b>${novos}</b> novo(s), <b>${atualizados}</b> atualizado(s)`+(ignorados?`, ${ignorados} ignorado(s)`:'')+'.');
-    }catch(err){console.error(err);toast('Não foi possível ler essa planilha. Verifique se o cabeçalho das colunas não foi alterado.','bad');}
+      toast(`Importação de <b>${mod.label}</b> concluída: <b>${novos}</b> novo(s), <b>${atualizados}</b> atualizado(s)`+(ignorados?`, ${ignorados} ignorado(s)`:'' )+'.');
+    }catch(err){console.error(err);toast('Não foi possível ler essa planilha.','bad');}
   };
   r.readAsArrayBuffer(file);
 }
@@ -2452,7 +2638,7 @@ document.addEventListener('click',e=>{
   }
 });
 
-/* ================= EMPRÉSTIMOS ================= */
+/* ============== EMPRÉSTIMOS ============== */
 let filtroEmp='';
 let empEditId=null;
 let empEditSig=null;
@@ -2460,9 +2646,11 @@ let carrinho=[];
 
 $('#empTabs').addEventListener('click',e=>{
   const b=e.target.closest('.tab');if(!b)return;
-  filtroEmp=b.dataset.filtro;$$('#empTabs .tab').forEach(t=>t.classList.toggle('active',t===b));renderEmprestimos();
+  filtroEmp=b.dataset.filtro;
+  $$('#empTabs .tab').forEach(t=>t.classList.toggle('active',t===b));
+  renderEmprestimos();
 });
-$('#empBusca').addEventListener('input',renderEmprestimos);
+$('#empBusca').addEventListener('input',debounce(renderEmprestimos,150));
 $('#btnRefreshEmp').addEventListener('click',()=>{atualizarTudo();toast('Visão recarregada ('+horaRelogio()+').');});
 
 $('#empOS').addEventListener('input',()=>{
@@ -2472,7 +2660,7 @@ $('#empOS').addEventListener('input',()=>{
   el.value=f;
   let cont=0,pos=digitosAntes===0?0:f.length;
   for(let i=0;i<f.length;i++){if(/\d/.test(f[i])){cont++;if(cont===digitosAntes){pos=i+1;break;}}}
-  el.setSelectionRange(pos,pos);
+  try{el.setSelectionRange(pos,pos);}catch(_){}
 });
 $('#empOS').addEventListener('blur',()=>{$('#empOS').value=formatarOS($('#empOS').value);});
 
@@ -2507,8 +2695,9 @@ function renderCart(){
   $('#empCartCount').textContent=carrinho.length;
   const box=$('#empCart');
   if(!carrinho.length){box.innerHTML='<div class="cart-empty">Nenhum equipamento adicionado.<br>Use o campo ao lado para adicionar.</div>';return;}
-  box.innerHTML=carrinho.map(id=>{const inf=infoEq(id);if(!inf)return '';return `
-    <div class="cart-item">
+  box.innerHTML=carrinho.map(id=>{
+    const inf=infoEq(id);if(!inf)return '';
+    return `<div class="cart-item">
       <span class="mono" style="font-weight:600">${esc(inf.patrimonio)}</span>
       <span class="subtle" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${icone(inf.tipo)} ${esc(inf.tipo)} ${esc(inf.marca)}${inf.serie?' · S/N '+esc(inf.serie):''}${inf.excluido?' · <span style="color:var(--bad)">(excluído)</span>':''}</span>
       <button type="button" class="ibtn bad rm" data-rm="${id}" title="Remover do empréstimo">✕</button>
@@ -2540,14 +2729,16 @@ function renderSigPreview(){
       <button type="button" class="sig-clear" id="btnRefazerSig">✕ Refazer assinatura</button>`;
     pv.style.display='flex';
     $('#wrapSigRet').style.display='none';
-    $('#btnRefazerSig').addEventListener('click',()=>{empEditSig=null;pv.style.display='none';$('#wrapSigRet').style.display='block';requestAnimationFrame(()=>sigRet.resize());});
+    $('#btnRefazerSig').addEventListener('click',()=>{
+      empEditSig=null;pv.style.display='none';$('#wrapSigRet').style.display='block';
+      requestAnimationFrame(()=>sigRet.resize());
+    });
   }else{
     pv.style.display='none';pv.innerHTML='';
     $('#wrapSigRet').style.display='block';
   }
 }
 
-/* LIMPEZA MANUAL (sem form.reset() → sem loop de reset) */
 let lastResetEmp=0;
 $('#formEmp').addEventListener('reset',e=>{const n=Date.now();if(n-lastResetEmp<400)return;lastResetEmp=n;setTimeout(resetEmpForm,0);});
 function resetEmpForm(){
@@ -2597,7 +2788,7 @@ function editarEmp(id){
     showView('emprestimos');
     rolarTopo();
     setTimeout(()=>{try{$('#empOS').focus({preventScroll:true});}catch(_){$('#empOS').focus();}},380);
-    toast('Modo edição ativo: '+(emp.os?'<b class="mono">'+esc(emp.os)+'</b>':'empréstimo')+'. Altere e clique em <b>Atualizar empréstimo</b>.','warn');
+    toast('Modo edição ativo: '+(emp.os?'<b class="mono">'+esc(emp.os)+'</b>':'empréstimo')+'.','warn');
   }catch(err){
     toast('Erro ao abrir a edição: '+esc(String(err&&err.message||err)),'bad');
   }
@@ -2606,18 +2797,26 @@ function editarEmp(id){
 $('#formEmp').addEventListener('submit',ev=>{
   ev.preventDefault();
   try{
-    const os=formatarOS($('#empOS').value),tec=$('#empTecnico').value,sol=$('#empSolicitante').value.trim(),
-          setor=$('#empSetor').value,dr=$('#empDataReserva').value,ini=$('#empIni').value,iniHora=$('#empIniHora').value,
-          fim=$('#empFim').value,ret=$('#empRetirou').value.trim(),st=$('#empStatus').value;
-    if(!carrinho.length)return toast('Adicione ao menos <b>um equipamento</b> ao empréstimo.','bad');
-    if(!tec||!sol||!setor)return toast('Preencha os campos obrigatórios: <b>Técnico, Solicitante e Setor</b>.','bad');
-    if(ini&&fim&&fim<ini)return toast('A data de devolução prevista não pode ser anterior à saída.','bad');
+    const os=formatarOS($('#empOS').value);
+    const tec=$('#empTecnico').value;
+    const sol=$('#empSolicitante').value.trim();
+    const setor=$('#empSetor').value;
+    const dr=$('#empDataReserva').value;
+    const ini=$('#empIni').value;
+    const iniHora=$('#empIniHora').value;
+    const fim=$('#empFim').value;
+    const ret=$('#empRetirou').value.trim();
+    const st=$('#empStatus').value;
+    if(!carrinho.length)return toast('Adicione ao menos <b>um equipamento</b>.','bad');
+    if(!tec||!sol||!setor)return toast('Preencha: <b>Técnico, Solicitante e Setor</b>.','bad');
+    if(ini&&fim&&fim<ini)return toast('A data de devolução não pode ser anterior à saída.','bad');
     const origEmp=empEditId?db.emprestimos.find(x=>x.id===empEditId):null;
     const origIds=origEmp?(origEmp.equipIds||[]):[];
     const permitidos=disponiveisParaEmp(empEditId).map(e=>e.id);
     for(const id of carrinho){
       if(!permitidos.includes(id)&&!origIds.includes(id)){
-        const inf=infoEq(id);return toast('O equipamento <b class="mono">'+esc(inf?inf.patrimonio:'?')+'</b> não está disponível para empréstimo.','bad');
+        const inf=infoEq(id);
+        return toast('O equipamento <b class="mono">'+esc(inf?inf.patrimonio:'?')+'</b> não está disponível.','bad');
       }
     }
     const sigFinal=sigRet.vazia()?empEditSig:sigRet.dataURL();
@@ -2629,12 +2828,12 @@ $('#formEmp').addEventListener('submit',ev=>{
       Object.assign(emp,dados,{atualizadoEm:Date.now()});
       if(!emp.devolucao)carrinho.forEach(id=>{const q=eqById(id);if(q)q.indisponivel=(st==='Indisponível');});
       salvo=emp;
-      toast('Empréstimo '+(os?'<b class="mono">'+esc(os)+'</b> ':'')+'atualizado — status dos equipamentos: <b>'+esc(st)+'</b>.');
+      toast('Empréstimo atualizado — equipamentos: <b>'+esc(st)+'</b>.');
     }else{
       salvo=Object.assign({id:uid(),devolucao:null,criadoEm:Date.now()},dados);
       db.emprestimos.push(salvo);
       carrinho.forEach(id=>{const q=eqById(id);if(q)q.indisponivel=(st==='Indisponível');});
-      toast('Empréstimo '+(os?'<b class="mono">'+esc(os)+'</b> ':'')+'registrado — '+carrinho.length+' equipamento(s) com status <b>'+esc(st)+'</b>.');
+      toast('Empréstimo registrado — '+carrinho.length+' equipamento(s) com status <b>'+esc(st)+'</b>.');
     }
     persistir();
     resetEmpForm();
@@ -2649,8 +2848,15 @@ $('#formEmp').addEventListener('submit',ev=>{
 function renderEmprestimos(){
   const busca=($('#empBusca').value||'').toLowerCase();
   let lista=[...db.emprestimos].sort((a,b)=>(b.criadoEm||0)-(a.criadoEm||0));
-  if(filtroEmp)lista=lista.filter(e=>{const k=statusEmp(e);return (filtroEmp==='ativo'&&k.label==='Reservado')||(filtroEmp==='atrasado'&&k==='Atrasado')||(filtroEmp==='devolvido'&&k==='Devolvido');});
-  if(busca)lista=lista.filter(e=>{const alvo=((e.os||'')+' '+(e.solicitante||'')+' '+(e.retirou||'')+' '+eqsEmp(e).map(q=>q.patrimonio+' '+q.tipo+' '+q.marca).join(' ')).toLowerCase();return alvo.includes(busca);});
+  /* FIX: usar k.label (antes era k==='Atrasado' — bug) */
+  if(filtroEmp)lista=lista.filter(e=>{
+    const k=statusEmp(e).label;
+    return (filtroEmp==='ativo'&&k==='Reservado')||(filtroEmp==='atrasado'&&k==='Atrasado')||(filtroEmp==='devolvido'&&k==='Devolvido');
+  });
+  if(busca)lista=lista.filter(e=>{
+    const alvo=((e.os||'')+' '+(e.solicitante||'')+' '+(e.retirou||'')+' '+eqsEmp(e).map(q=>q.patrimonio+' '+q.tipo+' '+q.marca).join(' ')).toLowerCase();
+    return alvo.includes(busca);
+  });
   $('#empTbody').innerHTML=lista.length?lista.map(e=>{
     const eqs=eqsEmp(e),st=statusEmp(e);const atraso=st.label==='Atrasado';
     const patCell=eqs.length?eqs.slice(0,2).map(i=>esc(i.patrimonio)+(i.excluido?'<span class="subtle" style="color:var(--bad)"> (excl.)</span>':'')).join(', ')+(eqs.length>2?` <span class="subtle">+${eqs.length-2}</span>`:''):'—';
@@ -2673,23 +2879,34 @@ function renderEmprestimos(){
         <button class="ibtn bad" title="Excluir" data-acao="emp-del" data-id="${e.id}">${TRASH_SVG}</button>
       </div></td>
     </tr>`;}).join(''):`<tr><td colspan="9" class="empty"><span class="big">🔁</span>Nenhum empréstimo encontrado.</td></tr>`;
-  const ativ=db.emprestimos.filter(e=>!e.devolucao).length, atr=db.emprestimos.filter(e=>!e.devolucao&&e.periodoFim&&e.periodoFim<hojeISO()).length;
+  const ativ=db.emprestimos.filter(e=>!e.devolucao).length;
+  const atr=db.emprestimos.filter(e=>!e.devolucao&&e.periodoFim&&e.periodoFim<hojeISO()).length;
   $('#empResumo').textContent=`${db.emprestimos.length} ordem(ns) · ${ativ} ativa(s) · ${atr} em atraso`;
   const att=$('#empAtt');if(att)att.textContent='vista atualizada às '+horaRelogio();
-  $$('#empTabs .tab').forEach(t=>{const f=t.dataset.filtro;const n=f===''?db.emprestimos.length:db.emprestimos.filter(e=>{const k=statusEmp(e).label;return(f==='ativo'&&k==='Reservado')||(f==='atrasado'&&k==='Atrasado')||(f==='devolvido'&&k==='Devolvido');}).length;
-    let el=t.querySelector('.n');if(!el){el=document.createElement('span');el.className='n';t.appendChild(el);}el.textContent=n;});
+  $$('#empTabs .tab').forEach(t=>{
+    const f=t.dataset.filtro;
+    const n=f===''?db.emprestimos.length:db.emprestimos.filter(e=>{
+      const k=statusEmp(e).label;
+      return(f==='ativo'&&k==='Reservado')||(f==='atrasado'&&k==='Atrasado')||(f==='devolvido'&&k==='Devolvido');
+    }).length;
+    let el=t.querySelector('.n');if(!el){el=document.createElement('span');el.className='n';t.appendChild(el);}
+    el.textContent=n;
+  });
 }
 $('#empTbody').addEventListener('click',e=>{
-  const b=e.target.closest('[data-acao]');if(!b)return;const emp=db.emprestimos.find(x=>x.id===b.dataset.id);if(!emp)return;
+  const b=e.target.closest('[data-acao]');if(!b)return;
+  const emp=db.emprestimos.find(x=>x.id===b.dataset.id);if(!emp)return;
   if(b.dataset.acao==='emp-dev')abrirDevolucao(emp);
   if(b.dataset.acao==='emp-edit')editarEmp(emp.id);
   if(b.dataset.acao==='emp-print')imprimirOS(emp);
   if(b.dataset.acao==='emp-del')confirmar('Excluir O.S.','Excluir a ordem <b class="mono">'+esc(emp.os||'(sem número)')+'</b>? Os equipamentos voltarão a ficar disponíveis.',()=>{
     if(!emp.devolucao)(emp.equipIds||[]).forEach(id=>{const q=eqById(id);if(q)q.indisponivel=false;});
-    db.emprestimos=db.emprestimos.filter(x=>x.id!==emp.id);persistir();if(empEditId===emp.id)resetEmpForm();atualizarTudo();toast('Ordem excluída.','warn');});
+    db.emprestimos=db.emprestimos.filter(x=>x.id!==emp.id);
+    persistir();
+    if(empEditId===emp.id)resetEmpForm();
+    atualizarTudo();toast('Ordem excluída.','warn');});
 });
 
-/* devolução */
 let devId=null;
 function abrirDevolucao(emp){
   devId=emp.id;const eqs=eqsEmp(emp);
@@ -2706,31 +2923,32 @@ function abrirDevolucao(emp){
 }
 $('#btnDevOk').addEventListener('click',()=>{
   const emp=db.emprestimos.find(x=>x.id===devId);if(!emp)return;
-  const quem=$('#devQuem').value.trim(),data=$('#devData').value||hojeISO(),hora=$('#devHora').value||horaAgora(),sit=$('#devSituacao').value;
+  const quem=$('#devQuem').value.trim();
+  const data=$('#devData').value||hojeISO();
+  const hora=$('#devHora').value||horaAgora();
+  const sit=$('#devSituacao').value;
   emp.devolucao={data,hora,quem:quem,assinatura:sigDev.dataURL(),situacao:sit};
   emp.atualizadoEm=Date.now();
   (emp.equipIds||[]).forEach(id=>{const q=eqById(id);if(q)q.indisponivel=(sit==='Indisponível');});
-  persistir();fecharModais();atualizarTudo();garantirVisivelEmp(emp);destacarLinha('#empTbody',emp.id);
-  toast('Devolução '+(emp.os?'da <b class="mono">'+esc(emp.os)+'</b> ':'')+'registrada em <b>'+fmtDT(data,hora)+'</b>. Equipamento(s) <b>'+sit+'</b>.');
+  persistir();fecharModais();atualizarTudo();
+  garantirVisivelEmp(emp);destacarLinha('#empTbody',emp.id);
+  toast('Devolução registrada em <b>'+fmtDT(data,hora)+'</b>. Equipamento(s) <b>'+sit+'</b>.');
 });
 
-/* ================= GUIAS DE TRANSFERÊNCIA (emissão = Concluída) ================= */
+/* ============== GUIAS ============== */
 let guiaEditId=null;
 let guiaEditSig=null;
 let guiaEditSigPat=null;
 let guiaEditSigDest=null;
 let cartGuia=[];
-let guiaOriSel='';   /* estado persistente da seleção de ORIGEM */
-let guiaDesSel='';   /* estado persistente da seleção de DESTINO */
 
 function proximaGuia(){let m=0;(db.guias||[]).forEach(g=>{const n=parseInt(g.numero,10);if(!isNaN(n)&&n>m)m=n;});return m+1;}
 function statusGuia(g){return {k:'ok',label:'Concluída'};}
 function origemGuiaSelecionada(){return (guiaOriSel&&setById(guiaOriSel))?guiaOriSel:($('#guiaSetorOri')?$('#guiaSetorOri').value:'');}
 function destinoGuiaSelecionado(){return (guiaDesSel&&setById(guiaDesSel))?guiaDesSel:($('#guiaSetorDes')?$('#guiaSetorDes').value:'');}
 
-$('#guiaBusca').addEventListener('input',renderGuias);
+$('#guiaBusca').addEventListener('input',debounce(renderGuias,150));
 
-/* Lista SOMENTE os equipamentos lotados na unidade de ORIGEM selecionada */
 function preencherSelGuiaEq(){
   const sel=$('#guiaEqSel');if(!sel)return;
   const ori=origemGuiaSelecionada();
@@ -2743,14 +2961,15 @@ function preencherSelGuiaEq(){
   sel.innerHTML=`<option value="">${ori?'Selecione para adicionar…':'⬆ Escolha a unidade de ORIGEM primeiro…'}</option>`+opts;
   if(antes&&pool.some(e=>e.id===antes&&!cartGuia.includes(antes)))sel.value=antes;
   const echo=$('#guiaEqEcho');
-  if(echo)echo.innerHTML='<span class="dot"></span>'+(ori?('Listando equipamentos lotados em <b>'+esc(setNome(ori))+'</b> ('+pool.length+' no total).'):'Escolha primeiro a unidade de ORIGEM para listar os equipamentos.');
+  if(echo)echo.innerHTML='<span class="dot"></span>'+(ori?('Listando equipamentos lotados em <b>'+esc(setNome(ori))+'</b> ('+pool.length+' no total).'):'Escolha primeiro a unidade de ORIGEM.');
 }
 function renderGuiaCart(){
   $('#guiaCartCount').textContent=cartGuia.length;
   const box=$('#guiaCart');
   if(!cartGuia.length){box.innerHTML='<div class="cart-empty">Nenhum equipamento adicionado à guia.</div>';return;}
-  box.innerHTML=cartGuia.map(id=>{const inf=infoEq(id);if(!inf)return '';return `
-    <div class="cart-item">
+  box.innerHTML=cartGuia.map(id=>{
+    const inf=infoEq(id);if(!inf)return '';
+    return `<div class="cart-item">
       <span class="mono" style="font-weight:600">${esc(inf.patrimonio)}</span>
       <span class="subtle" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${icone(inf.tipo)} ${esc(inf.tipo)} ${esc(inf.marca)}${inf.serie?' · S/N '+esc(inf.serie):''}</span>
       <button type="button" class="ibtn bad rm" data-rm="${id}" title="Remover da guia">✕</button>
@@ -2758,23 +2977,26 @@ function renderGuiaCart(){
 }
 function atualizarCartaoGuia(){renderGuiaCart();preencherSelGuiaEq();}
 
-/* Seleção de ORIGEM: guarda no estado, ecoa visualmente e filtra equipamentos */
 function onGuiaOriChange(){
   const el=$('#guiaSetorOri');if(!el)return;
   guiaOriSel=setById(el.value)?el.value:'';
   const s=setById(guiaOriSel);
   const echo=$('#guiaOriEcho');
   if(echo){
-    if(s){const n=db.equipamentos.filter(e=>e.setorId===s.id).length;
+    if(s){
+      const n=db.equipamentos.filter(e=>e.setorId===s.id).length;
       echo.className='hint eco';
-      echo.innerHTML='<span class="dot"></span>Origem selecionada: <b>'+esc(s.nome)+'</b> — '+n+' equipamento(s) lotado(s) nesta unidade.';}
-    else{echo.className='hint';echo.innerHTML='<span class="dot"></span>Ao escolher a origem, só os equipamentos lotados nela aparecem abaixo.';}
+      echo.innerHTML='<span class="dot"></span>Origem: <b>'+esc(s.nome)+'</b> — '+n+' equipamento(s) lotado(s).';
+    }else{
+      echo.className='hint';
+      echo.innerHTML='<span class="dot"></span>Ao escolher a origem, só os equipamentos lotados nela aparecem abaixo.';
+    }
   }
   const antes=cartGuia.length;
   if(guiaOriSel)cartGuia=cartGuia.filter(id=>{const q=eqById(id);return q&&q.setorId===guiaOriSel;});
   const removidos=antes-cartGuia.length;
   atualizarCartaoGuia();
-  if(removidos)toast(removidos+' item(ns) removido(s) da guia: não lotados na ORIGEM.','warn');
+  if(removidos)toast(removidos+' item(ns) removido(s): não lotados na ORIGEM.','warn');
 }
 function onGuiaDesChange(){
   const el=$('#guiaSetorDes');if(!el)return;
@@ -2782,7 +3004,7 @@ function onGuiaDesChange(){
   const s=setById(guiaDesSel);
   const echo=$('#guiaDesEcho');
   if(echo){
-    if(s){echo.className='hint eco';echo.innerHTML='<span class="dot"></span>Destino selecionado: <b>'+esc(s.nome)+'</b>.';}
+    if(s){echo.className='hint eco';echo.innerHTML='<span class="dot"></span>Destino: <b>'+esc(s.nome)+'</b>.';}
     else{echo.className='hint';echo.innerHTML='<span class="dot"></span>Unidade que receberá os bens.';}
   }
 }
@@ -2798,7 +3020,6 @@ function resolverSetorDigitadoGuia(txtId,hiddenId,onChangeFn){
 }
 $('#guiaSetorOriTxt').addEventListener('input',()=>resolverSetorDigitadoGuia('guiaSetorOriTxt','guiaSetorOri',onGuiaOriChange));
 $('#guiaSetorDesTxt').addEventListener('input',()=>resolverSetorDigitadoGuia('guiaSetorDesTxt','guiaSetorDes',onGuiaDesChange));
-/* formatação da O.S. da guia (mesmo padrão do O.S. de empréstimos) */
 $('#guiaOS').addEventListener('input',()=>{
   const el=$('#guiaOS');
   const digitosAntes=el.value.slice(0,el.selectionStart).replace(/\D/g,'').length;
@@ -2806,10 +3027,9 @@ $('#guiaOS').addEventListener('input',()=>{
   el.value=f;
   let cont=0,pos=digitosAntes===0?0:f.length;
   for(let i=0;i<f.length;i++){if(/\d/.test(f[i])){cont++;if(cont===digitosAntes){pos=i+1;break;}}}
-  el.setSelectionRange(pos,pos);
+  try{el.setSelectionRange(pos,pos);}catch(_){}
 });
 $('#guiaOS').addEventListener('blur',()=>{$('#guiaOS').value=formatarOS($('#guiaOS').value);});
-/* assinaturas da guia: recolhidas por padrão, expandem ao clicar */
 [['#wrapSigGuia',()=>sigGuia],['#wrapSigGuiaPat',()=>sigGuiaPat],['#wrapSigGuiaDest',()=>sigGuiaDest]].forEach(([id,getSig])=>{
   const el=$(id);if(!el)return;
   el.addEventListener('click',()=>{
@@ -2819,10 +3039,10 @@ $('#guiaOS').addEventListener('blur',()=>{$('#guiaOS').value=formatarOS($('#guia
 
 $('#btnAddGuiaEq').addEventListener('click',()=>{
   const id=$('#guiaEqSel').value;
-  if(!id)return toast('Selecione um equipamento para adicionar à guia.','bad');
+  if(!id)return toast('Selecione um equipamento.','bad');
   const ori=origemGuiaSelecionada();
   const q=eqById(id);
-  if(ori&&q&&q.setorId!==ori)return toast('Este equipamento não está lotado na unidade de ORIGEM.','bad');
+  if(ori&&q&&q.setorId!==ori)return toast('Este equipamento não está lotado na ORIGEM.','bad');
   if(!cartGuia.includes(id))cartGuia.push(id);
   atualizarCartaoGuia();
 });
@@ -2833,11 +3053,10 @@ $('#guiaCart').addEventListener('click',e=>{
   atualizarCartaoGuia();
 });
 
-/* Previews das 3 assinaturas da guia (ORIGEM, PATRIMÔNIO, DESTINO) */
 function renderSigGuiaPreview(){
   const defs=[
     {pv:'#sigGuiaPreview',wrap:'#wrapSigGuia',sig:guiaEditSig,canvas:sigGuia,alt:'assinatura de envio',btnId:'btnRefazerSigGuia',clear:()=>{guiaEditSig=null;}},
-    {pv:'#sigGuiaPatPreview',wrap:'#wrapSigGuiaPat',sig:guiaEditSigPat,canvas:sigGuiaPat,alt:'assinatura do setor de patrimônio',btnId:'btnRefazerSigGuiaPat',clear:()=>{guiaEditSigPat=null;}},
+    {pv:'#sigGuiaPatPreview',wrap:'#wrapSigGuiaPat',sig:guiaEditSigPat,canvas:sigGuiaPat,alt:'assinatura do patrimônio',btnId:'btnRefazerSigGuiaPat',clear:()=>{guiaEditSigPat=null;}},
     {pv:'#sigGuiaDestPreview',wrap:'#wrapSigGuiaDest',sig:guiaEditSigDest,canvas:sigGuiaDest,alt:'assinatura de recebimento',btnId:'btnRefazerSigGuiaDest',clear:()=>{guiaEditSigDest=null;}}
   ];
   defs.forEach(d=>{
@@ -2854,12 +3073,11 @@ function renderSigGuiaPreview(){
     }
   });
 }
-
-/* LIMPEZA MANUAL (sem form.reset() → sem loop de reset que zerava os selects) */
 let lastResetGuia=0;
 $('#formGuia').addEventListener('reset',e=>{const n=Date.now();if(n-lastResetGuia<400)return;lastResetGuia=n;setTimeout(resetGuiaForm,0);});
 function resetGuiaForm(){
-  guiaEditId=null;guiaEditSig=null;guiaEditSigPat=null;guiaEditSigDest=null;cartGuia=[];guiaOriSel='';guiaDesSel='';
+  guiaEditId=null;guiaEditSig=null;guiaEditSigPat=null;guiaEditSigDest=null;
+  cartGuia=[];guiaOriSel='';guiaDesSel='';
   $('#guiaSetorOri').value='';$('#guiaSetorDes').value='';
   $('#guiaSetorOriTxt').value='';$('#guiaSetorDesTxt').value='';
   $('#guiaOS').value='';
@@ -2883,19 +3101,38 @@ function resetGuiaForm(){
 }
 $('#btnGuiaCancel').addEventListener('click',resetGuiaForm);
 
-/* Emissão/atualização da guia — nasce CONCLUÍDA; responsáveis e assinaturas OPCIONAIS */
-$('#formGuia').addEventListener('submit',ev=>{
+/* Próximo número de guia via transação (evita colisão em emissão simultânea) */
+async function reservarProximoNumeroGuia(){
+  try{
+    const ref=docRefSecao('guias');
+    const novoNumero=await fsdb.runTransaction(async tx=>{
+      const snap=await tx.get(ref);
+      const items=(snap.exists&&Array.isArray(snap.data().items))?snap.data().items:[];
+      let m=0;items.forEach(g=>{const n=parseInt(g.numero,10);if(!isNaN(n)&&n>m)m=n;});
+      return m+1;
+    });
+    return novoNumero;
+  }catch(err){
+    console.warn('Transação falhou, usando cálculo local:',err);
+    return proximaGuia();
+  }
+}
+
+$('#formGuia').addEventListener('submit',async ev=>{
   ev.preventDefault();
-  const so=origemGuiaSelecionada(),sd=destinoGuiaSelecionado(),
-        ro=$('#guiaRespOri').value.trim(),rpat=$('#guiaRespPat').value.trim(),
-        rdest=$('#guiaRespDest').value.trim(),fo=$('#guiaFoneOri').value.trim(),
-        os=formatarOS($('#guiaOS').value),
-        chkSetor=$('#guiaChkSetor').checked;
-  if(!so||!sd)return toast('Selecione as unidades de <b>ORIGEM</b> e <b>DESTINO</b>.','bad');
-  if(so===sd)return toast('Origem e destino devem ser <b>unidades diferentes</b>.','bad');
-  if(!cartGuia.length)return toast('Adicione ao menos <b>um equipamento</b> à guia.','bad');
+  const so=origemGuiaSelecionada();
+  const sd=destinoGuiaSelecionado();
+  const ro=$('#guiaRespOri').value.trim();
+  const rpat=$('#guiaRespPat').value.trim();
+  const rdest=$('#guiaRespDest').value.trim();
+  const fo=$('#guiaFoneOri').value.trim();
+  const os=formatarOS($('#guiaOS').value);
+  const chkSetor=$('#guiaChkSetor').checked;
+  if(!so||!sd)return toast('Selecione <b>ORIGEM</b> e <b>DESTINO</b>.','bad');
+  if(so===sd)return toast('Origem e destino devem ser <b>diferentes</b>.','bad');
+  if(!cartGuia.length)return toast('Adicione ao menos <b>um equipamento</b>.','bad');
   const fora=cartGuia.filter(id=>{const q=eqById(id);return !q||q.setorId!==so;});
-  if(fora.length)return toast('Há itens na guia que <b>não estão lotados</b> na unidade de ORIGEM. Remova-os ou corrija a origem.','bad');
+  if(fora.length)return toast('Há itens que <b>não estão lotados</b> na ORIGEM.','bad');
   const sigFinal=sigGuia.vazia()?guiaEditSig:sigGuia.dataURL();
   const sigPatFinal=sigGuiaPat.vazia()?guiaEditSigPat:sigGuiaPat.dataURL();
   const sigDestFinal=sigGuiaDest.vazia()?guiaEditSigDest:sigGuiaDest.dataURL();
@@ -2912,19 +3149,19 @@ $('#formGuia').addEventListener('submit',ev=>{
     salvoId=g.id;
     toast('Guia nº <b class="mono">'+g.numero+'</b> atualizada.');
   }else{
-    const g={id:uid(),numero:proximaGuia(),emitidaEm:agora,os,
+    const numero=await reservarProximoNumeroGuia();
+    const g={id:uid(),numero,emitidaEm:agora,os,
       origemSetorId:so,origemRespNome:ro,origemRespFone:fo,patrimRespNome:rpat,
       destinoSetorId:sd,
       equipIds:[...cartGuia],origemAssinatura:sigFinal,patrimAssinatura:sigPatFinal,origemData:hojeISO(),
       recebimento:recebimento,registradoPorNome,criadoEm:agora};
     db.guias.push(g);salvoId=g.id;
     if(chkSetor)cartGuia.forEach(id=>{const q=eqById(id);if(q)q.setorId=sd;});
-    toast('Guia nº <b class="mono">'+g.numero+'</b> emitida como <b>Concluída</b>.'+(chkSetor?' Setor dos equipamentos atualizado para o DESTINO.':''));
+    toast('Guia nº <b class="mono">'+g.numero+'</b> emitida como <b>Concluída</b>.'+(chkSetor?' Setor dos equipamentos atualizado.':''));
   }
   persistir();resetGuiaForm();atualizarTudo();destacarLinha('#guiaTbody',salvoId);
 });
 
-/* Edição disponível para QUALQUER guia (inclusive concluída) */
 function editarGuia(id){
   const g=guiaById(id);if(!g)return;
   guiaEditId=id;
@@ -2947,7 +3184,7 @@ function editarGuia(id){
   sigGuia.limpar();sigGuiaPat.limpar();sigGuiaDest.limpar();
   renderSigGuiaPreview();
   {const s=setById(guiaOriSel);const echo=$('#guiaOriEcho');
-   if(echo&&s){echo.className='hint eco';echo.innerHTML='<span class="dot"></span>Origem selecionada: <b>'+esc(s.nome)+'</b> — '+db.equipamentos.filter(e=>e.setorId===s.id).length+' equipamento(s) lotado(s) nesta unidade.';}}
+   if(echo&&s){echo.className='hint eco';echo.innerHTML='<span class="dot"></span>Origem: <b>'+esc(s.nome)+'</b> — '+db.equipamentos.filter(e=>e.setorId===s.id).length+' equipamento(s) lotado(s).';}}
   atualizarCartaoGuia();
   $('#guiaFormTitle').textContent='Editando guia de transferência';
   $('#guiaEditBadge').style.display='inline-flex';
@@ -2959,7 +3196,7 @@ function editarGuia(id){
   $('#guiaEmisLbl').textContent=fmtDataHora(g.emitidaEm);
   showView('guias');
   rolarTopo();
-  toast('Modo edição ativo: guia nº <b class="mono">'+g.numero+'</b>. Ajuste e clique em <b>Atualizar guia</b>.','warn');
+  toast('Modo edição ativo: guia nº <b class="mono">'+g.numero+'</b>.','warn');
 }
 
 function renderGuias(){
@@ -2967,7 +3204,8 @@ function renderGuias(){
   let lista=[...(db.guias||[])].sort((a,b)=>(b.criadoEm||0)-(a.criadoEm||0));
   if(busca)lista=lista.filter(g=>{
     const alvo=(String(g.numero)+' '+(g.os||'')+' '+setNome(g.origemSetorId)+' '+setNome(g.destinoSetorId)+' '+(g.origemRespNome||'')+' '+(g.patrimRespNome||'')+' '+(g.recebimento?g.recebimento.respNome:'')+' '+(g.equipIds||[]).map(id=>{const i=infoEq(id);return i?i.patrimonio:'';}).join(' ')).toLowerCase();
-    return alvo.includes(busca);});
+    return alvo.includes(busca);
+  });
   $('#guiaTbody').innerHTML=lista.length?lista.map(g=>{
     const st=statusGuia(g);const n=(g.equipIds||[]).length;
     return `<tr data-id="${g.id}">
@@ -2984,35 +3222,32 @@ function renderGuias(){
         <button class="ibtn bad" title="Excluir" data-acao="guia-del" data-id="${g.id}">${TRASH_SVG}</button>
       </div></td>
     </tr>`;}).join(''):`<tr><td colspan="8" class="empty"><span class="big">📄</span>Nenhuma guia emitida.</td></tr>`;
-  const tot=(db.guias||[]).length;
-  $('#guiaResumo').textContent=`${tot} guia(s) · todas concluídas na emissão`;
+  $('#guiaResumo').textContent=`${(db.guias||[]).length} guia(s) · todas concluídas na emissão`;
 }
 $('#guiaTbody').addEventListener('click',e=>{
-  const b=e.target.closest('[data-acao]');if(!b)return;const g=guiaById(b.dataset.id);if(!g)return;
+  const b=e.target.closest('[data-acao]');if(!b)return;
+  const g=guiaById(b.dataset.id);if(!g)return;
   if(b.dataset.acao==='guia-edit')editarGuia(g.id);
   if(b.dataset.acao==='guia-print')imprimirGuia(g);
-  if(b.dataset.acao==='guia-del')confirmar('Excluir guia','Excluir a guia nº <b class="mono">'+g.numero+'</b>? Esta ação não pode ser desfeita.',()=>{
+  if(b.dataset.acao==='guia-del')confirmar('Excluir guia','Excluir a guia nº <b class="mono">'+g.numero+'</b>?',()=>{
     db.guias=db.guias.filter(x=>x.id!==g.id);
-    persistir();if(guiaEditId===g.id)resetGuiaForm();atualizarTudo();toast('Guia excluída.','warn');});
+    persistir();
+    if(guiaEditId===g.id)resetGuiaForm();
+    atualizarTudo();toast('Guia excluída.','warn');});
 });
 
-/* ================= IMPRESSORAS ================= */
+/* ============== IMPRESSORAS ============== */
 let impEditId=null;
-$('#impBusca').addEventListener('input',renderImpressoras);
-
+$('#impBusca').addEventListener('input',debounce(renderImpressoras,150));
 function sanitizarImpPatrimonio(){
   const el=$('#impPatrimonio');
   const pos=el.selectionStart||0;
   const digitosAntes=el.value.slice(0,pos).replace(/\D/g,'').length;
   const limpo=soDigitos(el.value);
-  if(limpo!==el.value){
-    el.value=limpo;
-    try{el.setSelectionRange(digitosAntes,digitosAntes);}catch(_){}
-  }
+  if(limpo!==el.value){el.value=limpo;try{el.setSelectionRange(digitosAntes,digitosAntes);}catch(_){}}
 }
 $('#impPatrimonio').addEventListener('input',sanitizarImpPatrimonio);
 $('#impPatrimonio').addEventListener('blur',sanitizarImpPatrimonio);
-
 let lastResetImp=0;
 $('#formImpressora').addEventListener('reset',e=>{const n=Date.now();if(n-lastResetImp<400)return;lastResetImp=n;setTimeout(resetImpForm,0);});
 function resetImpForm(){
@@ -3026,29 +3261,27 @@ function resetImpForm(){
   $('#impEditBadge').style.display='none';
 }
 $('#btnImpCancel').addEventListener('click',resetImpForm);
-
 $('#formImpressora').addEventListener('submit',ev=>{
   ev.preventDefault();
   const modelo=$('#impModelo').value.trim(),host=$('#impHost').value.trim(),local=$('#impLocal').value,
         ip=$('#impIP').value.trim(),pat=soDigitos($('#impPatrimonio').value),serie=$('#impSerie').value.trim(),
         login=$('#impLogin').value.trim(),id=$('#impId').value;
-  if(!modelo)return toast('Informe o <b>Modelo</b> da impressora.','bad');
-  if(ip&&!/^(\d{1,3}\.){3}\d{1,3}$/.test(ip))return toast('IP inválido. Use o formato <b>000.000.000.000</b>.','bad');
-  if(pat&&db.impressoras.some(p=>p.patrimonio===pat&&p.id!==id))return toast('Já existe uma impressora com o patrimônio <b class="mono">'+esc(pat)+'</b>.','bad');
+  if(!modelo)return toast('Informe o <b>Modelo</b>.','bad');
+  if(ip&&!/^(\d{1,3}\.){3}\d{1,3}$/.test(ip))return toast('IP inválido.','bad');
+  if(pat&&db.impressoras.some(p=>p.patrimonio===pat&&p.id!==id))return toast('Já existe com este patrimônio.','bad');
   let salvoId=id;
   if(id){
     const p=db.impressoras.find(x=>x.id===id);if(!p)return;
     Object.assign(p,{modelo,host,localSetorId:local,ip,patrimonio:pat,serie,loginWeb:login});
     salvoId=id;
-    toast('Impressora <b>'+esc(modelo)+'</b> atualizada.');
+    toast('Impressora atualizada.');
   }else{
     const novo={id:uid(),modelo,host,localSetorId:local,ip,patrimonio:pat,serie,loginWeb:login,criadoEm:Date.now()};
     db.impressoras.push(novo);salvoId=novo.id;
-    toast('Impressora <b>'+esc(modelo)+'</b> cadastrada.');
+    toast('Impressora cadastrada.');
   }
   persistir();resetImpForm();atualizarTudo();destacarLinha('#impTbody',salvoId);
 });
-
 function editarImpressora(id){
   const p=db.impressoras.find(x=>x.id===id);if(!p)return;
   impEditId=id;
@@ -3068,14 +3301,14 @@ function editarImpressora(id){
   $('#impEditBadge').textContent='✎ EDITANDO '+p.modelo;
   setImpTab('cadastro');rolarTopo();$('#impModelo').focus();
 }
-
 function excluirImpressora(id){
   const p=db.impressoras.find(x=>x.id===id);if(!p)return;
-  confirmar('Excluir impressora','Excluir a impressora <b>'+esc(p.modelo)+'</b>'+(p.host?' ('+esc(p.host)+')':'')+'? Esta ação não pode ser desfeita.',()=>{
+  confirmar('Excluir impressora','Excluir <b>'+esc(p.modelo)+'</b>'+(p.host?' ('+esc(p.host)+')':'')+'?',()=>{
     db.impressoras=db.impressoras.filter(x=>x.id!==id);
-    persistir();if(impEditId===id)resetImpForm();atualizarTudo();toast('Impressora excluída.','warn');});
+    persistir();
+    if(impEditId===id)resetImpForm();
+    atualizarTudo();toast('Impressora excluída.','warn');});
 }
-
 function renderImpressoras(){
   const busca=($('#impBusca').value||'').toLowerCase();
   let lista=[...db.impressoras].sort((a,b)=>String(a.modelo||'').localeCompare(String(b.modelo||'')));
@@ -3104,10 +3337,9 @@ $('#impTbody').addEventListener('click',e=>{
   if(b.dataset.acao==='imp-del')excluirImpressora(p.id);
 });
 
-/* ================= SWITCHS NR E IARAS ================= */
+/* ============== SWITCHS ============== */
 let swEditId=null;
-$('#swBusca').addEventListener('input',renderSwitches);
-
+$('#swBusca').addEventListener('input',debounce(renderSwitches,150));
 let lastResetSw=0;
 $('#formSwitch').addEventListener('reset',e=>{const n=Date.now();if(n-lastResetSw<400)return;lastResetSw=n;setTimeout(resetSwitchForm,0);});
 function resetSwitchForm(){
@@ -3121,15 +3353,14 @@ function resetSwitchForm(){
   $('#swEditBadge').style.display='none';
 }
 $('#btnSwCancel').addEventListener('click',resetSwitchForm);
-
 $('#formSwitch').addEventListener('submit',ev=>{
   ev.preventDefault();
   const nome=$('#swNome').value.trim(),local=$('#swLocal').value,ip=$('#swIP').value.trim(),
         login=$('#swLogin').value.trim(),senha=$('#swSenha').value.trim(),id=$('#swId').value;
-  if(!local)return toast('Selecione o <b>Local</b> (setor) do switch.','bad');
-  if(!ip)return toast('Informe o <b>IP</b> do switch.','bad');
-  if(!/^(\d{1,3}\.){3}\d{1,3}$/.test(ip))return toast('IP inválido. Use o formato <b>000.000.000.000</b>.','bad');
-  if(db.switches.some(s=>s.ip===ip&&s.id!==id))return toast('Já existe um switch cadastrado com o IP <b class="mono">'+esc(ip)+'</b>.','bad');
+  if(!local)return toast('Selecione o <b>Local</b>.','bad');
+  if(!ip)return toast('Informe o <b>IP</b>.','bad');
+  if(!/^(\d{1,3}\.){3}\d{1,3}$/.test(ip))return toast('IP inválido.','bad');
+  if(db.switches.some(s=>s.ip===ip&&s.id!==id))return toast('Já existe um switch com este IP.','bad');
   let salvoId=id;
   if(id){
     const s=db.switches.find(x=>x.id===id);if(!s)return;
@@ -3139,11 +3370,10 @@ $('#formSwitch').addEventListener('submit',ev=>{
   }else{
     const novo={id:uid(),nome,local,ip,login,senha,criadoEm:Date.now()};
     db.switches.push(novo);salvoId=novo.id;
-    toast('Switch cadastrado com sucesso.');
+    toast('Switch cadastrado.');
   }
   persistir();resetSwitchForm();atualizarTudo();destacarLinha('#swTbody',salvoId);
 });
-
 function editarSwitch(id){
   const s=db.switches.find(x=>x.id===id);if(!s)return;
   swEditId=id;
@@ -3161,14 +3391,14 @@ function editarSwitch(id){
   $('#swEditBadge').textContent='✎ EDITANDO '+(s.nome||s.ip);
   setSwTab('cadastro');rolarTopo();$('#swNome').focus();
 }
-
 function excluirSwitch(id){
   const s=db.switches.find(x=>x.id===id);if(!s)return;
-  confirmar('Excluir switch','Excluir o switch '+(s.nome?'<b>'+esc(s.nome)+'</b> ':'')+'(<span class="mono">'+esc(s.ip)+'</span>)? Esta ação não pode ser desfeita.',()=>{
+  confirmar('Excluir switch','Excluir '+(s.nome?'<b>'+esc(s.nome)+'</b> ':'')+'(<span class="mono">'+esc(s.ip)+'</span>)?',()=>{
     db.switches=db.switches.filter(x=>x.id!==id);
-    persistir();if(swEditId===id)resetSwitchForm();atualizarTudo();toast('Switch excluído.','warn');});
+    persistir();
+    if(swEditId===id)resetSwitchForm();
+    atualizarTudo();toast('Switch excluído.','warn');});
 }
-
 function renderSwitches(){
   const busca=($('#swBusca').value||'').toLowerCase();
   let lista=[...db.switches].sort((a,b)=>String(setNome(a.local)).localeCompare(String(setNome(b.local))));
@@ -3194,10 +3424,9 @@ $('#swTbody').addEventListener('click',e=>{
   if(b.dataset.acao==='sw-del')excluirSwitch(s.id);
 });
 
-/* ================= RACKS DE REDES ================= */
+/* ============== RACKS ============== */
 let rkEditId=null;
-$('#rkBusca').addEventListener('input',renderRacks);
-
+$('#rkBusca').addEventListener('input',debounce(renderRacks,150));
 let lastResetRk=0;
 $('#formRack').addEventListener('reset',e=>{const n=Date.now();if(n-lastResetRk<400)return;lastResetRk=n;setTimeout(resetRackForm,0);});
 function resetRackForm(){
@@ -3211,7 +3440,6 @@ function resetRackForm(){
   $('#rkEditBadge').style.display='none';
 }
 $('#btnRkCancel').addEventListener('click',resetRackForm);
-
 $('#formRack').addEventListener('submit',ev=>{
   ev.preventDefault();
   const rack=$('#rkRack').value,patch=$('#rkPatch').value,ponto=$('#rkPonto').value.trim(),tipo=$('#rkTipo').value,
@@ -3232,7 +3460,6 @@ $('#formRack').addEventListener('submit',ev=>{
   }
   persistir();resetRackForm();atualizarTudo();destacarLinha('#rkTbody',salvoId);
 });
-
 function editarRack(id){
   const p=db.racks.find(x=>x.id===id);if(!p)return;
   rkEditId=id;
@@ -3253,14 +3480,14 @@ function editarRack(id){
   $('#rkEditBadge').textContent='✎ EDITANDO '+(p.rack||'')+' / '+(p.ponto||p.patch||'');
   setRkTab('cadastro');rolarTopo();$('#rkRack').focus();
 }
-
 function excluirRack(id){
   const p=db.racks.find(x=>x.id===id);if(!p)return;
-  confirmar('Excluir ponto','Excluir este ponto de rack? Esta ação não pode ser desfeita.',()=>{
+  confirmar('Excluir ponto','Excluir este ponto de rack?',()=>{
     db.racks=db.racks.filter(x=>x.id!==id);
-    persistir();if(rkEditId===id)resetRackForm();atualizarTudo();toast('Ponto excluído.','warn');});
+    persistir();
+    if(rkEditId===id)resetRackForm();
+    atualizarTudo();toast('Ponto excluído.','warn');});
 }
-
 function renderRacks(){
   const busca=($('#rkBusca').value||'').toLowerCase();
   let lista=[...db.racks];
@@ -3288,8 +3515,6 @@ $('#rkTbody').addEventListener('click',e=>{
   if(b.dataset.acao==='rk-edit')editarRack(p.id);
   if(b.dataset.acao==='rk-del')excluirRack(p.id);
 });
-
-/* --------- Importação especial: planilha com uma aba por rack (5A, 5B, 5C, 5D, 6A, 6B, 6C, 6D) --------- */
 const RACKS_CONHECIDOS=['5A','5B','5C','5D','6A','6B','6C','6D'];
 function normalizarDoisDigitos(v){
   v=valorCelula(v);if(!v)return '';
@@ -3345,19 +3570,18 @@ $('#fileImportRacksMulti').addEventListener('change',e=>{
           else{db.racks.push(Object.assign({id:uid(),criadoEm:Date.now()},registro));novos++;}
         });
       });
-      if(!abasLidas){toast('Não encontrei nenhuma aba com nome de rack (5A, 5B, 5C, 5D, 6A, 6B, 6C ou 6D) nesse arquivo.','bad');return;}
+      if(!abasLidas){toast('Não encontrei abas com nome de rack (5A–6D).','bad');return;}
       persistir();atualizarTudo();
-      toast(`Importação de Racks concluída: <b>${abasLidas}</b> aba(s) lida(s), <b>${novos}</b> novo(s), <b>${atualizados}</b> atualizado(s)`+(ignorados?`, ${ignorados} ignorado(s)`:'')+'.');
-    }catch(err){console.error(err);toast('Não foi possível ler essa planilha. Verifique se as abas têm os nomes 5A, 5B, 5C, 5D, 6A, 6B, 6C ou 6D.','bad');}
+      toast(`Importação de Racks: <b>${abasLidas}</b> aba(s), <b>${novos}</b> novo(s), <b>${atualizados}</b> atualizado(s)`+(ignorados?`, ${ignorados} ignorado(s)`:'' )+'.');
+    }catch(err){console.error(err);toast('Não foi possível ler essa planilha.','bad');}
     e.target.value='';
   };
   r.readAsArrayBuffer(f);
 });
 
-/* ================= LICENÇAS OFFICE 2024 ================= */
+/* ============== LICENÇAS ============== */
 let licEditId=null;
-$('#licBusca').addEventListener('input',renderLicencas);
-
+$('#licBusca').addEventListener('input',debounce(renderLicencas,150));
 let lastResetLic=0;
 $('#formLicenca').addEventListener('reset',e=>{const n=Date.now();if(n-lastResetLic<400)return;lastResetLic=n;setTimeout(resetLicencaForm,0);});
 function resetLicencaForm(){
@@ -3370,16 +3594,14 @@ function resetLicencaForm(){
   $('#licEditBadge').style.display='none';
 }
 $('#btnLicCancel').addEventListener('click',resetLicencaForm);
-
 $('#formLicenca').addEventListener('submit',ev=>{
   ev.preventDefault();
   const host=$('#licHost').value.trim(),chave=$('#licChave').value.trim(),
         email=$('#licEmail').value.trim(),obs=$('#licObs').value.trim(),id=$('#licId').value;
-  
   if(db.licencas.some(l=>String(l.host||'').toLowerCase()===host.toLowerCase()&&l.id!==id))
-    return toast('Já existe uma licença cadastrada para o hostname <b class="mono">'+esc(host)+'</b>.','bad');
+    return toast('Já existe uma licença para <b class="mono">'+esc(host)+'</b>.','bad');
   if(chave&&db.licencas.some(l=>String(l.chave||'').toLowerCase()===chave.toLowerCase()&&l.id!==id))
-    return toast('Esta <b>chave</b> já está cadastrada em outro hostname.','bad');
+    return toast('Esta <b>chave</b> já está cadastrada.','bad');
   let salvoId=id;
   if(id){
     const l=db.licencas.find(x=>x.id===id);if(!l)return;
@@ -3388,11 +3610,10 @@ $('#formLicenca').addEventListener('submit',ev=>{
   }else{
     const novo={id:uid(),host,chave,email,obs,criadoEm:Date.now()};
     db.licencas.push(novo);salvoId=novo.id;
-    toast('Licença de <b class="mono">'+esc(host)+'</b> cadastrada.');
+    toast('Licença cadastrada.');
   }
   persistir();resetLicencaForm();atualizarTudo();destacarLinha('#licTbody',salvoId);
 });
-
 function editarLicenca(id){
   const l=db.licencas.find(x=>x.id===id);if(!l)return;
   licEditId=id;
@@ -3409,14 +3630,14 @@ function editarLicenca(id){
   $('#licEditBadge').textContent='✎ EDITANDO '+(l.host||'');
   setLicTab('cadastro');rolarTopo();$('#licHost').focus();
 }
-
 function excluirLicenca(id){
   const l=db.licencas.find(x=>x.id===id);if(!l)return;
-  confirmar('Excluir licença','Excluir a licença de <b class="mono">'+esc(l.host||'')+'</b>? Esta ação não pode ser desfeita.',()=>{
+  confirmar('Excluir licença','Excluir a licença de <b class="mono">'+esc(l.host||'')+'</b>?',()=>{
     db.licencas=db.licencas.filter(x=>x.id!==id);
-    persistir();if(licEditId===id)resetLicencaForm();atualizarTudo();toast('Licença excluída.','warn');});
+    persistir();
+    if(licEditId===id)resetLicencaForm();
+    atualizarTudo();toast('Licença excluída.','warn');});
 }
-
 function renderLicencas(){
   const busca=($('#licBusca').value||'').toLowerCase();
   let lista=[...db.licencas].sort((a,b)=>String(a.host||'').localeCompare(String(b.host||'')));
@@ -3441,15 +3662,24 @@ $('#licTbody').addEventListener('click',e=>{
   if(b.dataset.acao==='lic-del')excluirLicenca(l.id);
 });
 
-/* ================= MODAIS GENÉRICOS ================= */
+/* ============== MODAIS ============== */
 let confCb=null;
-function confirmar(titulo,msg,cb){$('#confTitulo').textContent=titulo;$('#confMsg').innerHTML=msg;confCb=cb;$('#modalConf').classList.add('show');}
+function confirmar(titulo,msg,cb){
+  $('#confTitulo').textContent=titulo;
+  $('#confMsg').innerHTML=msg;
+  confCb=cb;
+  $('#modalConf').classList.add('show');
+}
 $('#btnConfOk').addEventListener('click',()=>{const cb=confCb;fecharModais();cb&&cb();});
-function fecharModais(){$$('.modal-overlay').forEach(m=>m.classList.remove('show'));confCb=null;devId=null;}
+function fecharModais(){
+  $$('.modal-overlay').forEach(m=>m.classList.remove('show'));
+  confCb=null;devId=null;
+  if(scanInstance)pararScanner();
+}
 $$('.modal-overlay').forEach(m=>m.addEventListener('click',e=>{if(e.target===m||e.target.closest('[data-close]'))fecharModais();}));
 document.addEventListener('keydown',e=>{if(e.key==='Escape')fecharModais();});
 
-/* ================= IMPRESSÃO ================= */
+/* ============== IMPRESSÃO ============== */
 function imprimirOS(emp){
   const eqs=eqsEmp(emp),st=statusEmp(emp);
   const periodo=(emp.periodoIni||emp.periodoFim)?fmtDT(emp.periodoIni,emp.periodoIniHora)+' → '+fmtData(emp.periodoFim):'—';
@@ -3484,8 +3714,6 @@ function imprimirOS(emp){
   </div>`;
   setTimeout(()=>window.print(),60);
 }
-
-/* Guia de Transferência — 3 assinaturas: ORIGEM, SETOR DE PATRIMÔNIO e DESTINO */
 function imprimirGuia(g){
   const item=(l,v)=>`<div class="r-item"><div class="rl">${l}</div><div class="rv">${v}</div></div>`;
   const bens=(g.equipIds||[]).map(infoEq).filter(Boolean);
@@ -3524,49 +3752,60 @@ function imprimirGuia(g){
     </div>
     <div class="r-sigs3">
       <div class="r-sig">${g.origemAssinatura?`<img src="${g.origemAssinatura}">`:'<div style="height:64px"></div>'}
-        <div class="line"><b>(ORIGEM)</b> Responsável pelo envio do(s) bem(ns) acima especificado(s)<br>
-        Nome: ${esc(g.origemRespNome||'')}</div></div>
+        <div class="line"><b>(ORIGEM)</b> Responsável pelo envio<br>Nome: ${esc(g.origemRespNome||'')}</div></div>
       <div class="r-sig">${g.patrimAssinatura?`<img src="${g.patrimAssinatura}">`:'<div style="height:64px"></div>'}
-        <div class="line"><b>(SETOR DE PATRIMÔNIO)</b> Responsável pelo registro da transferência<br>
-        Nome: ${esc(g.patrimRespNome||'')}</div></div>
+        <div class="line"><b>(SETOR DE PATRIMÔNIO)</b> Responsável pelo registro<br>Nome: ${esc(g.patrimRespNome||'')}</div></div>
       <div class="r-sig">${rec&&rec.assinatura?`<img src="${rec.assinatura}">`:'<div style="height:64px"></div>'}
-        <div class="line"><b>(DESTINO)</b> Responsável pelo recebimento do(s) bem(ns) acima especificado(s)<br>
-        Nome: ${esc(rec&&rec.respNome?rec.respNome:'')}</div></div>
+        <div class="line"><b>(DESTINO)</b> Responsável pelo recebimento<br>Nome: ${esc(rec&&rec.respNome?rec.respNome:'')}</div></div>
     </div>
     <div class="r-foot">Documento gerado pelo ${NOME_SISTEMA} em ${new Date().toLocaleString('pt-BR')}</div>
   </div>`;
   setTimeout(()=>window.print(),60);
 }
 
-/* ================= BACKUP ================= */
+/* ============== BACKUP ============== */
 $('#btnExport').addEventListener('click',()=>{
   const blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='nii-patrimonios-backup-'+hojeISO().replace(/-/g,'')+'.json';a.click();
-  URL.revokeObjectURL(a.href);toast('Backup exportado.');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='nii-patrimonios-backup-'+hojeISO().replace(/-/g,'')+'.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('Backup exportado.');
 });
 $('#btnImport').addEventListener('click',()=>$('#fileImport').click());
 $('#fileImport').addEventListener('change',e=>{
-  const f=e.target.files[0];if(!f)return;const r=new FileReader();
-  r.onload=()=>{try{const d=JSON.parse(r.result);
-    if(!d||!Array.isArray(d.equipamentos)||!Array.isArray(d.emprestimos)||!Array.isArray(d.tecnicos)||!Array.isArray(d.setores))throw 0;
-    if(!Array.isArray(d.tipos))d.tipos=[...DEFAULT_TIPOS];
-    if(!Array.isArray(d.marcas))d.marcas=[...DEFAULT_MARCAS];
-    d.emprestimos.forEach(x=>{if(!Array.isArray(x.equipIds)){x.equipIds=x.equipId?[x.equipId]:[];delete x.equipId;}});
-    if(!d.eqSnap||typeof d.eqSnap!=='object')d.eqSnap={};
-    if(!Array.isArray(d.impressoras))d.impressoras=[];
-    (d.guias||[]).forEach(g=>{if(g&&!g.recebimento){g.recebimento={data:g.origemData||hojeISO(),hora:'',respNome:'',assinatura:null,atualizouSetor:false,ts:g.emitidaEm||Date.now()};}});
-    normalizarSetores(d.setores);
-    db=d;persistir();garantirModelos();garantirGuias();
-    selSig='';
-    resetFormEquip();resetTec();resetSet();resetEmpForm();resetModForm();resetGuiaForm();resetImpForm();resetSwitchForm();resetRackForm();resetLicencaForm();
-    atualizarTudo();toast('Backup importado com sucesso.');
-  }catch(_){toast('Arquivo de backup inválido.','bad');}};
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{
+    try{
+      const d=JSON.parse(r.result);
+      if(!d||!Array.isArray(d.equipamentos)||!Array.isArray(d.emprestimos)||!Array.isArray(d.tecnicos)||!Array.isArray(d.setores))throw 0;
+      if(!Array.isArray(d.tipos))d.tipos=[...DEFAULT_TIPOS];
+      if(!Array.isArray(d.marcas))d.marcas=[...DEFAULT_MARCAS];
+      d.emprestimos.forEach(x=>{if(!Array.isArray(x.equipIds)){x.equipIds=x.equipId?[x.equipId]:[];delete x.equipId;}});
+      if(!d.eqSnap||typeof d.eqSnap!=='object')d.eqSnap={};
+      if(!Array.isArray(d.impressoras))d.impressoras=[];
+      (d.guias||[]).forEach(g=>{if(g&&!g.recebimento){g.recebimento={data:g.origemData||hojeISO(),hora:'',respNome:'',assinatura:null,atualizouSetor:false,ts:g.emitidaEm||Date.now()};}});
+      normalizarSetores(d.setores);
+      db=d;
+      persistir();
+      garantirModelos();garantirGuias();
+      selSig='';
+      resetFormEquip();resetTec();resetSet();resetEmpForm();resetModForm();resetGuiaForm();resetImpForm();resetSwitchForm();resetRackForm();resetLicencaForm();
+      atualizarTudo();
+      toast('Backup importado com sucesso.');
+    }catch(_){toast('Arquivo de backup inválido.','bad');}
+  };
   r.readAsText(f);e.target.value='';
 });
 
-/* ================= RELÓGIO / GERAL ================= */
-function tick(){const d=new Date();$('#clock').textContent=d.toLocaleTimeString('pt-BR');
-  $('#dataHoje').textContent=d.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});}
+/* ============== RELÓGIO E TUDO ============== */
+function tick(){
+  const d=new Date();
+  $('#clock').textContent=d.toLocaleTimeString('pt-BR');
+  $('#dataHoje').textContent=d.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});
+}
 setInterval(tick,1000);tick();
 function atualizarBadges(){
   $('#badge-eq').textContent=db.equipamentos.length;
@@ -3580,19 +3819,31 @@ function atualizarBadges(){
   $('#badge-set').textContent=db.setores.length;
 }
 function atualizarTudo(){
-  [preencherSelects,renderModelos,renderEquipamentos,renderTecnicos,renderSetores,renderEmprestimos,renderGuias,renderImpressoras,renderSwitches,renderRacks,renderLicencas,renderPlanilhasHub,atualizarCartaoEmp,atualizarBadges]
-    .forEach(f=>{try{f();}catch(err){console.error('NII render:',err);}});
+  [
+    preencherSelects,renderModelos,renderEquipamentos,renderTecnicos,renderSetores,
+    renderEmprestimos,renderGuias,renderImpressoras,renderSwitches,renderRacks,
+    renderLicencas,renderPlanilhasHub,atualizarCartaoEmp,atualizarBadges
+  ].forEach(f=>{try{f();}catch(err){console.error('NII render:',err);}});
   if(currentView==='dashboard'){try{renderDashboard();}catch(err){console.error('NII render:',err);}}
 }
 
-/* ================= INICIALIZAÇÃO ================= */
+/* ============== INICIALIZAÇÃO ============== */
 $('#eqData').value=hojeISO();
 $('#empDataReserva').value=hojeISO();
-$('#empIni').value=hojeISO();$('#empIniHora').value=horaAgora();
-preencherSelects();atualizarTudo();renderDashboard();resetGuiaForm();resetTec();
-requestAnimationFrame(()=>{sigRet.resize();sigDev.resize();sigGuia.resize();sigGuiaPat.resize();sigGuiaDest.resize();});
-window.addEventListener('resize',()=>{sigRet.resize();sigGuia.resize();sigGuiaPat.resize();sigGuiaDest.resize();
-  if($('#modalDev').classList.contains('show'))sigDev.resize();});
+$('#empIni').value=hojeISO();
+$('#empIniHora').value=horaAgora();
+preencherSelects();
+atualizarTudo();
+renderDashboard();
+resetGuiaForm();
+resetTec();
+requestAnimationFrame(()=>{
+  sigRet.resize();sigDev.resize();sigGuia.resize();sigGuiaPat.resize();sigGuiaDest.resize();
+});
+window.addEventListener('resize',()=>{
+  sigRet.resize();sigGuia.resize();sigGuiaPat.resize();sigGuiaDest.resize();
+  if($('#modalDev').classList.contains('show'))sigDev.resize();
+});
 </script>
 </body>
 </html>
