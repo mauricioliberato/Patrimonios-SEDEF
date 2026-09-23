@@ -108,7 +108,7 @@ input.leitura-ok{animation:leituraOk 1.1s ease}
 .form-actions{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
 .input-with-cam{position:relative;display:flex;gap:6px}
 .input-with-cam input{flex:1}
-.btn-cam{flex:0 0 auto;width:40px;padding:0;display:grid;place-items:center;background:var(--ink);color:#fff;border:none;border-radius:6px;cursor:pointer;box-shadow:0 2px 0 #061220;transition:.15s}
+.btn-cam{flex:0 0 auto;width:40px;height:40px;padding:0;display:grid;place-items:center;background:var(--ink);color:#fff;border:none;border-radius:6px;cursor:pointer;box-shadow:0 2px 0 #061220;transition:.15s}
 .btn-cam:hover{background:#1a3348;transform:translateY(-1px)}
 .btn-cam:active{transform:translateY(1px)}
 .btn-cam svg{width:20px;height:20px}
@@ -465,6 +465,13 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
             <h3>Equipamentos cadastrados (unidades)</h3>
             <div class="toolbar">
               <input type="text" id="eqBusca" placeholder="🔍 Buscar patrimônio, série, obs…">
+              <button type="button" class="btn-cam" data-scan-target="eqBusca"
+                      title="Buscar por código de barras (câmera do celular)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M3 8V5a2 2 0 012-2h3M21 8V5a2 2 0 00-2-2h-3M3 16v3a2 2 0 002 2h3M21 16v3a2 2 0 01-2 2h-3"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+              </button>
               <select id="eqFiltroTipo"></select>
               <select id="eqFiltroStatus">
                 <option value="">Todos os status</option>
@@ -1379,7 +1386,7 @@ const SESSAO_TTL_MS=8*60*60*1000; /* 8 horas */
 let usuarioAtual=null;
 let sincronizando=false;
 let unsubscribers=[];
-let ultimaLeituraRemota={}; /* controla versão remota por seção para detectar sobrescrita */
+let ultimaLeituraRemota={};
 
 const SECOES=['equipamentos','tecnicos','setores','emprestimos','guias','impressoras','switches','racks','licencas','listas','eqSnap'];
 function docRefSecao(nome){return fsdb.collection('sistema').doc(nome);}
@@ -1450,9 +1457,7 @@ async function tentarLogin(usuario,senha){
     if(t){
       const ok=hash?(String(t.senhaHash||'')===hash||String(t.senha||'')===senha):(String(t.senha||'')===senha);
       if(!ok)return null;
-      /* migra senha em texto para hash */
       if(!t.senhaHash&&hash){
-        const restante=lista.filter(x=>x.id!==t.id).map(x=>({...x,senha:undefined}));
         const atualizada=lista.map(x=>x.id===t.id?{...x,senhaHash:hash,senha:undefined}:x);
         try{await docRefSecao('tecnicos').set({items:atualizada});}catch(e){console.warn('Falha ao migrar senha:',e);}
       }
@@ -1480,10 +1485,6 @@ function lerSessao(){
     if(s.expiraEm&&Date.now()>s.expiraEm){sessionStorage.removeItem(SESSAO_KEY);return null;}
     return s;
   }catch(_){return null;}
-}
-function renovarSessao(u){
-  const s={...u,expiraEm:Date.now()+SESSAO_TTL_MS};
-  sessionStorage.setItem(SESSAO_KEY,JSON.stringify(s));
 }
 function mostrarApp(u){
   usuarioAtual=u;
@@ -1781,7 +1782,7 @@ $('#btnMenuMobile').addEventListener('click',()=>{
 });
 function fecharMenuMobile(){$('#navPrincipal').classList.remove('aberto');$('#btnMenuMobile').setAttribute('aria-expanded','false');}
 
-/* ============== ASSINATURA (JPEG comprimido) ============== */
+/* ============== ASSINATURA ============== */
 class Assinador{
   constructor(canvas){
     this.c=canvas;
@@ -1823,7 +1824,6 @@ class Assinador{
   }
   limpar(){this.tracos=[];this.atual=null;this.desenhar();}
   vazia(){return this.tracos.length===0;}
-  /* JPEG comprimido + fundo branco (evita PNG pesado) */
   dataURL(){
     if(this.vazia())return null;
     try{
@@ -1859,13 +1859,19 @@ async function abrirScanner(targetId){
       {facingMode:'environment'},
       {fps:10,qrbox:{width:260,height:130},aspectRatio:2.0},
       texto=>{
+        /* usa dígitos quando houver (patrimônio), senão o texto cru (série com letras) */
         const dig=soDigitos(texto);
-        if(dig){
+        const valor=dig||String(texto||'').trim();
+        if(valor){
           const el=$('#'+scanTarget);
           if(el){
-            el.value=dig;
+            el.value=valor;
             el.classList.remove('leitura-ok');void el.offsetWidth;el.classList.add('leitura-ok');
             beep();
+            /* dispara 'input' para que listeners (busca com debounce, sanitização etc.) reajam sozinhos */
+            el.dispatchEvent(new Event('input',{bubbles:true}));
+            /* se for busca de equipamentos, aciona imediatamente sem esperar debounce */
+            if(el.id==='eqBusca'&&typeof renderEquipamentos==='function')renderEquipamentos();
           }
         }
         pararScanner();
@@ -2127,7 +2133,6 @@ $('#formEquip').addEventListener('submit',ev=>{
     toast('Unidade <b class="mono">'+esc(pat)+'</b> cadastrada'+(mod?' ('+esc(mod.tipo)+' '+esc(mod.marca)+')':'')+'.');
   }
   persistir();resetFormEquip();atualizarTudo();destacarLinha('#eqTbody',salvoId);
-  /* prepara próximo cadastro automaticamente */
   setTimeout(()=>{if(!$('#eqId').value)$('#eqPatrimonio').focus();},150);
 });
 let lastResetEq=0;
@@ -2848,7 +2853,6 @@ $('#formEmp').addEventListener('submit',ev=>{
 function renderEmprestimos(){
   const busca=($('#empBusca').value||'').toLowerCase();
   let lista=[...db.emprestimos].sort((a,b)=>(b.criadoEm||0)-(a.criadoEm||0));
-  /* FIX: usar k.label (antes era k==='Atrasado' — bug) */
   if(filtroEmp)lista=lista.filter(e=>{
     const k=statusEmp(e).label;
     return (filtroEmp==='ativo'&&k==='Reservado')||(filtroEmp==='atrasado'&&k==='Atrasado')||(filtroEmp==='devolvido'&&k==='Devolvido');
@@ -3101,7 +3105,6 @@ function resetGuiaForm(){
 }
 $('#btnGuiaCancel').addEventListener('click',resetGuiaForm);
 
-/* Próximo número de guia via transação (evita colisão em emissão simultânea) */
 async function reservarProximoNumeroGuia(){
   try{
     const ref=docRefSecao('guias');
