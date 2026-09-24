@@ -133,6 +133,7 @@ input.leitura-ok{animation:leituraOk 1.1s ease}
 .btn-danger{background:var(--bad);color:#fff;box-shadow:0 2px 0 #a83226}
 .btn-danger:hover{background:#e05a4d;transform:translateY(-1px)}
 .btn-sm{padding:7px 12px;font-size:12px}
+.btn:disabled{opacity:.45;cursor:default;transform:none}
 
 .ibtn{width:30px;height:30px;display:inline-grid;place-items:center;border:1px solid var(--line);background:#fff;border-radius:6px;color:var(--muted);cursor:pointer;transition:.15s;opacity:.65}
 tr:hover .ibtn,li:hover .ibtn,.cart-item:hover .ibtn{opacity:1}
@@ -235,8 +236,9 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
 .x-close:hover{color:var(--bad)}
 .info-chip{background:var(--info-bg);border:1px solid #bfe0ec;border-radius:8px;padding:10px 14px;font-size:12.5px;color:#0b5a77;line-height:1.55}
 
-#scanReader{width:100%;min-height:220px;background:#0a1620;border-radius:8px;overflow:hidden;display:grid;place-items:center;color:#8ba3b6;font-size:13px}
+#scanReader{width:100%}
 #scanReader video{width:100%!important;height:auto!important;display:block}
+#scanZoom{accent-color:var(--accent);height:6px}
 
 #toasts{position:fixed;right:20px;bottom:20px;z-index:300;display:flex;flex-direction:column;gap:10px}
 .toast{background:var(--ink);color:#fff;padding:13px 18px 13px 14px;border-radius:8px;border-left:4px solid var(--ok);font-size:13px;box-shadow:0 10px 26px rgba(0,0,0,.28);animation:toastIn .28s ease both;max-width:360px;transition:opacity .35s,transform .35s}
@@ -1246,14 +1248,27 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
 </div>
 
 <div class="modal-overlay" id="modalScan">
-  <div class="modal" style="width:min(560px,100%)">
+  <div class="modal" style="width:min(600px,100%)">
     <div class="modal-h">
       <h3>📷 Ler código de barras</h3>
       <button class="x-close" data-close>&times;</button>
     </div>
     <div class="modal-b">
-      <div id="scanReader" style="min-height:220px;background:#0a1620;border-radius:8px;overflow:hidden;display:grid;place-items:center;color:#8ba3b6;font-size:13px">
-        Iniciando câmera…
+      <div id="scanWrapper" style="position:relative;background:#0a1620;border-radius:8px;overflow:hidden;min-height:260px;display:grid;place-items:center">
+        <div id="scanReader" style="width:100%">
+          <div style="padding:20px;color:#8ba3b6;text-align:center;font-size:13px">Iniciando câmera…</div>
+        </div>
+        <div id="scanGuia" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:82%;height:30%;border:2px solid rgba(255,140,26,.85);border-radius:6px;box-shadow:0 0 0 9999px rgba(0,0,0,.35);pointer-events:none;display:none">
+          <div style="position:absolute;left:0;right:0;top:-22px;text-align:center;color:#ffb061;font:600 11px 'IBM Plex Sans',sans-serif;letter-spacing:.1em;text-transform:uppercase">aponte para o código</div>
+        </div>
+      </div>
+      <div id="scanControles" style="display:none;gap:8px;align-items:center;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm" id="btnScanTorch" type="button" title="Ligar lanterna">🔦 Lanterna</button>
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink-soft);flex:1;min-width:180px">
+          Zoom <input type="range" id="scanZoom" min="100" max="400" value="100" style="flex:1" disabled>
+          <span class="mono" id="scanZoomVal" style="width:38px;text-align:right">1.0×</span>
+        </label>
+        <span class="subtle" id="scanStatus"></span>
       </div>
       <p class="subtle" id="scanHint">Aponte a câmera para o código. A leitura é automática — só os <b>números</b> são aproveitados.</p>
     </div>
@@ -1856,16 +1871,20 @@ $('#sigGuiaClear').addEventListener('click',()=>sigGuia.limpar());
 $('#sigGuiaPatClear').addEventListener('click',()=>sigGuiaPat.limpar());
 $('#sigGuiaDestClear').addEventListener('click',()=>sigGuiaDest.limpar());
 
-/* ============== SCANNER v2 — BarcodeDetector nativo + html5-qrcode + foto ============== */
+/* ============== SCANNER v3 — ML Kit + canvas + votação + lanterna + zoom ============== */
 let scanStream = null;
-let scanHtml5 = null;
-let scanAtivo = false;
+let scanTrack  = null;
+let scanHtml5  = null;
+let scanAtivo  = false;
 let scanTarget = null;
+let scanVotos  = { ultimo: null, contagem: 0 };
+let scanCaps   = null;
+let scanTorchOn = false;
 
 const FORMATOS_1D = ['code_128','code_39','code_93','codabar','ean_13','ean_8','upc_a','upc_e','itf'];
 const FORMATOS_QR = ['qr_code','data_matrix','pdf417','aztec'];
+const FORMATOS = [...FORMATOS_1D, ...FORMATOS_QR];
 
-/* Extrai SOMENTE dígitos: "PR 100001179218" → "100001179218" */
 function normalizarCodigoLido(texto){
   if(texto==null)return '';
   return String(texto).replace(/\D/g,'');
@@ -1873,16 +1892,18 @@ function normalizarCodigoLido(texto){
 
 async function abrirScanner(targetId){
   scanTarget = targetId;
+  scanVotos = { ultimo: null, contagem: 0 };
   $('#modalScan').classList.add('show');
+  $('#scanControles').style.display='none';
+  $('#scanGuia').style.display='none';
+  $('#scanStatus').textContent='';
   await new Promise(r=>setTimeout(r,120));
-  $('#scanReader').innerHTML = '<div style="padding:16px">Iniciando câmera…</div>';
+  $('#scanReader').innerHTML = '<div style="padding:20px;color:#8ba3b6;text-align:center;font-size:13px">Iniciando câmera…</div>';
 
   if('BarcodeDetector' in window){
-    try{
-      await iniciarScannerNativo();
-      return;
-    }catch(e){
-      console.warn('BarcodeDetector nativo indisponível, caindo para html5-qrcode:', e);
+    try{ await iniciarScannerNativo(); return; }
+    catch(e){
+      console.warn('BarcodeDetector indisponível, caindo para html5-qrcode:', e);
       $('#scanReader').innerHTML = '';
     }
   }
@@ -1891,18 +1912,36 @@ async function abrirScanner(targetId){
 
 async function iniciarScannerNativo(){
   const suportados = await BarcodeDetector.getSupportedFormats();
-  const wanted = [...FORMATOS_1D, ...FORMATOS_QR].filter(f => suportados.includes(f));
+  const wanted = FORMATOS.filter(f => suportados.includes(f));
+  if(!wanted.length) throw new Error('Nenhum formato suportado');
   const detector = new BarcodeDetector({ formats: wanted });
-  $('#scanHint').innerHTML = 'Decoder: <b>BarcodeDetector (nativo)</b> · só os números são aproveitados.';
 
-  const stream = await navigator.mediaDevices.getUserMedia({
+  const constraints = {
+    audio: false,
     video: {
       facingMode: { ideal: 'environment' },
       width:  { ideal: 1920 },
-      height: { ideal: 1080 }
-    },
-    audio: false
-  });
+      height: { ideal: 1080 },
+      focusMode: 'continuous',
+      exposureMode: 'continuous',
+      whiteBalanceMode: 'continuous'
+    }
+  };
+  let stream;
+  try{
+    stream = await navigator.mediaDevices.getUserMedia(constraints);
+  }catch(e){
+    console.warn('Constraints avançados falharam, usando básico:', e);
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: { facingMode: { ideal: 'environment' } }
+    });
+  }
+
+  const track = stream.getVideoTracks()[0];
+  scanStream = stream;
+  scanTrack = track;
+  scanCaps = track.getCapabilities ? track.getCapabilities() : {};
 
   const video = document.createElement('video');
   video.setAttribute('playsinline','true');
@@ -1912,20 +1951,46 @@ async function iniciarScannerNativo(){
   $('#scanReader').innerHTML = '';
   $('#scanReader').appendChild(video);
   video.srcObject = stream;
-  await video.play();
 
-  scanStream = stream;
+  await new Promise((resolve)=>{
+    if(video.readyState >= 2) return resolve();
+    video.onloadedmetadata = () => resolve();
+    setTimeout(resolve, 2000);
+  });
+  await video.play();
+  await new Promise(r=>setTimeout(r, 600));
+
+  const canvas = document.createElement('canvas');
+  canvas.width  = video.videoWidth  || 1280;
+  canvas.height = video.videoHeight || 720;
+  const ctx = canvas.getContext('2d');
+
+  $('#scanGuia').style.display='block';
+  $('#scanHint').innerHTML = 'Decoder: <b>ML Kit</b> (BarcodeDetector nativo) · só os números são aproveitados.';
+  $('#scanControles').style.display='flex';
+  ativarControles(track);
+
   scanAtivo = true;
 
+  let turno = 0;
   const loop = async () => {
-    if(!scanAtivo)return;
+    if(!scanAtivo) return;
     try{
-      const codigos = await detector.detect(video);
+      let alvo = video;
+      if(turno % 2 === 1){
+        ctx.filter = 'grayscale(1) contrast(1.7) brightness(1.05)';
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        alvo = canvas;
+      }
+      turno++;
+      const codigos = await detector.detect(alvo);
       if(codigos && codigos.length){
         const bruto = codigos[0].rawValue;
-        pararScanner();
-        aplicarLeitura(bruto);
-        return;
+        if(confirmarLeitura(bruto)){
+          pararScanner();
+          aplicarLeitura(bruto);
+          return;
+        }
       }
     }catch(_){}
     requestAnimationFrame(loop);
@@ -1933,10 +1998,24 @@ async function iniciarScannerNativo(){
   loop();
 }
 
+function confirmarLeitura(bruto){
+  const digitos = normalizarCodigoLido(bruto);
+  if(!digitos) return false;
+  if(scanVotos.ultimo === digitos){
+    scanVotos.contagem++;
+  } else {
+    scanVotos.ultimo = digitos;
+    scanVotos.contagem = 1;
+  }
+  $('#scanStatus').textContent = 'lendo ('+scanVotos.contagem+'/3)…';
+  return scanVotos.contagem >= 3;
+}
+
 async function iniciarScannerHtml5(){
   try{
     const F = Html5QrcodeSupportedFormats;
     scanHtml5 = new Html5Qrcode('scanReader', false);
+    $('#scanGuia').style.display='block';
     $('#scanHint').innerHTML = 'Decoder: <b>html5-qrcode</b> · só os números são aproveitados.';
     scanAtivo = true;
     await scanHtml5.start(
@@ -1945,7 +2024,7 @@ async function iniciarScannerHtml5(){
         fps: 20,
         qrbox: (w, h) => {
           const larg = Math.floor(w * 0.92);
-          const alt  = Math.floor(Math.min(h * 0.65, larg * 0.6));
+          const alt  = Math.floor(Math.min(h * 0.65, larg * 0.55));
           return { width: larg, height: alt };
         },
         aspectRatio: 1.777,
@@ -1958,6 +2037,7 @@ async function iniciarScannerHtml5(){
         experimentalFeatures: { useBarCodeDetectorIfSupported: true }
       },
       texto=>{
+        if(!normalizarCodigoLido(texto)) return;
         pararScanner();
         aplicarLeitura(texto);
       },
@@ -1967,6 +2047,48 @@ async function iniciarScannerHtml5(){
     console.error('html5-qrcode falhou:', e);
     toast('Não foi possível acessar a câmera. Verifique as permissões do navegador.','bad');
     pararScanner();
+  }
+}
+
+function ativarControles(track){
+  const btnTorch = $('#btnScanTorch');
+  const inpZoom  = $('#scanZoom');
+  const lblZoom  = $('#scanZoomVal');
+
+  if(scanCaps && scanCaps.torch){
+    btnTorch.disabled = false;
+    btnTorch.onclick = async () => {
+      try{
+        scanTorchOn = !scanTorchOn;
+        await track.applyConstraints({ advanced: [{ torch: scanTorchOn }] });
+        btnTorch.textContent = scanTorchOn ? '🔦 ON' : '🔦 Lanterna';
+        btnTorch.classList.toggle('btn-accent', scanTorchOn);
+      }catch(e){ console.warn('Torch falhou:', e); }
+    };
+  } else {
+    btnTorch.disabled = true;
+    btnTorch.style.opacity = '.4';
+  }
+
+  if(scanCaps && scanCaps.zoom){
+    const min = scanCaps.zoom.min ?? 1;
+    const max = scanCaps.zoom.max ?? 5;
+    const step = scanCaps.zoom.step ?? 0.1;
+    inpZoom.min = 100;
+    inpZoom.max = Math.round((max/min)*100);
+    inpZoom.step = Math.max(1, Math.round((step/min)*100));
+    inpZoom.value = 100;
+    inpZoom.disabled = false;
+    inpZoom.oninput = async () => {
+      const fator = Number(inpZoom.value)/100;
+      const z = min*fator;
+      lblZoom.textContent = fator.toFixed(1)+'×';
+      try{ await track.applyConstraints({ advanced: [{ zoom: z }] }); }catch(_){}
+    };
+    lblZoom.textContent = '1.0×';
+  } else {
+    inpZoom.disabled = true;
+    lblZoom.textContent = '—';
   }
 }
 
@@ -1988,26 +2110,26 @@ function aplicarLeitura(bruto){
 
 function pararScanner(){
   scanAtivo = false;
+  scanTorchOn = false;
+  scanCaps = null;
   if(scanStream){
     try{ scanStream.getTracks().forEach(t=>t.stop()); }catch(_){}
-    scanStream = null;
+    scanStream = null; scanTrack = null;
   }
   if(scanHtml5){
     try{ scanHtml5.stop().then(()=>{ try{scanHtml5.clear();}catch(_){} }).catch(()=>{}); }catch(_){}
     scanHtml5 = null;
   }
   const r = $('#scanReader'); if(r) r.innerHTML = '';
+  $('#scanGuia').style.display='none';
   $('#modalScan').classList.remove('show');
   scanTarget = null;
 }
 
-/* Abrir scanner em qualquer botão com data-scan-target */
 document.addEventListener('click',e=>{
   const b = e.target.closest('[data-scan-target]');
   if(b){ e.preventDefault(); abrirScanner(b.dataset.scanTarget); }
 });
-
-/* Modo "Usar foto" — captura uma imagem e decodifica offline */
 document.addEventListener('click',e=>{
   if(e.target.closest('#btnScanFoto')){
     e.preventDefault();
@@ -2029,13 +2151,13 @@ async function tentarLerFoto(file){
     try{
       const bitmap = await createImageBitmap(file);
       const suportados = await BarcodeDetector.getSupportedFormats();
-      const wanted = [...FORMATOS_1D, ...FORMATOS_QR].filter(f => suportados.includes(f));
+      const wanted = FORMATOS.filter(f => suportados.includes(f));
       const detector = new BarcodeDetector({ formats: wanted });
       const codigos = await detector.detect(bitmap);
-      if(codigos && codigos.length){
-        aplicarLeitura(codigos[0].rawValue);
-        return;
-      }
+      if(codigos && codigos.length){ aplicarLeitura(codigos[0].rawValue); return; }
+      const pre = await preProcessarImagem(bitmap);
+      const codigos2 = await detector.detect(pre);
+      if(codigos2 && codigos2.length){ aplicarLeitura(codigos2[0].rawValue); return; }
     }catch(err){ console.warn('detect(foto) falhou:', err); }
   }
   try{
@@ -2048,8 +2170,17 @@ async function tentarLerFoto(file){
     aplicarLeitura(res);
   }catch(err){
     console.error('scanFile falhou:', err);
-    toast('Não consegui ler o código nesta foto. Tente: (1) aproximar mais a câmera, (2) deixar o código ocupar boa parte do quadro, (3) evitar reflexos.','bad');
+    toast('Não consegui ler o código nesta foto. Tente aproximar mais a câmera e deixar o código ocupar boa parte do quadro.','bad');
   }
+}
+
+async function preProcessarImagem(bitmap){
+  const c = document.createElement('canvas');
+  c.width = bitmap.width; c.height = bitmap.height;
+  const x = c.getContext('2d');
+  x.filter = 'grayscale(1) contrast(1.8) brightness(1.1)';
+  x.drawImage(bitmap, 0, 0);
+  return c;
 }
 
 /* ============== SELECTS AUXILIARES ============== */
