@@ -1958,7 +1958,7 @@ async function iniciarScannerNativo(){
     setTimeout(resolve, 2000);
   });
   await video.play();
-  await new Promise(r=>setTimeout(r, 600));
+  await new Promise(r=>setTimeout(r, 800));
 
   const canvas = document.createElement('canvas');
   canvas.width  = video.videoWidth  || 1280;
@@ -2054,6 +2054,14 @@ function ativarControles(track){
   const btnTorch = $('#btnScanTorch');
   const inpZoom  = $('#scanZoom');
   const lblZoom  = $('#scanZoomVal');
+
+  /* Foco contínuo: no Android, muitos Chrome/WebView ignoram focusMode passado direto no
+     getUserMedia() inicial — só funciona de verdade pedindo de novo com applyConstraints()
+     depois que o stream já está rodando. É isso que fazia a câmera ficar sem focar de perto. */
+  if(scanCaps && Array.isArray(scanCaps.focusMode) && scanCaps.focusMode.includes('continuous')){
+    track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] })
+      .catch(e=>console.warn('Foco contínuo não aplicado:', e));
+  }
 
   if(scanCaps && scanCaps.torch){
     btnTorch.disabled = false;
