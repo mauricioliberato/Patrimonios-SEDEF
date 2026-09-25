@@ -1951,14 +1951,26 @@ async function iniciarScannerNativo(){
      TODAS as advanced constraints se uma delas falhar, por isso separamos. */
   const aplicarSePossivel = async (nome, valor) => {
     try{
-      if(scanCaps[nome] && Array.isArray(scanCaps[nome]) && scanCaps[nome].includes(valor)){
-        await track.applyConstraints({ advanced:[{ [nome]: valor }] });
-      }
-    }catch(e){ console.warn('applyConstraints '+nome+' falhou:', e); }
+      await track.applyConstraints({ advanced:[{ [nome]: valor }] });
+    }catch(e){ /* aparelho não suporta — segue em frente */ }
   };
+  // Tenta forçar auto-foco, mesmo que o aparelho não reporte como suportado
   await aplicarSePossivel('focusMode', 'continuous');
   await aplicarSePossivel('exposureMode', 'continuous');
   await aplicarSePossivel('whiteBalanceMode', 'continuous');
+  
+  /* alguns Androids travam o foco no infinito ao abrir a câmera;
+   forçar um single-shot periodicamente faz o autofoco "acordar" */
+setInterval(async ()=>{
+  if(!scanAtivo || !scanTrack) return;
+  try{
+    await scanTrack.applyConstraints({ advanced:[{ focusMode:'single-shot' }] });
+    setTimeout(async ()=>{
+      if(!scanAtivo || !scanTrack) return;
+      try{ await scanTrack.applyConstraints({ advanced:[{ focusMode:'continuous' }] }); }catch(_){}
+    }, 400);
+  }catch(_){}
+}, 2500);
 
   const video = document.createElement('video');
   video.setAttribute('playsinline','true');
@@ -2026,8 +2038,8 @@ function confirmarLeitura(bruto){
     scanVotos.ultimo = digitos;
     scanVotos.contagem = 1;
   }
-  $('#scanStatus').textContent = 'lendo ('+scanVotos.contagem+'/3)…';
-  return scanVotos.contagem >= 3;
+  $('#scanStatus').textContent = 'lendo ('+scanVotos.contagem+'/2)…';
+  return scanVotos.contagem >= 2;
 }
 
 async function iniciarScannerHtml5(){
@@ -2179,9 +2191,15 @@ function pararScanner(){
   scanTarget = null;
 }
 
-document.addEventListener('click',e=>{
-  const b = e.target.closest('[data-scan-target]');
-  if(b){ e.preventDefault(); abrirScanner(b.dataset.scanTarget); }
+document.addEventListener('change',async e=>{
+  if(e.target && e.target.id==='fileScanFoto'){
+    const f = e.target.files[0]; if(!f) return;
+    const alvoGuardado = scanTarget;       // preserva o alvo
+    pararScanner();                         // fecha o modal e para a câmera
+    scanTarget = alvoGuardado;              // restaura
+    try{ await tentarLerFoto(f); }
+    finally{ scanTarget = null; }
+  }
 });
 document.addEventListener('click',e=>{
   if(e.target.closest('#btnScanFoto')){
@@ -2199,20 +2217,53 @@ document.addEventListener('change',async e=>{
   }
 });
 
+function carregarImagemArquivo(file){
+  return new Promise(resolve=>{
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = ()=>{ URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = ()=>{ URL.revokeObjectURL(url); resolve(null); };
+    img.src = url;
+  });
+}
+
 async function tentarLerFoto(file){
-  if('BarcodeDetector' in window){
-    try{
-      const bitmap = await createImageBitmap(file);
-      const suportados = await BarcodeDetector.getSupportedFormats();
-      const wanted = FORMATOS.filter(f => suportados.includes(f));
-      const detector = new BarcodeDetector({ formats: wanted });
-      const codigos = await detector.detect(bitmap);
-      if(codigos && codigos.length){ aplicarLeitura(codigos[0].rawValue); return; }
-      const pre = await preProcessarImagem(bitmap);
-      const codigos2 = await detector.detect(pre);
-      if(codigos2 && codigos2.length){ aplicarLeitura(codigos2[0].rawValue); return; }
-    }catch(err){ console.warn('detect(foto) falhou:', err); }
+  const img = await carregarImagemArquivo(file);
+  if(!img){
+    toast('Não consegui abrir a imagem.','bad');
+    return;
   }
+
+  const estrategias = [
+    { escala: 1.0, filtro: null },
+    { escala: 0.7, filtro: 'grayscale(1) contrast(1.5)' },
+    { escala: 0.5, filtro: 'grayscale(1) contrast(1.8) brightness(1.05)' },
+    { escala: 1.5, filtro: 'grayscale(1) contrast(1.5)' }
+  ];
+
+  for(const est of estrategias){
+    const c = document.createElement('canvas');
+    c.width  = Math.max(1, Math.round(img.naturalWidth  * est.escala));
+    c.height = Math.max(1, Math.round(img.naturalHeight * est.escala));
+    const x = c.getContext('2d');
+    if(est.filtro) x.filter = est.filtro;
+    x.drawImage(img, 0, 0, c.width, c.height);
+
+    if('BarcodeDetector' in window){
+      try{
+        const suportados = await BarcodeDetector.getSupportedFormats();
+        const wanted = FORMATOS.filter(f => suportados.includes(f));
+        const detector = new BarcodeDetector({ formats: wanted });
+        const codigos = await detector.detect(c);
+        if(codigos && codigos.length){
+          aplicarLeitura(codigos[0].rawValue);
+          return;
+        }
+      }catch(err){ console.warn('detect tentativa falhou:', err); }
+    }
+  }
+
+  /* Fallback: html5-qrcode com arquivo bruto */
   try{
     const tmpId = 'scanFileTmp';
     let tmp = document.getElementById(tmpId);
@@ -2223,7 +2274,7 @@ async function tentarLerFoto(file){
     aplicarLeitura(res);
   }catch(err){
     console.error('scanFile falhou:', err);
-    toast('Não consegui ler o código nesta foto. Tente aproximar mais a câmera e deixar o código ocupar boa parte do quadro.','bad');
+    toast('Não consegui ler o código nesta foto. Aproxime mais e deixe o código ocupar boa parte do quadro.','bad');
   }
 }
 
