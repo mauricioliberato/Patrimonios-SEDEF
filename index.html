@@ -1501,13 +1501,19 @@ async function tentarLogin(usuario,senha){
 }
 function salvarSessao(u){
   const s={...u,expiraEm:Date.now()+SESSAO_TTL_MS};
-  sessionStorage.setItem(SESSAO_KEY,JSON.stringify(s));
+  try{localStorage.setItem(SESSAO_KEY,JSON.stringify(s));}catch(_){}
+  try{sessionStorage.setItem(SESSAO_KEY,JSON.stringify(s));}catch(_){}
 }
 function lerSessao(){
   try{
-    const s=JSON.parse(sessionStorage.getItem(SESSAO_KEY)||'null');
+    const raw=localStorage.getItem(SESSAO_KEY)||sessionStorage.getItem(SESSAO_KEY);
+    const s=JSON.parse(raw||'null');
     if(!s||!s.usuario)return null;
-    if(s.expiraEm&&Date.now()>s.expiraEm){sessionStorage.removeItem(SESSAO_KEY);return null;}
+    if(s.expiraEm&&Date.now()>s.expiraEm){
+      try{localStorage.removeItem(SESSAO_KEY);}catch(_){}
+      try{sessionStorage.removeItem(SESSAO_KEY);}catch(_){}
+      return null;
+    }
     return s;
   }catch(_){return null;}
 }
@@ -1582,7 +1588,8 @@ $('#formLogin').addEventListener('submit',async ev=>{
 async function sair(){
   if(presencaTimer)clearInterval(presencaTimer);
   await removerPresenca();
-  sessionStorage.removeItem(SESSAO_KEY);
+  try{localStorage.removeItem(SESSAO_KEY);}catch(_){}
+  try{sessionStorage.removeItem(SESSAO_KEY);}catch(_){}
   location.reload();
 }
 $('#btnSair').addEventListener('click',sair);
@@ -1918,34 +1925,40 @@ async function iniciarScannerNativo(){
   if(!wanted.length) throw new Error('Nenhum formato suportado');
   const detector = new BarcodeDetector({ formats: wanted });
 
-  const constraints = {
-    audio: false,
-    video: {
-      facingMode: { ideal: 'environment' },
-      width:  { ideal: 1920 },
-      height: { ideal: 1080 },
-      advanced: [
-        { focusMode: 'continuous' },
-        { exposureMode: 'continuous' },
-        { whiteBalanceMode: 'continuous' }
-      ]
-    }
-  };
-  let stream;
-  try{
-    stream = await navigator.mediaDevices.getUserMedia(constraints);
-  }catch(e){
-    console.warn('Constraints avançados falharam, usando básico:', e);
-    stream = await navigator.mediaDevices.getUserMedia({
-      audio: false,
-      video: { facingMode: { ideal: 'environment' } }
-    });
+  /* Cadeia de tentativas — da mais modesta para a mais ousada.
+     1280x720 costuma ser mais nítido no Android do que forçar 1920x1080,
+     porque muitos aparelhos devolvem um stream reescalado no modo 1080p. */
+  const tentativas = [
+    { audio:false, video:{ facingMode:{ ideal:'environment' }, width:{ ideal:1280 }, height:{ ideal:720 } } },
+    { audio:false, video:{ facingMode:{ ideal:'environment' }, width:{ ideal:1920 }, height:{ ideal:1080 } } },
+    { audio:false, video:{ facingMode:{ ideal:'environment' } } },
+    { audio:false, video:{ facingMode:'environment' } }
+  ];
+
+  let stream = null, ultimoErro = null;
+  for(const c of tentativas){
+    try{ stream = await navigator.mediaDevices.getUserMedia(c); break; }
+    catch(e){ ultimoErro = e; }
   }
+  if(!stream) throw ultimoErro || new Error('Não foi possível acessar a câmera');
 
   const track = stream.getVideoTracks()[0];
   scanStream = stream;
   scanTrack = track;
   scanCaps = track.getCapabilities ? track.getCapabilities() : {};
+
+  /* Aplica foco/exposição/balanço UM POR VEZ. Alguns Androids descartam
+     TODAS as advanced constraints se uma delas falhar, por isso separamos. */
+  const aplicarSePossivel = async (nome, valor) => {
+    try{
+      if(scanCaps[nome] && Array.isArray(scanCaps[nome]) && scanCaps[nome].includes(valor)){
+        await track.applyConstraints({ advanced:[{ [nome]: valor }] });
+      }
+    }catch(e){ console.warn('applyConstraints '+nome+' falhou:', e); }
+  };
+  await aplicarSePossivel('focusMode', 'continuous');
+  await aplicarSePossivel('exposureMode', 'continuous');
+  await aplicarSePossivel('whiteBalanceMode', 'continuous');
 
   const video = document.createElement('video');
   video.setAttribute('playsinline','true');
@@ -1956,13 +1969,13 @@ async function iniciarScannerNativo(){
   $('#scanReader').appendChild(video);
   video.srcObject = stream;
 
-  await new Promise((resolve)=>{
-    if(video.readyState >= 2) return resolve();
-    video.onloadedmetadata = () => resolve();
-    setTimeout(resolve, 2000);
+  await new Promise(r=>{
+    if(video.readyState >= 2) return r();
+    video.onloadedmetadata = () => r();
+    setTimeout(r, 2500);
   });
   await video.play();
-  await new Promise(r=>setTimeout(r, 800));
+  await new Promise(r=>setTimeout(r, 900));
 
   const canvas = document.createElement('canvas');
   canvas.width  = video.videoWidth  || 1280;
@@ -1971,14 +1984,13 @@ async function iniciarScannerNativo(){
 
   $('#scanGuia').style.display='block';
   {
-    const focoInfo = (scanCaps && Array.isArray(scanCaps.focusMode) && scanCaps.focusMode.length) ? scanCaps.focusMode.join(', ') : 'não informado pelo aparelho';
+    const focoInfo = (scanCaps && Array.isArray(scanCaps.focusMode) && scanCaps.focusMode.length) ? scanCaps.focusMode.join(', ') : 'não informado';
     $('#scanHint').innerHTML = `Decoder: <b>ML Kit</b> · Resolução: <b>${canvas.width}×${canvas.height}</b> · Foco suportado: <b>${esc(focoInfo)}</b> · só os números são aproveitados.`;
   }
   $('#scanControles').style.display='flex';
   ativarControles(track);
 
   scanAtivo = true;
-
   let turno = 0;
   const loop = async () => {
     if(!scanAtivo) return;
@@ -2026,7 +2038,7 @@ async function iniciarScannerHtml5(){
     $('#scanHint').innerHTML = 'Decoder: <b>html5-qrcode</b> · só os números são aproveitados.';
     scanAtivo = true;
     await scanHtml5.start(
-      { facingMode: 'environment' },
+  { facingMode: { ideal: 'environment' } },
       {
         fps: 20,
         qrbox: (w, h) => {
