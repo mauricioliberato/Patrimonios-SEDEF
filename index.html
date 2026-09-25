@@ -2209,12 +2209,18 @@ document.addEventListener('click',e=>{
     inp.click();
   }
 });
-document.addEventListener('change',async e=>{
-  if(e.target && e.target.id==='fileScanFoto'){
-    const f = e.target.files[0]; if(!f) return;
-    pararScanner();
-    await tentarLerFoto(f);
+
+document.addEventListener('click',e=>{
+  const b = e.target.closest('[data-scan-target]');
+  if(!b) return;
+  e.preventDefault();
+  e.stopPropagation();
+  if(typeof abrirScanner !== 'function'){
+    console.error('[NII] abrirScanner não definida');
+    toast('Função do scanner não carregou. Recarregue a página.','bad');
+    return;
   }
+  abrirScanner(b.dataset.scanTarget);
 });
 
 function carregarImagemArquivo(file){
