@@ -1911,7 +1911,7 @@ $('#sigGuiaClear').addEventListener('click',()=>sigGuia.limpar());
 $('#sigGuiaPatClear').addEventListener('click',()=>sigGuiaPat.limpar());
 $('#sigGuiaDestClear').addEventListener('click',()=>sigGuiaDest.limpar());
 
-/* ============== SCANNER v3 — ML Kit + canvas + votação + lanterna + zoom ============== */
+/* ============== SCANNER v4 — ImageCapture + foco + fallback ============== */
 let scanStream = null;
 let scanTrack  = null;
 let scanHtml5  = null;
@@ -1922,6 +1922,7 @@ let scanCaps   = null;
 let scanTorchOn = false;
 let scanFocusTimer = null;
 let scanRefocoInterval = null;
+let scanImageCapture = null;
 
 const FORMATOS_1D = ['code_128','code_39','code_93','codabar','ean_13','ean_8','upc_a','upc_e','itf'];
 const FORMATOS_QR = ['qr_code','data_matrix','pdf417','aztec'];
@@ -1965,8 +1966,8 @@ async function iniciarScannerNativo(){
   const detector = new BarcodeDetector({ formats: wanted });
 
   const tentativas = [
-    { audio:false, video:{ facingMode:{ ideal:'environment' }, width:{ ideal:1280 }, height:{ ideal:720 } } },
     { audio:false, video:{ facingMode:{ ideal:'environment' }, width:{ ideal:1920 }, height:{ ideal:1080 } } },
+    { audio:false, video:{ facingMode:{ ideal:'environment' }, width:{ ideal:1280 }, height:{ ideal:720 } } },
     { audio:false, video:{ facingMode:{ ideal:'environment' } } },
     { audio:false, video:{ facingMode:'environment' } }
   ];
@@ -1983,28 +1984,29 @@ async function iniciarScannerNativo(){
   scanTrack = track;
   scanCaps = track.getCapabilities ? track.getCapabilities() : {};
 
-  const aplicarSePossivel = async (nome, valor) => {
-    try{ await track.applyConstraints({ advanced:[{ [nome]: valor }] }); }
-    catch(e){ /* aparelho não suporta */ }
-  };
-  await aplicarSePossivel('focusMode', 'continuous');
-  await aplicarSePossivel('exposureMode', 'continuous');
-  await aplicarSePossivel('whiteBalanceMode', 'continuous');
+  /* Aplica foco/exposição/balanço — várias tentativas porque cada Android responde diferente */
+  const aplicar = async (c) => { try{ await track.applyConstraints({ advanced:[c] }); return true; }catch(_){ return false; } };
+  await aplicar({ focusMode:'continuous' });
+  await aplicar({ focusMode:'single-shot' });
+  await aplicar({ focusMode:'manual' });
+  await aplicar({ exposureMode:'continuous' });
+  await aplicar({ whiteBalanceMode:'continuous' });
 
-  /* Re-foco periódico. Alguns Androids (S23) reportam apenas 'manual' —
-     nesses casos tentamos focusDistance também. */
+  /* Re-foco periódico. O S23 reporta apenas 'manual' — nesse caso
+     o applyConstraints com manual costuma disparar um autofoco real. */
   if(scanRefocoInterval) clearInterval(scanRefocoInterval);
   scanRefocoInterval = setInterval(async ()=>{
     if(!scanAtivo || !scanTrack) return;
-    try{ await scanTrack.applyConstraints({ advanced:[{ focusMode:'continuous' }] }); }catch(_){}
-    try{ await scanTrack.applyConstraints({ advanced:[{ focusMode:'single-shot' }] }); }catch(_){}
+    if(await aplicar({ focusMode:'continuous' })) return;
+    if(await aplicar({ focusMode:'single-shot' })) return;
+    if(await aplicar({ focusMode:'manual' })) return;
     if(scanCaps && scanCaps.focusDistance){
       const min = scanCaps.focusDistance.min ?? 0;
       const max = scanCaps.focusDistance.max ?? 10;
-      const alvo = Math.min(max, Math.max(min, 0.3));
-      try{ await scanTrack.applyConstraints({ advanced:[{ focusDistance: alvo }] }); }catch(_){}
+      const alvo = Math.min(max, Math.max(min, 0.25));
+      await aplicar({ focusDistance: alvo });
     }
-  }, 2000);
+  }, 1500);
 
   const video = document.createElement('video');
   video.setAttribute('playsinline','true');
@@ -2023,39 +2025,65 @@ async function iniciarScannerNativo(){
   await video.play();
   await new Promise(r=>setTimeout(r, 900));
 
+  /* ImageCapture pega frames direto da câmera em resolução nativa.
+     É o que faz a câmera do sistema funcionar bem — o <video> vem reescalado. */
+  try{
+    scanImageCapture = (typeof ImageCapture !== 'undefined') ? new ImageCapture(track) : null;
+  }catch(_){ scanImageCapture = null; }
+
   const canvas = document.createElement('canvas');
-  canvas.width  = video.videoWidth  || 1280;
-  canvas.height = video.videoHeight || 720;
+  const settings = track.getSettings ? track.getSettings() : {};
+  canvas.width  = settings.width  || video.videoWidth  || 1280;
+  canvas.height = settings.height || video.videoHeight || 720;
   const ctx = canvas.getContext('2d');
 
   $('#scanGuia').style.display='block';
   {
     const focoInfo = (scanCaps && Array.isArray(scanCaps.focusMode) && scanCaps.focusMode.length) ? scanCaps.focusMode.join(', ') : 'não informado';
-    $('#scanHint').innerHTML = `Decoder: <b>ML Kit</b> · Resolução: <b>${canvas.width}×${canvas.height}</b> · Foco suportado: <b>${esc(focoInfo)}</b> · só os números são aproveitados.`;
+    const modo = scanImageCapture ? 'ImageCapture' : 'video';
+    $('#scanHint').innerHTML = `Decoder: <b>ML Kit</b> · Captura: <b>${canvas.width}×${canvas.height}</b> (${modo}) · Foco: <b>${esc(focoInfo)}</b> · só os números são aproveitados.`;
   }
   $('#scanControles').style.display='flex';
   ativarControles(track);
 
   scanAtivo = true;
   let turno = 0;
+
+  const capturarFrame = async () => {
+    if(scanImageCapture){
+      try{
+        const bitmap = await scanImageCapture.grabFrame();
+        ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+        if(bitmap.close) bitmap.close();
+        return canvas;
+      }catch(_){ /* cai para o video */ }
+    }
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    return canvas;
+  };
+
   const loop = async () => {
     if(!scanAtivo) return;
     try{
-      let alvo = video;
+      const alvo = await capturarFrame();
+      /* Em frames alternados aplica filtro de contraste (ML Kit lê melhor) */
       if(turno % 2 === 1){
-        ctx.filter = 'grayscale(1) contrast(1.7) brightness(1.05)';
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        alvo = canvas;
+        const tmp = document.createElement('canvas');
+        tmp.width = canvas.width; tmp.height = canvas.height;
+        const tctx = tmp.getContext('2d');
+        tctx.filter = 'grayscale(1) contrast(1.9) brightness(1.05)';
+        tctx.drawImage(canvas, 0, 0);
+        const codigosFiltrados = await detector.detect(tmp);
+        if(codigosFiltrados && codigosFiltrados.length){
+          const bruto = codigosFiltrados[0].rawValue;
+          if(confirmarLeitura(bruto)){ pararScanner(); aplicarLeitura(bruto); return; }
+        }
       }
       turno++;
       const codigos = await detector.detect(alvo);
       if(codigos && codigos.length){
         const bruto = codigos[0].rawValue;
-        if(confirmarLeitura(bruto)){
-          pararScanner();
-          aplicarLeitura(bruto);
-          return;
-        }
+        if(confirmarLeitura(bruto)){ pararScanner(); aplicarLeitura(bruto); return; }
       }
     }catch(_){}
     requestAnimationFrame(loop);
@@ -2066,13 +2094,11 @@ async function iniciarScannerNativo(){
 function confirmarLeitura(bruto){
   const digitos = normalizarCodigoLido(bruto);
   if(!digitos) return false;
-
-  /* Patrimônios do PR têm 12 dígitos. Se já veio com 8+ dígitos, é leitura limpa. */
+  /* Patrimônios do PR têm 12 dígitos. 8+ é leitura limpa. */
   if(digitos.length >= 8){
     $('#scanStatus').textContent = 'lendo ✓';
     return true;
   }
-
   if(scanVotos.ultimo === digitos){
     scanVotos.contagem++;
   } else {
@@ -2128,30 +2154,26 @@ function ativarControles(track){
   const inpZoom  = $('#scanZoom');
   const lblZoom  = $('#scanZoomVal');
 
-  const suportaContinuo = !!(scanCaps && Array.isArray(scanCaps.focusMode) && scanCaps.focusMode.includes('continuous'));
-  const suportaSingle   = !!(scanCaps && Array.isArray(scanCaps.focusMode) && scanCaps.focusMode.includes('single-shot'));
-  const suportaFoco     = suportaContinuo || suportaSingle;
-
   async function forcarFoco(){
-    try{
-      if(suportaSingle) await track.applyConstraints({ advanced: [{ focusMode: 'single-shot' }] });
-      if(suportaContinuo) await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
-    }catch(e){}
+    const aplicar = async (c) => { try{ await track.applyConstraints({ advanced:[c] }); return true; }catch(_){ return false; } };
+    if(await aplicar({ focusMode:'continuous' })) return;
+    if(await aplicar({ focusMode:'single-shot' })) return;
+    if(await aplicar({ focusMode:'manual' })) return;
+    if(scanCaps && scanCaps.focusDistance){
+      const min = scanCaps.focusDistance.min ?? 0;
+      const max = scanCaps.focusDistance.max ?? 10;
+      await aplicar({ focusDistance: Math.min(max, Math.max(min, 0.25)) });
+    }
   }
-  if(suportaContinuo) forcarFoco();
 
-  if(suportaFoco){
-    btnFoco.disabled = false;
-    btnFoco.onclick = () => { btnFoco.textContent='🎯 Focando…'; forcarFoco().finally(()=>{btnFoco.textContent='🎯 Focar';}); };
-    const video = $('#scanReader video');
-    if(video) video.addEventListener('click', forcarFoco);
-    if(scanFocusTimer) clearInterval(scanFocusTimer);
-    if(suportaContinuo) scanFocusTimer = setInterval(forcarFoco, 2500);
-  } else {
-    btnFoco.disabled = false;
-    btnFoco.title = 'Foco gerenciado automaticamente';
-    btnFoco.onclick = forcarFoco;
-  }
+  /* Botão Focar sempre ativo (mesmo em aparelhos sem suporte "contínuo") */
+  btnFoco.disabled = false;
+  btnFoco.onclick = () => {
+    btnFoco.textContent = '🎯 Focando…';
+    forcarFoco().finally(()=>{ btnFoco.textContent = '🎯 Focar'; });
+  };
+  const video = $('#scanReader video');
+  if(video) video.addEventListener('click', forcarFoco);
 
   if(scanCaps && scanCaps.torch){
     btnTorch.disabled = false;
@@ -2212,6 +2234,7 @@ function pararScanner(){
   scanAtivo = false;
   scanTorchOn = false;
   scanCaps = null;
+  scanImageCapture = null;
   if(scanStream){
     try{ scanStream.getTracks().forEach(t=>t.stop()); }catch(_){}
     scanStream = null; scanTrack = null;
@@ -2244,7 +2267,6 @@ document.addEventListener('click',e=>{
     inp.click();
   }
 });
-
 document.addEventListener('click',e=>{
   const b = e.target.closest('[data-scan-target]');
   if(!b) return;
