@@ -1263,6 +1263,7 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
         </div>
       </div>
       <div id="scanControles" style="display:none;gap:8px;align-items:center;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm" id="btnScanFoco" type="button" title="Forçar reajuste de foco">🎯 Focar</button>
         <button class="btn btn-ghost btn-sm" id="btnScanTorch" type="button" title="Ligar lanterna">🔦 Lanterna</button>
         <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink-soft);flex:1;min-width:180px">
           Zoom <input type="range" id="scanZoom" min="100" max="400" value="100" style="flex:1" disabled>
@@ -1270,7 +1271,7 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
         </label>
         <span class="subtle" id="scanStatus"></span>
       </div>
-      <p class="subtle" id="scanHint">Aponte a câmera para o código. A leitura é automática — só os <b>números</b> são aproveitados.</p>
+      <p class="subtle" id="scanHint">Aponte a câmera para o código, ou toque na imagem para focar. A leitura é automática — só os <b>números</b> são aproveitados.</p>
     </div>
     <div class="modal-f">
       <button class="btn btn-ghost" id="btnScanFoto" type="button">📸 Usar foto</button>
@@ -1880,6 +1881,7 @@ let scanTarget = null;
 let scanVotos  = { ultimo: null, contagem: 0 };
 let scanCaps   = null;
 let scanTorchOn = false;
+let scanFocusTimer = null;
 
 const FORMATOS_1D = ['code_128','code_39','code_93','codabar','ean_13','ean_8','upc_a','upc_e','itf'];
 const FORMATOS_QR = ['qr_code','data_matrix','pdf417','aztec'];
@@ -1922,9 +1924,11 @@ async function iniciarScannerNativo(){
       facingMode: { ideal: 'environment' },
       width:  { ideal: 1920 },
       height: { ideal: 1080 },
-      focusMode: 'continuous',
-      exposureMode: 'continuous',
-      whiteBalanceMode: 'continuous'
+      advanced: [
+        { focusMode: 'continuous' },
+        { exposureMode: 'continuous' },
+        { whiteBalanceMode: 'continuous' }
+      ]
     }
   };
   let stream;
@@ -1966,7 +1970,10 @@ async function iniciarScannerNativo(){
   const ctx = canvas.getContext('2d');
 
   $('#scanGuia').style.display='block';
-  $('#scanHint').innerHTML = 'Decoder: <b>ML Kit</b> (BarcodeDetector nativo) · só os números são aproveitados.';
+  {
+    const focoInfo = (scanCaps && Array.isArray(scanCaps.focusMode) && scanCaps.focusMode.length) ? scanCaps.focusMode.join(', ') : 'não informado pelo aparelho';
+    $('#scanHint').innerHTML = `Decoder: <b>ML Kit</b> · Resolução: <b>${canvas.width}×${canvas.height}</b> · Foco suportado: <b>${esc(focoInfo)}</b> · só os números são aproveitados.`;
+  }
   $('#scanControles').style.display='flex';
   ativarControles(track);
 
@@ -2052,15 +2059,41 @@ async function iniciarScannerHtml5(){
 
 function ativarControles(track){
   const btnTorch = $('#btnScanTorch');
+  const btnFoco  = $('#btnScanFoco');
   const inpZoom  = $('#scanZoom');
   const lblZoom  = $('#scanZoomVal');
 
-  /* Foco contínuo: no Android, muitos Chrome/WebView ignoram focusMode passado direto no
-     getUserMedia() inicial — só funciona de verdade pedindo de novo com applyConstraints()
-     depois que o stream já está rodando. É isso que fazia a câmera ficar sem focar de perto. */
-  if(scanCaps && Array.isArray(scanCaps.focusMode) && scanCaps.focusMode.includes('continuous')){
-    track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] })
-      .catch(e=>console.warn('Foco contínuo não aplicado:', e));
+  /* Foco: no Android, muitos Chrome/WebView ignoram focusMode pedido no getUserMedia inicial —
+     só funciona de verdade insistindo com applyConstraints() depois que o stream já está rodando,
+     e mesmo assim alguns aparelhos só reagem a um pedido de foco único ("single-shot") por vez
+     em vez de realmente ficarem contínuos. Por isso: pede contínuo, insiste periodicamente,
+     e dá um botão + toque na tela para forçar um refoco manual na hora. */
+  const suportaContinuo = !!(scanCaps && Array.isArray(scanCaps.focusMode) && scanCaps.focusMode.includes('continuous'));
+  const suportaSingle   = !!(scanCaps && Array.isArray(scanCaps.focusMode) && scanCaps.focusMode.includes('single-shot'));
+  const suportaFoco     = suportaContinuo || suportaSingle;
+
+  async function forcarFoco(){
+    try{
+      if(suportaSingle){
+        await track.applyConstraints({ advanced: [{ focusMode: 'single-shot' }] });
+        await new Promise(r=>setTimeout(r,350));
+      }
+      if(suportaContinuo) await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+    }catch(e){ console.warn('Refoco falhou:', e); }
+  }
+  if(suportaContinuo) forcarFoco();
+
+  if(suportaFoco){
+    btnFoco.disabled = false;
+    btnFoco.onclick = () => { btnFoco.textContent='🎯 Focando…'; forcarFoco().finally(()=>{btnFoco.textContent='🎯 Focar';}); };
+    const video = $('#scanReader video');
+    if(video) video.addEventListener('click', forcarFoco);
+    if(scanFocusTimer) clearInterval(scanFocusTimer);
+    if(suportaContinuo) scanFocusTimer = setInterval(forcarFoco, 2500);
+  } else {
+    btnFoco.disabled = true;
+    btnFoco.style.opacity = '.4';
+    btnFoco.title = 'Este aparelho não informa suporte a controle de foco';
   }
 
   if(scanCaps && scanCaps.torch){
