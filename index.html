@@ -1499,19 +1499,42 @@ async function tentarLogin(usuario,senha){
   }catch(err){console.error('Erro ao checar usuarios:',err);}
   return null;
 }
+
+/* ============== COOKIES (3ª camada de sessão) ============== */
+function _cookieSet(nome,valor,maxAgeSeg){
+  try{
+    document.cookie=nome+'='+encodeURIComponent(valor)+'; path=/; max-age='+maxAgeSeg+'; SameSite=Lax';
+  }catch(_){}
+}
+function _cookieGet(nome){
+  try{
+    const par=document.cookie.split('; ').find(c=>c.startsWith(nome+'='));
+    return par?decodeURIComponent(par.split('=').slice(1).join('=')):null;
+  }catch(_){return null;}
+}
+function _cookieDel(nome){
+  try{document.cookie=nome+'=; path=/; max-age=0; SameSite=Lax';}catch(_){}
+}
+
 function salvarSessao(u){
   const s={...u,expiraEm:Date.now()+SESSAO_TTL_MS};
-  try{localStorage.setItem(SESSAO_KEY,JSON.stringify(s));}catch(_){}
-  try{sessionStorage.setItem(SESSAO_KEY,JSON.stringify(s));}catch(_){}
+  const json=JSON.stringify(s);
+  try{localStorage.setItem(SESSAO_KEY,json);}catch(_){}
+  try{sessionStorage.setItem(SESSAO_KEY,json);}catch(_){}
+  _cookieSet(SESSAO_KEY,json,Math.floor(SESSAO_TTL_MS/1000));
 }
 function lerSessao(){
   try{
-    const raw=localStorage.getItem(SESSAO_KEY)||sessionStorage.getItem(SESSAO_KEY);
+    let raw=null;
+    try{raw=localStorage.getItem(SESSAO_KEY);}catch(_){}
+    if(!raw){try{raw=sessionStorage.getItem(SESSAO_KEY);}catch(_){}}
+    if(!raw){raw=_cookieGet(SESSAO_KEY);}
     const s=JSON.parse(raw||'null');
     if(!s||!s.usuario)return null;
     if(s.expiraEm&&Date.now()>s.expiraEm){
       try{localStorage.removeItem(SESSAO_KEY);}catch(_){}
       try{sessionStorage.removeItem(SESSAO_KEY);}catch(_){}
+      _cookieDel(SESSAO_KEY);
       return null;
     }
     return s;
@@ -1590,13 +1613,22 @@ async function sair(){
   await removerPresenca();
   try{localStorage.removeItem(SESSAO_KEY);}catch(_){}
   try{sessionStorage.removeItem(SESSAO_KEY);}catch(_){}
+  _cookieDel(SESSAO_KEY);
   location.reload();
 }
 $('#btnSair').addEventListener('click',sair);
 $('#btnSairMobile').addEventListener('click',sair);
 (function autoLogin(){
   const salvo=lerSessao();
-  if(salvo)mostrarApp(salvo);
+  if(salvo){
+    console.log('[NII] auto-login OK para',salvo.usuario);
+    mostrarApp(salvo);
+  }else{
+    console.log('[NII] sessão não encontrada — mostrando login');
+    try{console.log('[NII] localStorage:',localStorage.getItem(SESSAO_KEY)?'presente':'vazio');}catch(_){console.log('[NII] localStorage: inacessível');}
+    try{console.log('[NII] sessionStorage:',sessionStorage.getItem(SESSAO_KEY)?'presente':'vazio');}catch(_){console.log('[NII] sessionStorage: inacessível');}
+    console.log('[NII] cookie:',_cookieGet(SESSAO_KEY)?'presente':'vazio');
+  }
 })();
 
 /* ============== BANCO LOCAL ============== */
@@ -1889,6 +1921,7 @@ let scanVotos  = { ultimo: null, contagem: 0 };
 let scanCaps   = null;
 let scanTorchOn = false;
 let scanFocusTimer = null;
+let scanRefocoInterval = null;
 
 const FORMATOS_1D = ['code_128','code_39','code_93','codabar','ean_13','ean_8','upc_a','upc_e','itf'];
 const FORMATOS_QR = ['qr_code','data_matrix','pdf417','aztec'];
@@ -1900,23 +1933,29 @@ function normalizarCodigoLido(texto){
 }
 
 async function abrirScanner(targetId){
-  scanTarget = targetId;
-  scanVotos = { ultimo: null, contagem: 0 };
-  $('#modalScan').classList.add('show');
-  $('#scanControles').style.display='none';
-  $('#scanGuia').style.display='none';
-  $('#scanStatus').textContent='';
-  await new Promise(r=>setTimeout(r,120));
-  $('#scanReader').innerHTML = '<div style="padding:20px;color:#8ba3b6;text-align:center;font-size:13px">Iniciando câmera…</div>';
+  try{
+    scanTarget = targetId;
+    scanVotos = { ultimo: null, contagem: 0 };
+    $('#modalScan').classList.add('show');
+    $('#scanControles').style.display='none';
+    $('#scanGuia').style.display='none';
+    $('#scanStatus').textContent='';
+    await new Promise(r=>setTimeout(r,120));
+    $('#scanReader').innerHTML = '<div style="padding:20px;color:#8ba3b6;text-align:center;font-size:13px">Iniciando câmera…</div>';
 
-  if('BarcodeDetector' in window){
-    try{ await iniciarScannerNativo(); return; }
-    catch(e){
-      console.warn('BarcodeDetector indisponível, caindo para html5-qrcode:', e);
-      $('#scanReader').innerHTML = '';
+    if('BarcodeDetector' in window){
+      try{ await iniciarScannerNativo(); return; }
+      catch(e){
+        console.warn('BarcodeDetector indisponível, caindo para html5-qrcode:', e);
+        $('#scanReader').innerHTML = '';
+      }
     }
+    await iniciarScannerHtml5();
+  }catch(err){
+    console.error('abrirScanner falhou:', err);
+    toast('Erro ao abrir o scanner: '+esc(String(err && err.message || err)),'bad');
+    pararScanner();
   }
-  await iniciarScannerHtml5();
 }
 
 async function iniciarScannerNativo(){
@@ -1925,9 +1964,6 @@ async function iniciarScannerNativo(){
   if(!wanted.length) throw new Error('Nenhum formato suportado');
   const detector = new BarcodeDetector({ formats: wanted });
 
-  /* Cadeia de tentativas — da mais modesta para a mais ousada.
-     1280x720 costuma ser mais nítido no Android do que forçar 1920x1080,
-     porque muitos aparelhos devolvem um stream reescalado no modo 1080p. */
   const tentativas = [
     { audio:false, video:{ facingMode:{ ideal:'environment' }, width:{ ideal:1280 }, height:{ ideal:720 } } },
     { audio:false, video:{ facingMode:{ ideal:'environment' }, width:{ ideal:1920 }, height:{ ideal:1080 } } },
@@ -1947,30 +1983,28 @@ async function iniciarScannerNativo(){
   scanTrack = track;
   scanCaps = track.getCapabilities ? track.getCapabilities() : {};
 
-  /* Aplica foco/exposição/balanço UM POR VEZ. Alguns Androids descartam
-     TODAS as advanced constraints se uma delas falhar, por isso separamos. */
   const aplicarSePossivel = async (nome, valor) => {
-    try{
-      await track.applyConstraints({ advanced:[{ [nome]: valor }] });
-    }catch(e){ /* aparelho não suporta — segue em frente */ }
+    try{ await track.applyConstraints({ advanced:[{ [nome]: valor }] }); }
+    catch(e){ /* aparelho não suporta */ }
   };
-  // Tenta forçar auto-foco, mesmo que o aparelho não reporte como suportado
   await aplicarSePossivel('focusMode', 'continuous');
   await aplicarSePossivel('exposureMode', 'continuous');
   await aplicarSePossivel('whiteBalanceMode', 'continuous');
-  
-  /* alguns Androids travam o foco no infinito ao abrir a câmera;
-   forçar um single-shot periodicamente faz o autofoco "acordar" */
-setInterval(async ()=>{
-  if(!scanAtivo || !scanTrack) return;
-  try{
-    await scanTrack.applyConstraints({ advanced:[{ focusMode:'single-shot' }] });
-    setTimeout(async ()=>{
-      if(!scanAtivo || !scanTrack) return;
-      try{ await scanTrack.applyConstraints({ advanced:[{ focusMode:'continuous' }] }); }catch(_){}
-    }, 400);
-  }catch(_){}
-}, 2500);
+
+  /* Re-foco periódico. Alguns Androids (S23) reportam apenas 'manual' —
+     nesses casos tentamos focusDistance também. */
+  if(scanRefocoInterval) clearInterval(scanRefocoInterval);
+  scanRefocoInterval = setInterval(async ()=>{
+    if(!scanAtivo || !scanTrack) return;
+    try{ await scanTrack.applyConstraints({ advanced:[{ focusMode:'continuous' }] }); }catch(_){}
+    try{ await scanTrack.applyConstraints({ advanced:[{ focusMode:'single-shot' }] }); }catch(_){}
+    if(scanCaps && scanCaps.focusDistance){
+      const min = scanCaps.focusDistance.min ?? 0;
+      const max = scanCaps.focusDistance.max ?? 10;
+      const alvo = Math.min(max, Math.max(min, 0.3));
+      try{ await scanTrack.applyConstraints({ advanced:[{ focusDistance: alvo }] }); }catch(_){}
+    }
+  }, 2000);
 
   const video = document.createElement('video');
   video.setAttribute('playsinline','true');
@@ -2032,6 +2066,13 @@ setInterval(async ()=>{
 function confirmarLeitura(bruto){
   const digitos = normalizarCodigoLido(bruto);
   if(!digitos) return false;
+
+  /* Patrimônios do PR têm 12 dígitos. Se já veio com 8+ dígitos, é leitura limpa. */
+  if(digitos.length >= 8){
+    $('#scanStatus').textContent = 'lendo ✓';
+    return true;
+  }
+
   if(scanVotos.ultimo === digitos){
     scanVotos.contagem++;
   } else {
@@ -2050,7 +2091,7 @@ async function iniciarScannerHtml5(){
     $('#scanHint').innerHTML = 'Decoder: <b>html5-qrcode</b> · só os números são aproveitados.';
     scanAtivo = true;
     await scanHtml5.start(
-  { facingMode: { ideal: 'environment' } },
+      { facingMode: { ideal: 'environment' } },
       {
         fps: 20,
         qrbox: (w, h) => {
@@ -2087,23 +2128,15 @@ function ativarControles(track){
   const inpZoom  = $('#scanZoom');
   const lblZoom  = $('#scanZoomVal');
 
-  /* Foco: no Android, muitos Chrome/WebView ignoram focusMode pedido no getUserMedia inicial —
-     só funciona de verdade insistindo com applyConstraints() depois que o stream já está rodando,
-     e mesmo assim alguns aparelhos só reagem a um pedido de foco único ("single-shot") por vez
-     em vez de realmente ficarem contínuos. Por isso: pede contínuo, insiste periodicamente,
-     e dá um botão + toque na tela para forçar um refoco manual na hora. */
   const suportaContinuo = !!(scanCaps && Array.isArray(scanCaps.focusMode) && scanCaps.focusMode.includes('continuous'));
   const suportaSingle   = !!(scanCaps && Array.isArray(scanCaps.focusMode) && scanCaps.focusMode.includes('single-shot'));
   const suportaFoco     = suportaContinuo || suportaSingle;
 
   async function forcarFoco(){
     try{
-      if(suportaSingle){
-        await track.applyConstraints({ advanced: [{ focusMode: 'single-shot' }] });
-        await new Promise(r=>setTimeout(r,350));
-      }
+      if(suportaSingle) await track.applyConstraints({ advanced: [{ focusMode: 'single-shot' }] });
       if(suportaContinuo) await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
-    }catch(e){ console.warn('Refoco falhou:', e); }
+    }catch(e){}
   }
   if(suportaContinuo) forcarFoco();
 
@@ -2115,9 +2148,9 @@ function ativarControles(track){
     if(scanFocusTimer) clearInterval(scanFocusTimer);
     if(suportaContinuo) scanFocusTimer = setInterval(forcarFoco, 2500);
   } else {
-    btnFoco.disabled = true;
-    btnFoco.style.opacity = '.4';
-    btnFoco.title = 'Este aparelho não informa suporte a controle de foco';
+    btnFoco.disabled = false;
+    btnFoco.title = 'Foco gerenciado automaticamente';
+    btnFoco.onclick = forcarFoco;
   }
 
   if(scanCaps && scanCaps.torch){
@@ -2128,7 +2161,7 @@ function ativarControles(track){
         await track.applyConstraints({ advanced: [{ torch: scanTorchOn }] });
         btnTorch.textContent = scanTorchOn ? '🔦 ON' : '🔦 Lanterna';
         btnTorch.classList.toggle('btn-accent', scanTorchOn);
-      }catch(e){ console.warn('Torch falhou:', e); }
+      }catch(e){}
     };
   } else {
     btnTorch.disabled = true;
@@ -2174,6 +2207,8 @@ function aplicarLeitura(bruto){
 }
 
 function pararScanner(){
+  if(scanRefocoInterval){ clearInterval(scanRefocoInterval); scanRefocoInterval = null; }
+  if(scanFocusTimer){ clearInterval(scanFocusTimer); scanFocusTimer = null; }
   scanAtivo = false;
   scanTorchOn = false;
   scanCaps = null;
@@ -2194,9 +2229,9 @@ function pararScanner(){
 document.addEventListener('change',async e=>{
   if(e.target && e.target.id==='fileScanFoto'){
     const f = e.target.files[0]; if(!f) return;
-    const alvoGuardado = scanTarget;       // preserva o alvo
-    pararScanner();                         // fecha o modal e para a câmera
-    scanTarget = alvoGuardado;              // restaura
+    const alvoGuardado = scanTarget;
+    pararScanner();
+    scanTarget = alvoGuardado;
     try{ await tentarLerFoto(f); }
     finally{ scanTarget = null; }
   }
@@ -2269,7 +2304,6 @@ async function tentarLerFoto(file){
     }
   }
 
-  /* Fallback: html5-qrcode com arquivo bruto */
   try{
     const tmpId = 'scanFileTmp';
     let tmp = document.getElementById(tmpId);
