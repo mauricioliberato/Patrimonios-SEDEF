@@ -475,11 +475,16 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
                 </svg>
               </button>
               <select id="eqFiltroTipo"></select>
+              <select id="eqFiltroSetor"></select>
               <select id="eqFiltroStatus">
                 <option value="">Todos os status</option>
                 <option>Disponível</option><option>Reservado</option><option>Indisponível</option>
                 <option value="naoEmp">Não emprestáveis</option>
               </select>
+              <button type="button" class="btn btn-dark btn-sm" id="btnImprimirListaEq"
+                      title="Imprimir a lista com os filtros atuais">
+                🖨️ Imprimir lista
+              </button>
             </div>
           </div>
           <div class="card-b flush">
@@ -1911,7 +1916,7 @@ $('#sigGuiaClear').addEventListener('click',()=>sigGuia.limpar());
 $('#sigGuiaPatClear').addEventListener('click',()=>sigGuiaPat.limpar());
 $('#sigGuiaDestClear').addEventListener('click',()=>sigGuiaDest.limpar());
 
-/* ============== SCANNER v4 — ImageCapture + foco + fallback ============== */
+/* ============== SCANNER v4 ============== */
 let scanStream = null;
 let scanTrack  = null;
 let scanHtml5  = null;
@@ -1984,7 +1989,6 @@ async function iniciarScannerNativo(){
   scanTrack = track;
   scanCaps = track.getCapabilities ? track.getCapabilities() : {};
 
-  /* Aplica foco/exposição/balanço — várias tentativas porque cada Android responde diferente */
   const aplicar = async (c) => { try{ await track.applyConstraints({ advanced:[c] }); return true; }catch(_){ return false; } };
   await aplicar({ focusMode:'continuous' });
   await aplicar({ focusMode:'single-shot' });
@@ -1992,8 +1996,6 @@ async function iniciarScannerNativo(){
   await aplicar({ exposureMode:'continuous' });
   await aplicar({ whiteBalanceMode:'continuous' });
 
-  /* Re-foco periódico. O S23 reporta apenas 'manual' — nesse caso
-     o applyConstraints com manual costuma disparar um autofoco real. */
   if(scanRefocoInterval) clearInterval(scanRefocoInterval);
   scanRefocoInterval = setInterval(async ()=>{
     if(!scanAtivo || !scanTrack) return;
@@ -2025,8 +2027,6 @@ async function iniciarScannerNativo(){
   await video.play();
   await new Promise(r=>setTimeout(r, 900));
 
-  /* ImageCapture pega frames direto da câmera em resolução nativa.
-     É o que faz a câmera do sistema funcionar bem — o <video> vem reescalado. */
   try{
     scanImageCapture = (typeof ImageCapture !== 'undefined') ? new ImageCapture(track) : null;
   }catch(_){ scanImageCapture = null; }
@@ -2056,7 +2056,7 @@ async function iniciarScannerNativo(){
         ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
         if(bitmap.close) bitmap.close();
         return canvas;
-      }catch(_){ /* cai para o video */ }
+      }catch(_){}
     }
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     return canvas;
@@ -2066,7 +2066,6 @@ async function iniciarScannerNativo(){
     if(!scanAtivo) return;
     try{
       const alvo = await capturarFrame();
-      /* Em frames alternados aplica filtro de contraste (ML Kit lê melhor) */
       if(turno % 2 === 1){
         const tmp = document.createElement('canvas');
         tmp.width = canvas.width; tmp.height = canvas.height;
@@ -2094,7 +2093,6 @@ async function iniciarScannerNativo(){
 function confirmarLeitura(bruto){
   const digitos = normalizarCodigoLido(bruto);
   if(!digitos) return false;
-  /* Patrimônios do PR têm 12 dígitos. 8+ é leitura limpa. */
   if(digitos.length >= 8){
     $('#scanStatus').textContent = 'lendo ✓';
     return true;
@@ -2166,7 +2164,6 @@ function ativarControles(track){
     }
   }
 
-  /* Botão Focar sempre ativo (mesmo em aparelhos sem suporte "contínuo") */
   btnFoco.disabled = false;
   btnFoco.onclick = () => {
     btnFoco.textContent = '🎯 Focando…';
@@ -2392,9 +2389,6 @@ function preencherSelects(){
     {const el=$('#eqModelo');if(el){const v=el.value;
       el.innerHTML=`<option value="">Selecione o modelo…</option>`+(db.modelos||[]).map(m=>`<option value="${m.id}">${icone(m.tipo)} ${esc(m.tipo)} · ${esc(m.marca)}${m.descricao?' — '+esc(m.descricao):''}</option>`).join('');
       if((db.modelos||[]).some(m=>m.id===v))el.value=v;}}
-    {const ft=$('#eqFiltroTipo');if(ft){const v=ft.value;
-      ft.innerHTML=`<option value="">Todos os tipos</option>`+db.tipos.map(t=>`<option>${esc(t)}</option>`).join('');
-      if(db.tipos.includes(v))ft.value=v;}}
   }
   preencherSelEquip();
   preencherSelGuiaEq();
@@ -2645,10 +2639,13 @@ function irParaEmprestimo(id){
 function renderEquipamentos(){
   const busca=($('#eqBusca').value||'').toLowerCase();
   const ft=$('#eqFiltroTipo').value;
+  const fse=$('#eqFiltroSetor').value;
   const fs=$('#eqFiltroStatus').value;
+
   const lista=db.equipamentos.filter(eq=>{
     const st=statusEquip(eq).label;
     if(ft&&eq.tipo!==ft)return false;
+    if(fse&&eq.setorId!==fse)return false;
     if(fs){if(fs==='naoEmp'){if(eq.emprestavel!==false)return false;}else if(st!==fs)return false;}
     if(busca){
       const mod=eq.modeloId?modById(eq.modeloId):null;
@@ -2657,6 +2654,7 @@ function renderEquipamentos(){
     }
     return true;
   }).sort((a,b)=>String(a.patrimonio).localeCompare(String(b.patrimonio),undefined,{numeric:true}));
+
   $('#eqTbody').innerHTML=lista.length?lista.map(eq=>{
     const st=statusEquip(eq);const bloqueado=eq.emprestavel===false;
     const mod=eq.modeloId?modById(eq.modeloId):null;
@@ -2676,13 +2674,143 @@ function renderEquipamentos(){
         <button class="ibtn bad" title="Excluir" data-acao="eq-del" data-id="${eq.id}">${TRASH_SVG}</button>
       </div></td>
     </tr>`;}).join(''):`<tr><td colspan="8" class="empty"><span class="big">🗄️</span>Nenhum equipamento encontrado.</td></tr>`;
+
   const d=db.equipamentos.filter(e=>statusEquip(e).label==='Disponível').length;
   const bloq=db.equipamentos.filter(e=>e.emprestavel===false).length;
   $('#eqResumo').textContent=`${db.equipamentos.length} unidade(s) · ${d} disponível(is) · ${bloq} bloqueada(s) p/ empréstimo · ${(db.modelos||[]).length} modelo(s) no catálogo`;
+
+  /* -------- Contadores dinâmicos nos filtros --------
+     Cada select mostra quantos itens existem em cada opção,
+     considerando os OUTROS filtros ativos (menos o próprio). */
+  const baseFiltroTipo=db.equipamentos.filter(eq=>{
+    if(fse&&eq.setorId!==fse)return false;
+    if(fs){if(fs==='naoEmp'){if(eq.emprestavel!==false)return false;}else if(statusEquip(eq).label!==fs)return false;}
+    return true;
+  });
+  const contagemTipo={};
+  baseFiltroTipo.forEach(eq=>{contagemTipo[eq.tipo]=(contagemTipo[eq.tipo]||0)+1;});
+  const selTipo=$('#eqFiltroTipo');
+  if(selTipo){
+    const vAtual=selTipo.value;
+    selTipo.innerHTML=`<option value="">Todos os tipos (${baseFiltroTipo.length})</option>`
+      +db.tipos.map(t=>{
+        const n=contagemTipo[t]||0;
+        return `<option value="${esc(t)}"${n===0?' disabled':''}>${esc(t)} (${n})</option>`;
+      }).join('');
+    if(db.tipos.includes(vAtual))selTipo.value=vAtual;
+  }
+
+  const baseFiltroSetor=db.equipamentos.filter(eq=>{
+    if(ft&&eq.tipo!==ft)return false;
+    if(fs){if(fs==='naoEmp'){if(eq.emprestavel!==false)return false;}else if(statusEquip(eq).label!==fs)return false;}
+    return true;
+  });
+  const contagemSetor={};
+  baseFiltroSetor.forEach(eq=>{const k=eq.setorId||'';contagemSetor[k]=(contagemSetor[k]||0)+1;});
+  const selSetor=$('#eqFiltroSetor');
+  if(selSetor){
+    const vAtual=selSetor.value;
+    selSetor.innerHTML=`<option value="">Todos os setores (${baseFiltroSetor.length})</option>`
+      +db.setores.map(s=>{
+        const n=contagemSetor[s.id]||0;
+        return `<option value="${s.id}"${n===0?' disabled':''}>${esc(s.nome)} (${n})</option>`;
+      }).join('');
+    if(vAtual&&setById(vAtual))selSetor.value=vAtual;
+  }
 }
+
+function imprimirListaEquipamentos(){
+  const busca=($('#eqBusca').value||'').trim();
+  const ft=$('#eqFiltroTipo').value;
+  const fse=$('#eqFiltroSetor').value;
+  const fs=$('#eqFiltroStatus').value;
+
+  const lista=db.equipamentos.filter(eq=>{
+    const st=statusEquip(eq).label;
+    if(ft&&eq.tipo!==ft)return false;
+    if(fse&&eq.setorId!==fse)return false;
+    if(fs){if(fs==='naoEmp'){if(eq.emprestavel!==false)return false;}else if(st!==fs)return false;}
+    if(busca){
+      const mod=eq.modeloId?modById(eq.modeloId):null;
+      const alvo=(eq.patrimonio+' '+eq.serie+' '+eq.tipo+' '+eq.marca+' '+(mod?mod.descricao:'')+' '+(eq.obs||'')+' '+setNome(eq.setorId)+' '+tecNome(eq.tecnicoId)).toLowerCase();
+      if(!alvo.includes(busca))return false;
+    }
+    return true;
+  }).sort((a,b)=>String(a.patrimonio).localeCompare(String(b.patrimonio),undefined,{numeric:true}));
+
+  if(!lista.length){
+    toast('Nenhum equipamento corresponde aos filtros ativos.','warn');
+    return;
+  }
+
+  const filtrosAplicados=[];
+  if(ft)filtrosAplicados.push('Tipo: <b>'+esc(ft)+'</b>');
+  if(fse)filtrosAplicados.push('Setor: <b>'+esc(setNome(fse))+'</b>');
+  if(fs)filtrosAplicados.push('Status: <b>'+esc(fs==='naoEmp'?'Não emprestáveis':fs)+'</b>');
+  if(busca)filtrosAplicados.push('Busca: <b>'+esc(busca)+'</b>');
+
+  const porTipo={};
+  lista.forEach(eq=>{porTipo[eq.tipo]=(porTipo[eq.tipo]||0)+1;});
+  const resumoTipos=Object.entries(porTipo).sort((a,b)=>b[1]-a[1])
+    .map(([t,n])=>`${esc(t)}: <b>${n}</b>`).join(' · ');
+
+  const linhas=lista.map(eq=>{
+    const mod=eq.modeloId?modById(eq.modeloId):null;
+    const st=statusEquip(eq).label;
+    const emprest=eq.emprestavel===false?'Não':'Sim';
+    return `<tr>
+      <td class="mono" style="font-weight:600">${esc(eq.patrimonio||'—')}</td>
+      <td class="mono">${esc(eq.serie||'—')}</td>
+      <td>${esc(eq.tipo||'—')} ${esc(eq.marca||'')}${mod&&mod.descricao?'<div style="font-size:10px;color:#666">'+esc(mod.descricao)+'</div>':''}</td>
+      <td>${esc(setNome(eq.setorId))}</td>
+      <td>${esc(tecNome(eq.tecnicoId))}</td>
+      <td>${esc(st)}</td>
+      <td>${emprest}</td>
+      <td>${eq.data?fmtData(eq.data):'—'}</td>
+    </tr>`;
+  }).join('');
+
+  $('#printArea').innerHTML=`<div class="recibo">
+    <div class="rec-head">
+      <div>
+        <h2>${NOME_SISTEMA}</h2>
+        <div style="font-size:12px;color:#555">${ORG}</div>
+        <div style="font-size:13px;font-weight:600;margin-top:4px">RELAÇÃO DE EQUIPAMENTOS PATRIMONIAIS</div>
+      </div>
+      <div class="rec-right">
+        <img src="${BRASAO_B64}" class="rec-brasao" alt="Brasão">
+        <div class="subtle" style="font-size:11px">Emitido em</div>
+        <div class="mono" style="font-size:12px;font-weight:600">${new Date().toLocaleString('pt-BR')}</div>
+      </div>
+    </div>
+
+    <div class="r-block" style="margin-bottom:12px">
+      <h4>Filtros aplicados</h4>
+      <div style="font-size:12px;line-height:1.7">
+        ${filtrosAplicados.length?filtrosAplicados.join(' &nbsp;·&nbsp; '):'<i>Nenhum filtro — listando todos os equipamentos.</i>'}
+      </div>
+      <div style="font-size:12px;margin-top:6px">
+        <b>Total:</b> ${lista.length} equipamento(s) &nbsp;·&nbsp; ${resumoTipos}
+      </div>
+    </div>
+
+    <table class="r-table">
+      <thead><tr>
+        <th>Patrimônio</th><th>Série</th><th>Equipamento</th><th>Setor</th><th>Técnico</th><th>Status</th><th>Emprestável</th><th>Data</th>
+      </tr></thead>
+      <tbody>${linhas}</tbody>
+    </table>
+
+    <div class="r-foot">Documento gerado pelo ${NOME_SISTEMA} em ${new Date().toLocaleString('pt-BR')}</div>
+  </div>`;
+  setTimeout(()=>window.print(),60);
+}
+
 $('#eqBusca').addEventListener('input',debounce(renderEquipamentos,150));
 $('#eqFiltroTipo').addEventListener('change',renderEquipamentos);
+$('#eqFiltroSetor').addEventListener('change',renderEquipamentos);
 $('#eqFiltroStatus').addEventListener('change',renderEquipamentos);
+$('#btnImprimirListaEq').addEventListener('click',imprimirListaEquipamentos);
 $('#eqTbody').addEventListener('click',e=>{
   const b=e.target.closest('[data-acao]');if(!b)return;
   if(b.dataset.acao==='eq-edit')editarEquip(b.dataset.id);
@@ -4134,7 +4262,7 @@ function fecharModais(){
 $$('.modal-overlay').forEach(m=>m.addEventListener('click',e=>{if(e.target===m||e.target.closest('[data-close]'))fecharModais();}));
 document.addEventListener('keydown',e=>{if(e.key==='Escape')fecharModais();});
 
-/* ============== IMPRESSÃO ============== */
+/* ============== IMPRESSÃO (empréstimos e guias) ============== */
 function imprimirOS(emp){
   const eqs=eqsEmp(emp),st=statusEmp(emp);
   const periodo=(emp.periodoIni||emp.periodoFim)?fmtDT(emp.periodoIni,emp.periodoIniHora)+' → '+fmtData(emp.periodoFim):'—';
