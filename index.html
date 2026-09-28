@@ -2771,7 +2771,8 @@ function renderMultiSetores(contagemSetor){
 
   for(const id of [...eqSetoresSelecionados]){ if(!setById(id)) eqSetoresSelecionados.delete(id); }
 
-  wrap.innerHTML=db.setores.length?db.setores.map(s=>{
+  const setoresOrdenados=[...db.setores].sort((a,b)=>String(a.nome||'').localeCompare(String(b.nome||''),'pt-BR',{sensitivity:'base'}));
+wrap.innerHTML=setoresOrdenados.length?setoresOrdenados.map(s=>{
     const n=contagemSetor[s.id]||0;
     const marcado=eqSetoresSelecionados.has(s.id);
     return `<label class="multi-sel-opt${marcado?' marcado':''}" data-id="${s.id}">
