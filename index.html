@@ -2906,14 +2906,37 @@ document.addEventListener('click',e=>{
   }
 });
 $('#eqFiltroSetorOpts').addEventListener('click',e=>{
+  const opt=e.target.closest('.multi-sel-opt');
+  if(!opt) return;
+  const id=opt.dataset.id;
+  if(!id) return;
+
+  /* Se o clique foi direto no <input>, o navegador já vai alternar sozinho.
+     Deixa o evento 'change' cuidar (adicionado abaixo). */
   if(e.target.tagName==='INPUT') return;
-  const opt=e.target.closest('.multi-sel-opt');if(!opt)return;
-  const id=opt.dataset.id;if(!id)return;
-  if(eqSetoresSelecionados.has(id))eqSetoresSelecionados.delete(id);
-  else eqSetoresSelecionados.add(id);
+
+  /* Clique no label/texto: previne o clique duplo e alterna manualmente. */
+  e.preventDefault();
+  const cb = opt.querySelector('input[type=checkbox]');
+  const vaiMarcar = !eqSetoresSelecionados.has(id);
+  if(vaiMarcar) eqSetoresSelecionados.add(id);
+  else eqSetoresSelecionados.delete(id);
+  if(cb) cb.checked = vaiMarcar;
   renderEquipamentos();
 });
-$('#eqFiltroSetorPanel').addEventListener('click',e=>{
+
+/* Handler separado para quando o usuário clica EXATAMENTE no <input>:
+   o navegador já alternou o .checked sozinho, então só sincronizamos o Set. */
+$('#eqFiltroSetorOpts').addEventListener('change',e=>{
+  if(e.target.tagName!=='INPUT') return;
+  const opt = e.target.closest('.multi-sel-opt');
+  if(!opt) return;
+  const id = opt.dataset.id;
+  if(!id) return;
+  if(e.target.checked) eqSetoresSelecionados.add(id);
+  else eqSetoresSelecionados.delete(id);
+  renderEquipamentos();
+});$('#eqFiltroSetorPanel').addEventListener('click',e=>{
   const b=e.target.closest('[data-multi]');if(!b)return;
   e.stopPropagation();
   const acao=b.dataset.multi;
