@@ -236,6 +236,47 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
 .x-close:hover{color:var(--bad)}
 .info-chip{background:var(--info-bg);border:1px solid #bfe0ec;border-radius:8px;padding:10px 14px;font-size:12.5px;color:#0b5a77;line-height:1.55}
 
+/* ---------- Multi-select de setores ---------- */
+.multi-sel{position:relative;display:inline-block}
+.multi-sel-btn{
+  width:auto;min-width:190px;padding:10px 12px;border:1px solid var(--line2);border-radius:6px;
+  background:#fff;font:400 14px var(--body);color:var(--ink);cursor:pointer;text-align:left;
+  display:flex;align-items:center;gap:8px;justify-content:space-between;
+}
+.multi-sel-btn:hover{border-color:var(--ink-soft)}
+.multi-sel-btn.aberto{border-color:var(--accent);box-shadow:0 0 0 3px rgba(255,140,26,.18)}
+.multi-sel-btn .caret{font-size:10px;color:var(--muted);transition:transform .15s}
+.multi-sel-btn.aberto .caret{transform:rotate(180deg)}
+.multi-sel-btn .badge{
+  font:600 10.5px var(--mono);background:var(--accent);color:#201302;
+  padding:2px 7px;border-radius:999px;
+}
+.multi-sel-panel{
+  position:absolute;top:calc(100% + 4px);left:0;z-index:80;
+  background:#fff;border:1px solid var(--line2);border-radius:8px;
+  box-shadow:0 8px 24px rgba(13,31,45,.18);
+  min-width:240px;max-height:320px;overflow-y:auto;padding:6px 0;display:none;
+}
+.multi-sel-panel.aberto{display:block}
+.multi-sel-acoes{
+  display:flex;gap:8px;padding:6px 12px;border-bottom:1px solid var(--line);
+  font-size:11px;
+}
+.multi-sel-acoes button{
+  background:none;border:none;color:var(--accent-dk);font:600 11px var(--body);
+  cursor:pointer;padding:2px 4px;letter-spacing:.05em;text-transform:uppercase;
+}
+.multi-sel-acoes button:hover{text-decoration:underline}
+.multi-sel-opt{
+  display:flex;align-items:center;gap:10px;padding:8px 14px;
+  font:400 13.5px var(--body);cursor:pointer;
+}
+.multi-sel-opt:hover{background:#f4f8fb}
+.multi-sel-opt input{width:16px;height:16px;accent-color:var(--accent);cursor:pointer;flex:0 0 16px}
+.multi-sel-opt .nome{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.multi-sel-opt .qt{font:600 11.5px var(--mono);color:var(--muted)}
+.multi-sel-opt.marcado .nome{font-weight:600;color:var(--accent-dk)}
+
 #scanReader{width:100%}
 #scanReader video{width:100%!important;height:auto!important;display:block}
 #scanZoom{accent-color:var(--accent);height:6px}
@@ -475,7 +516,20 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
                 </svg>
               </button>
               <select id="eqFiltroTipo"></select>
-              <select id="eqFiltroSetor"></select>
+              <div class="multi-sel" id="eqFiltroSetorWrap">
+                <button type="button" class="multi-sel-btn" id="eqFiltroSetorBtn">
+                  <span id="eqFiltroSetorTxt">Todos os setores</span>
+                  <span class="caret">▼</span>
+                </button>
+                <div class="multi-sel-panel" id="eqFiltroSetorPanel">
+                  <div class="multi-sel-acoes">
+                    <button type="button" data-multi="all">Todos</button>
+                    <button type="button" data-multi="none">Nenhum</button>
+                    <button type="button" data-multi="invert">Inverter</button>
+                  </div>
+                  <div id="eqFiltroSetorOpts"></div>
+                </div>
+              </div>
               <select id="eqFiltroStatus">
                 <option value="">Todos os status</option>
                 <option>Disponível</option><option>Reservado</option><option>Indisponível</option>
@@ -1777,6 +1831,9 @@ const TITULOS={
   planilhas:['Importar/Exportar','Baixe modelos, exporte dados ou importe planilhas']
 };
 let currentView='dashboard';
+
+let eqSetoresSelecionados = new Set(); // ids dos setores marcados no filtro
+
 function showView(v){
   currentView=v;
   $$('.view').forEach(x=>x.classList.toggle('active',x.id==='view-'+v));
@@ -2639,13 +2696,12 @@ function irParaEmprestimo(id){
 function renderEquipamentos(){
   const busca=($('#eqBusca').value||'').toLowerCase();
   const ft=$('#eqFiltroTipo').value;
-  const fse=$('#eqFiltroSetor').value;
   const fs=$('#eqFiltroStatus').value;
 
   const lista=db.equipamentos.filter(eq=>{
     const st=statusEquip(eq).label;
     if(ft&&eq.tipo!==ft)return false;
-    if(fse&&eq.setorId!==fse)return false;
+    if(!filtrarPorSetores(eq))return false;
     if(fs){if(fs==='naoEmp'){if(eq.emprestavel!==false)return false;}else if(st!==fs)return false;}
     if(busca){
       const mod=eq.modeloId?modById(eq.modeloId):null;
@@ -2679,11 +2735,8 @@ function renderEquipamentos(){
   const bloq=db.equipamentos.filter(e=>e.emprestavel===false).length;
   $('#eqResumo').textContent=`${db.equipamentos.length} unidade(s) · ${d} disponível(is) · ${bloq} bloqueada(s) p/ empréstimo · ${(db.modelos||[]).length} modelo(s) no catálogo`;
 
-  /* -------- Contadores dinâmicos nos filtros --------
-     Cada select mostra quantos itens existem em cada opção,
-     considerando os OUTROS filtros ativos (menos o próprio). */
   const baseFiltroTipo=db.equipamentos.filter(eq=>{
-    if(fse&&eq.setorId!==fse)return false;
+    if(!filtrarPorSetores(eq))return false;
     if(fs){if(fs==='naoEmp'){if(eq.emprestavel!==false)return false;}else if(statusEquip(eq).label!==fs)return false;}
     return true;
   });
@@ -2707,28 +2760,52 @@ function renderEquipamentos(){
   });
   const contagemSetor={};
   baseFiltroSetor.forEach(eq=>{const k=eq.setorId||'';contagemSetor[k]=(contagemSetor[k]||0)+1;});
-  const selSetor=$('#eqFiltroSetor');
-  if(selSetor){
-    const vAtual=selSetor.value;
-    selSetor.innerHTML=`<option value="">Todos os setores (${baseFiltroSetor.length})</option>`
-      +db.setores.map(s=>{
-        const n=contagemSetor[s.id]||0;
-        return `<option value="${s.id}"${n===0?' disabled':''}>${esc(s.nome)} (${n})</option>`;
-      }).join('');
-    if(vAtual&&setById(vAtual))selSetor.value=vAtual;
+  renderMultiSetores(contagemSetor);
+}
+
+/* ---------- Multi-select de setores ---------- */
+function renderMultiSetores(contagemSetor){
+  const wrap=$('#eqFiltroSetorOpts');
+  const btnTxt=$('#eqFiltroSetorTxt');
+  if(!wrap)return;
+
+  for(const id of [...eqSetoresSelecionados]){ if(!setById(id)) eqSetoresSelecionados.delete(id); }
+
+  wrap.innerHTML=db.setores.length?db.setores.map(s=>{
+    const n=contagemSetor[s.id]||0;
+    const marcado=eqSetoresSelecionados.has(s.id);
+    return `<label class="multi-sel-opt${marcado?' marcado':''}" data-id="${s.id}">
+      <input type="checkbox" ${marcado?'checked':''} ${n===0 && !marcado?'disabled':''}>
+      <span class="nome">${esc(s.nome)}</span>
+      <span class="qt">${n}</span>
+    </label>`;
+  }).join(''):'<div class="multi-sel-opt" style="color:var(--muted)">Nenhum setor cadastrado.</div>';
+
+  const n=eqSetoresSelecionados.size;
+  if(n===0){
+    btnTxt.textContent='Todos os setores';
+  }else if(n===1){
+    const id=[...eqSetoresSelecionados][0];
+    btnTxt.textContent=setNome(id);
+  }else{
+    btnTxt.innerHTML='Setores selecionados <span class="badge">'+n+'</span>';
   }
+}
+function setoresSelecionadosArray(){return [...eqSetoresSelecionados];}
+function filtrarPorSetores(eq){
+  if(eqSetoresSelecionados.size===0)return true;
+  return eqSetoresSelecionados.has(eq.setorId);
 }
 
 function imprimirListaEquipamentos(){
   const busca=($('#eqBusca').value||'').trim();
   const ft=$('#eqFiltroTipo').value;
-  const fse=$('#eqFiltroSetor').value;
   const fs=$('#eqFiltroStatus').value;
 
   const lista=db.equipamentos.filter(eq=>{
     const st=statusEquip(eq).label;
     if(ft&&eq.tipo!==ft)return false;
-    if(fse&&eq.setorId!==fse)return false;
+    if(!filtrarPorSetores(eq))return false;
     if(fs){if(fs==='naoEmp'){if(eq.emprestavel!==false)return false;}else if(st!==fs)return false;}
     if(busca){
       const mod=eq.modeloId?modById(eq.modeloId):null;
@@ -2745,7 +2822,10 @@ function imprimirListaEquipamentos(){
 
   const filtrosAplicados=[];
   if(ft)filtrosAplicados.push('Tipo: <b>'+esc(ft)+'</b>');
-  if(fse)filtrosAplicados.push('Setor: <b>'+esc(setNome(fse))+'</b>');
+  if(eqSetoresSelecionados.size>0){
+    const nomes=[...eqSetoresSelecionados].map(id=>esc(setNome(id))).join(', ');
+    filtrosAplicados.push('Setor(es): <b>'+nomes+'</b>');
+  }
   if(fs)filtrosAplicados.push('Status: <b>'+esc(fs==='naoEmp'?'Não emprestáveis':fs)+'</b>');
   if(busca)filtrosAplicados.push('Busca: <b>'+esc(busca)+'</b>');
 
@@ -2808,7 +2888,42 @@ function imprimirListaEquipamentos(){
 
 $('#eqBusca').addEventListener('input',debounce(renderEquipamentos,150));
 $('#eqFiltroTipo').addEventListener('change',renderEquipamentos);
-$('#eqFiltroSetor').addEventListener('change',renderEquipamentos);
+
+/* ---------- Eventos do multi-select de setores ---------- */
+$('#eqFiltroSetorBtn').addEventListener('click',e=>{
+  e.stopPropagation();
+  const p=$('#eqFiltroSetorPanel');
+  const b=$('#eqFiltroSetorBtn');
+  const aberto=p.classList.toggle('aberto');
+  b.classList.toggle('aberto',aberto);
+});
+document.addEventListener('click',e=>{
+  const wrap=$('#eqFiltroSetorWrap');
+  if(!wrap)return;
+  if(!wrap.contains(e.target)){
+    $('#eqFiltroSetorPanel')?.classList.remove('aberto');
+    $('#eqFiltroSetorBtn')?.classList.remove('aberto');
+  }
+});
+$('#eqFiltroSetorOpts').addEventListener('click',e=>{
+  if(e.target.tagName==='INPUT') return;
+  const opt=e.target.closest('.multi-sel-opt');if(!opt)return;
+  const id=opt.dataset.id;if(!id)return;
+  if(eqSetoresSelecionados.has(id))eqSetoresSelecionados.delete(id);
+  else eqSetoresSelecionados.add(id);
+  renderEquipamentos();
+});
+$('#eqFiltroSetorPanel').addEventListener('click',e=>{
+  const b=e.target.closest('[data-multi]');if(!b)return;
+  e.stopPropagation();
+  const acao=b.dataset.multi;
+  if(acao==='all'){db.setores.forEach(s=>eqSetoresSelecionados.add(s.id));}
+  if(acao==='none'){eqSetoresSelecionados.clear();}
+  if(acao==='invert'){db.setores.forEach(s=>{if(eqSetoresSelecionados.has(s.id))eqSetoresSelecionados.delete(s.id);else eqSetoresSelecionados.add(s.id);});}
+  renderEquipamentos();
+  $('#eqFiltroSetorPanel').classList.remove('aberto');
+  $('#eqFiltroSetorBtn').classList.remove('aberto');
+});
 $('#eqFiltroStatus').addEventListener('change',renderEquipamentos);
 $('#btnImprimirListaEq').addEventListener('click',imprimirListaEquipamentos);
 $('#eqTbody').addEventListener('click',e=>{
