@@ -27,6 +27,11 @@
    9. Barra lateral mostra a data do último backup exportado, com alerta
       quando passa de 7 dias. O plano gratuito (Spark) não tem backup
       automático - este botão é a única proteção dos dados.
+  10. A senha do switch agora é type="password" com um botão de mostrar/
+      ocultar - antes ficava legível a olho nu na tela.
+  11. SheetJS atualizado de 0.18.5 para 0.20.3 (CVE-2023-30533) e todas as
+      5 bibliotecas externas passaram a ter atributo "integrity" (SRI), que
+      trava o conteúdo exato e recusa executar se a CDN mudar o arquivo.
 
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
@@ -1056,7 +1061,13 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
                 </div>
                 <div class="field c4">
                   <label>Senha</label>
-                  <input type="text" id="swSenha" class="mono" placeholder="Senha de acesso">
+                  <!-- type="password" para não ficar legível a olho nu (antes era
+                       text). O olhinho mostra/esconde só quando a pessoa quer. -->
+                  <div style="position:relative">
+                    <input type="password" id="swSenha" class="mono" placeholder="Senha de acesso" autocomplete="off" style="width:100%;padding-right:34px">
+                    <button type="button" id="btnSwSenhaVer" title="Mostrar ou ocultar a senha"
+                      style="position:absolute;right:4px;top:50%;transform:translateY(-50%);background:none;border:0;cursor:pointer;font-size:15px;line-height:1;padding:4px">👁</button>
+                  </div>
                 </div>
                 <div class="field c12 form-actions">
                   <button type="submit" class="btn btn-accent" id="btnSwSubmit">✔ Salvar switch</button>
@@ -1437,11 +1448,17 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
   </div>
 </div>
 
-<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<!-- Bibliotecas externas. O atributo "integrity" trava o conteúdo exato de cada
+     arquivo: se a CDN for comprometida ou o arquivo for trocado, o navegador se
+     recusa a executar em vez de rodar código estranho com acesso aos dados.
+     Os hashes abaixo são SHA-384 dos arquivos servidos em 14/10/2026. -->
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js" integrity="sha384-+65NgAKqXr1Nb7sBmV6O09pL8ASqZsi29OE718meKinGAWaa70VE5V6LNjXVBjIA" crossorigin="anonymous"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js" integrity="sha384-I1LYojsZ5RM1cOda44Z2h42Qa6YfsQ1XkXxREnhp4ueYBR/4d1pG1K+NZM537Vsj" crossorigin="anonymous"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js" integrity="sha384-YHSscHG455M7b+d6r5ibTMznxrZxV272bMjXT9ndTgmx05fLR7HsdmcVklhpBSyt" crossorigin="anonymous"></script>
+<!-- SheetJS 0.20.3: a 0.18.5 tinha a CVE-2023-30533 (poluição de protótipo ao
+     ler planilha XLSX). Ela saiu do cdnjs — o CDN oficial é o cdn.sheetjs.com. -->
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" integrity="sha384-EnyY0/GSHQGSxSgMwaIPzSESbqoOLSexfnSMN2AP+39Ckmn92stwABZynq1JyzdT" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js" integrity="sha384-c9d8RFSL+u3exBOJ4Yp3HUJXS4znl9f+z66d1y54ig+ea249SpqR+w1wyvXz/lk+" crossorigin="anonymous"></script>
 
 <script>
 'use strict';
@@ -4321,11 +4338,20 @@ $('#impTbody').addEventListener('click',e=>{
 /* ============== SWITCHS ============== */
 let swEditId=null;
 $('#swBusca').addEventListener('input',debounce(renderSwitches,150));
+/* Olhinho da senha: mostra/esconde só quando a pessoa escolher. */
+if($('#btnSwSenhaVer'))$('#btnSwSenhaVer').addEventListener('click',()=>{
+  const el=$('#swSenha');if(!el)return;
+  const passouAPrever=el.type==='password';
+  el.type=passouAPrever?'text':'password';
+  $('#btnSwSenhaVer').textContent=passouAPrever?'🙈':'👁';
+});
 let lastResetSw=0;
 $('#formSwitch').addEventListener('reset',e=>{const n=Date.now();if(n-lastResetSw<400)return;lastResetSw=n;setTimeout(resetSwitchForm,0);});
 function resetSwitchForm(){
   swEditId=null;
   ['swNome','swIP','swLogin','swSenha'].forEach(id=>{const el=$('#'+id);if(el)el.value='';});
+  const ps=$('#swSenha');if(ps)ps.type='password';   /* volta a ficar oculta */
+  const bt=$('#btnSwSenhaVer');if(bt)bt.textContent='👁';
   $('#swLocal').value='';
   $('#swFormTitle').textContent='Cadastro de switch';
   $('#btnSwSubmit').textContent='✔ Salvar switch';
