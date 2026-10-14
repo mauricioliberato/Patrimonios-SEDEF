@@ -38,6 +38,8 @@
   13. Abertura sem internet: em vez de ficar 12s esperando e acusando erro,
       o app abre na hora com a cópia local e avisa com calma. Ao voltar a
       conexão, sincroniza sozinho e avisa.
+  14. A lista de equipamentos agora é paginada (50 por página). Antes,
+      todas as linhas iam ao DOM de uma vez - e a lista só cresce.
 
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
@@ -191,6 +193,15 @@ tr:hover .ibtn,li:hover .ibtn,.cart-item:hover .ibtn{opacity:1}
 .actions{display:flex;gap:6px;justify-content:flex-end;align-items:center}
 
 .table-wrap{overflow:auto;max-height:58vh}
+/* Rodapé da lista de equipamentos: resumo + paginação */
+.eq-rodape{padding:10px 20px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.paginacao{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+.paginacao[hidden]{display:none}
+.pag-btn{min-width:32px;height:32px;padding:0 9px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font:inherit;font-size:13px;line-height:1;cursor:pointer;transition:.15s}
+.pag-btn:hover:not(:disabled){border-color:var(--accent);color:var(--accent-dk)}
+.pag-btn.ativo{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+.pag-btn:disabled{opacity:.38;cursor:not-allowed}
+.pag-elips{padding:0 3px;color:var(--muted);font-size:13px}
 table{width:100%;border-collapse:collapse;font-size:13.5px}
 thead th{position:sticky;top:0;z-index:2;background:#f6f8fa;font:600 10.5px var(--body);letter-spacing:.09em;text-transform:uppercase;color:var(--muted);text-align:left;padding:11px 14px;border-bottom:2px solid var(--line)}
 tbody td{padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
@@ -598,7 +609,10 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
               </table>
             </div>
           </div>
-          <div style="padding:10px 20px;border-top:1px solid var(--line)"><span class="subtle" id="eqResumo"></span></div>
+          <div class="eq-rodape">
+            <span class="subtle" id="eqResumo"></span>
+            <div class="paginacao" id="eqPaginacao" hidden></div>
+          </div>
         </div>
 
         <div class="card eq-panel" id="cardModForm" style="display:none">
@@ -2118,6 +2132,13 @@ let currentView='dashboard';
 
 let eqSetoresSelecionados = new Set(); // ids dos setores marcados no filtro
 
+/* Paginação da lista de equipamentos: só a página atual vai ao DOM,
+   porque a lista tem milhares de linhas. eqFocoId aponta a linha que
+   deve ficar visível (ex.: logo após salvar). */
+const EQ_POR_PAGINA = 50;
+let eqPagina = 1;
+let eqFocoId = null;
+
 function showView(v){
   currentView=v;
   $$('.view').forEach(x=>x.classList.toggle('active',x.id==='view-'+v));
@@ -2565,7 +2586,7 @@ function aplicarLeitura(bruto){
     el.classList.remove('leitura-ok'); void el.offsetWidth; el.classList.add('leitura-ok');
     beep();
     el.dispatchEvent(new Event('input',{bubbles:true}));
-    if(el.id==='eqBusca' && typeof renderEquipamentos==='function') renderEquipamentos();
+    if(el.id==='eqBusca' && typeof renderEquipamentos==='function'){ eqPagina=1; renderEquipamentos(); }
   }
 }
 
@@ -2922,7 +2943,7 @@ $('#formEquip').addEventListener('submit',ev=>{
     db.equipamentos.push(novo);salvoId=novo.id;
     toast('Unidade <b class="mono">'+esc(pat)+'</b> cadastrada'+(mod?' ('+esc(mod.tipo)+' '+esc(mod.marca)+')':'')+'.');
   }
-  persistir();resetFormEquip();atualizarTudo();destacarLinha('#eqTbody',salvoId);
+  persistir();resetFormEquip();eqFocoId=salvoId;atualizarTudo();destacarLinha('#eqTbody',salvoId);
   setTimeout(()=>{if(!$('#eqId').value)$('#eqPatrimonio').focus();},150);
 });
 let lastResetEq=0;
@@ -2980,6 +3001,28 @@ function irParaEmprestimo(id){
   addEqForm(id);
   setTimeout(()=>$('#empDataReserva').focus(),120);
 }
+/* ---------- Controles de paginação da lista de equipamentos ---------- */
+function renderPaginacaoEq(totalPaginas){
+  const box=$('#eqPaginacao');
+  if(!box)return;
+  if(totalPaginas<=1){box.hidden=true;box.innerHTML='';return;}
+  box.hidden=false;
+  const btn=(rot,pg,ativo,des,tit)=>
+    `<button type="button" class="pag-btn${ativo?' ativo':''}" data-pag="${pg}"${des?' disabled':''}${tit?` title="${tit}"`:''}>${rot}</button>`;
+  /* janela: primeira, última e as vizinhas da atual — com reticências no meio */
+  const vistas=new Set([1,totalPaginas]);
+  for(let p=eqPagina-2;p<=eqPagina+2;p++)if(p>=1&&p<=totalPaginas)vistas.add(p);
+  const ordem=[...vistas].sort((a,b)=>a-b);
+  let html=btn('‹',eqPagina-1,false,eqPagina<=1,'Página anterior');
+  let ant=0;
+  ordem.forEach(p=>{
+    if(p-ant>1)html+='<span class="pag-elips">…</span>';
+    html+=btn(p,p,p===eqPagina,false,'Ir para a página '+p);
+    ant=p;
+  });
+  html+=btn('›',eqPagina+1,false,eqPagina>=totalPaginas,'Próxima página');
+  box.innerHTML=html;
+}
 function renderEquipamentos(){
   const busca=($('#eqBusca').value||'').toLowerCase();
   const ft=$('#eqFiltroTipo').value;
@@ -2998,7 +3041,20 @@ function renderEquipamentos(){
     return true;
   }).sort((a,b)=>String(a.patrimonio).localeCompare(String(b.patrimonio),undefined,{numeric:true}));
 
-  $('#eqTbody').innerHTML=lista.length?lista.map(eq=>{
+  /* --- Paginação: só a página atual é renderizada --- */
+  const totalFiltrado=lista.length;
+  const totalPaginas=Math.max(1,Math.ceil(totalFiltrado/EQ_POR_PAGINA));
+  if(eqFocoId){ /* quem acabou de salvar deve ver a própria linha */
+    const idx=lista.findIndex(x=>x.id===eqFocoId);
+    if(idx>=0)eqPagina=Math.floor(idx/EQ_POR_PAGINA)+1;
+    eqFocoId=null;
+  }
+  if(eqPagina>totalPaginas)eqPagina=totalPaginas;
+  if(eqPagina<1)eqPagina=1;
+  const ini=(eqPagina-1)*EQ_POR_PAGINA;
+  const visiveis=lista.slice(ini,ini+EQ_POR_PAGINA);
+
+  $('#eqTbody').innerHTML=visiveis.length?visiveis.map(eq=>{
     const st=statusEquip(eq);const bloqueado=eq.emprestavel===false;
     const mod=eq.modeloId?modById(eq.modeloId):null;
     return `
@@ -3020,7 +3076,9 @@ function renderEquipamentos(){
 
   const d=db.equipamentos.filter(e=>statusEquip(e).label==='Disponível').length;
   const bloq=db.equipamentos.filter(e=>e.emprestavel===false).length;
-  $('#eqResumo').textContent=`${db.equipamentos.length} unidade(s) · ${d} disponível(is) · ${bloq} bloqueada(s) p/ empréstimo · ${(db.modelos||[]).length} modelo(s) no catálogo`;
+  const fatia=totalFiltrado?`${ini+1}–${Math.min(ini+EQ_POR_PAGINA,totalFiltrado)}`:'0';
+  $('#eqResumo').textContent=`Mostrando ${fatia} de ${totalFiltrado} resultado(s) · ${db.equipamentos.length} unidade(s) · ${d} disponível(is) · ${bloq} bloqueada(s) p/ empréstimo · ${(db.modelos||[]).length} modelo(s) no catálogo`;
+  renderPaginacaoEq(totalPaginas);
 
   const baseFiltroTipo=db.equipamentos.filter(eq=>{
     if(!filtrarPorSetores(eq))return false;
@@ -3174,8 +3232,20 @@ function imprimirListaEquipamentos(){
   setTimeout(()=>window.print(),60);
 }
 
-$('#eqBusca').addEventListener('input',debounce(renderEquipamentos,150));
-$('#eqFiltroTipo').addEventListener('change',renderEquipamentos);
+$('#eqBusca').addEventListener('input',debounce(()=>{eqPagina=1;renderEquipamentos();},150));
+$('#eqFiltroTipo').addEventListener('change',()=>{eqPagina=1;renderEquipamentos();});
+$('#eqPaginacao').addEventListener('click',e=>{
+  const b=e.target.closest('[data-pag]');
+  if(!b||b.disabled)return;
+  const pg=parseInt(b.dataset.pag,10);
+  if(!pg||pg===eqPagina)return;
+  eqPagina=pg;
+  renderEquipamentos();
+  /* volta ao topo da tabela: a pessoa clicou embaixo, não deve achar
+     que a página não mudou */
+  const tw=$('#eqTbody').closest('.table-wrap');
+  if(tw)tw.scrollTop=0;
+});
 
 /* ---------- Eventos do multi-select de setores ---------- */
 $('#eqFiltroSetorBtn').addEventListener('click',e=>{
@@ -3210,6 +3280,7 @@ $('#eqFiltroSetorOpts').addEventListener('click',e=>{
   if(vaiMarcar) eqSetoresSelecionados.add(id);
   else eqSetoresSelecionados.delete(id);
   if(cb) cb.checked = vaiMarcar;
+  eqPagina=1;
   renderEquipamentos();
 });
 
@@ -3223,6 +3294,7 @@ $('#eqFiltroSetorOpts').addEventListener('change',e=>{
   if(!id) return;
   if(e.target.checked) eqSetoresSelecionados.add(id);
   else eqSetoresSelecionados.delete(id);
+  eqPagina=1;
   renderEquipamentos();
 });$('#eqFiltroSetorPanel').addEventListener('click',e=>{
   const b=e.target.closest('[data-multi]');if(!b)return;
@@ -3231,11 +3303,12 @@ $('#eqFiltroSetorOpts').addEventListener('change',e=>{
   if(acao==='all'){db.setores.forEach(s=>eqSetoresSelecionados.add(s.id));}
   if(acao==='none'){eqSetoresSelecionados.clear();}
   if(acao==='invert'){db.setores.forEach(s=>{if(eqSetoresSelecionados.has(s.id))eqSetoresSelecionados.delete(s.id);else eqSetoresSelecionados.add(s.id);});}
+  eqPagina=1;
   renderEquipamentos();
   $('#eqFiltroSetorPanel').classList.remove('aberto');
   $('#eqFiltroSetorBtn').classList.remove('aberto');
 });
-$('#eqFiltroStatus').addEventListener('change',renderEquipamentos);
+$('#eqFiltroStatus').addEventListener('change',()=>{eqPagina=1;renderEquipamentos();});
 $('#btnImprimirListaEq').addEventListener('click',imprimirListaEquipamentos);
 $('#eqTbody').addEventListener('click',e=>{
   const b=e.target.closest('[data-acao]');if(!b)return;
