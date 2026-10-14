@@ -21,6 +21,9 @@
    7. Corrigido o erro "TITULOS[undefined][0]" ao clicar nos botões-pai de
       submenu (Equipamento/Impressora/Switch/Rack/Licença). Bug pré-existente,
       não relacionado à migração.
+   8. Ao fim da sessão (logout ou sessão expirada) os listeners do Firestore
+      são encerrados e a trava de dupla entrada é liberada - evita os erros
+      "permission-denied" no console e permite entrar de novo sem recarregar.
 
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
@@ -1884,6 +1887,18 @@ $('#btnSairMobile').addEventListener('click',sair);
 let _jaEntrou=false;
 auth.onAuthStateChanged(async fbUser=>{
   if(!fbUser){
+    /* Sem sessão: derruba TUDO que só funciona autenticado.
+       Sem isso os listeners continuam de pé e passam a acusar
+       "Missing or insufficient permissions" no console, e a flag _jaEntrou
+       impediria que o usuário entrasse de novo sem recarregar a página
+       (na prática: o login pareceria "não funcionar"). */
+    if(presencaTimer){clearInterval(presencaTimer);presencaTimer=null;}
+    if(presencaUnsub){try{presencaUnsub();}catch(_){}presencaUnsub=null;}
+    unsubscribers.forEach(u=>{try{u();}catch(_){}});
+    unsubscribers=[];
+    ultimaLeituraRemota={};
+    sincronizando=false;   /* sem sessão nenhuma gravação pode ser tentada */
+    _jaEntrou=false;
     /* Sem sessão: garante que o overlay de login está visível */
     document.body.classList.remove('logado');
     $('#loginOverlay').classList.remove('hidden');
