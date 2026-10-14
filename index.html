@@ -24,6 +24,9 @@
    8. Ao fim da sessão (logout ou sessão expirada) os listeners do Firestore
       são encerrados e a trava de dupla entrada é liberada - evita os erros
       "permission-denied" no console e permite entrar de novo sem recarregar.
+   9. Barra lateral mostra a data do último backup exportado, com alerta
+      quando passa de 7 dias. O plano gratuito (Spark) não tem backup
+      automático - este botão é a única proteção dos dados.
 
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
@@ -495,6 +498,7 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
         <button class="btn-side" id="btnExport">⬇ Exportar backup</button>
         <button class="btn-side" id="btnImport">⬆ Importar</button>
       </div>
+      <small id="backupStatus" style="display:block;font-weight:600">Backup: verificando…</small>
       <small>Dados sincronizados em nuvem (Firebase).</small>
     </div>
   </aside>
@@ -1812,6 +1816,7 @@ function mostrarApp(u){
   </div>`;
   iniciarSincronizacao();
   iniciarPresenca();
+  iniciarBackupMeta();
 }
 function revelarApp(){
   $('#loginOverlay').classList.add('hidden');
@@ -4739,6 +4744,48 @@ function imprimirGuia(g){
 }
 
 /* ============== BACKUP ============== */
+/* O plano gratuito do Firebase (Spark) NÃO faz backup automático — isso é
+   recurso só do plano pago. O único protegido é este botão, então registramos
+   quando ele foi usado e avisamos na barra lateral quando está velho. */
+const backupMetaRef=()=>fsdb.collection('sistema').doc('backupMeta');
+let backupUltimoMs=null,backupPor='';
+function pintarBackup(){
+  const el=$('#backupStatus');if(!el)return;
+  const quem=backupPor?' — por '+esc(backupPor):'';
+  if(backupUltimoMs===null){
+    el.textContent='⚠ Backup: nunca exportado';
+    el.style.color='#ffb4a2';
+    el.title='O plano gratuito não tem backup automático. Clique em "Exportar backup" e guarde o arquivo baixado.';
+    return;
+  }
+  const dias=Math.floor((Date.now()-backupUltimoMs)/86400000);
+  const quando=new Date(backupUltimoMs).toLocaleDateString('pt-BR');
+  if(dias<=7){
+    el.textContent='✓ Backup: '+quando;
+    el.style.color='#a7e8bd';
+  }else{
+    el.textContent='⚠ Backup: '+quando+' ('+dias+' dias)';
+    el.style.color='#ffb4a2';
+  }
+  el.title='Última exportação'+quem+'. Guarde o arquivo baixado em um local seguro.';
+}
+/* Um listener por sessão: quando alguém exporta, todos veem a data mudar na
+   hora. O unsubscribe entra na mesma lista dos demais e sai junto no logout. */
+function iniciarBackupMeta(){
+  const unsub=backupMetaRef().onSnapshot(snap=>{
+    backupUltimoMs=(snap.exists&&snap.data().ultimaExportacao)||null;
+    backupPor=(snap.exists&&snap.data().por)||'';
+    pintarBackup();
+  },err=>{console.warn('Status de backup indisponível:',err);});
+  unsubscribers.push(unsub);
+}
+async function registrarBackup(){
+  backupUltimoMs=Date.now();
+  backupPor=usuarioAtual?(usuarioAtual.nome||usuarioAtual.usuario||''):'';
+  pintarBackup();
+  try{await backupMetaRef().set({ultimaExportacao:backupUltimoMs,por:backupPor},{merge:true});}
+  catch(err){console.error('Não deu para registrar o backup:',err);}
+}
 $('#btnExport').addEventListener('click',()=>{
   const blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'});
   const a=document.createElement('a');
@@ -4746,6 +4793,7 @@ $('#btnExport').addEventListener('click',()=>{
   a.download='nii-patrimonios-backup-'+hojeISO().replace(/-/g,'')+'.json';
   a.click();
   URL.revokeObjectURL(a.href);
+  registrarBackup();
   toast('Backup exportado.');
 });
 $('#btnImport').addEventListener('click',()=>$('#fileImport').click());
