@@ -1899,6 +1899,7 @@ auth.onAuthStateChanged(async fbUser=>{
        (na prática: o login pareceria "não funcionar"). */
     if(presencaTimer){clearInterval(presencaTimer);presencaTimer=null;}
     if(presencaUnsub){try{presencaUnsub();}catch(_){}presencaUnsub=null;}
+    if(backupUnsub){try{backupUnsub();}catch(_){}backupUnsub=null;}
     unsubscribers.forEach(u=>{try{u();}catch(_){}});
     unsubscribers=[];
     ultimaLeituraRemota={};
@@ -4769,15 +4770,17 @@ function pintarBackup(){
   }
   el.title='Última exportação'+quem+'. Guarde o arquivo baixado em um local seguro.';
 }
-/* Um listener por sessão: quando alguém exporta, todos veem a data mudar na
-   hora. O unsubscribe entra na mesma lista dos demais e sai junto no logout. */
+/* Tem variável própria, como o presencaUnsub: iniciarSincronizacao REESCREVE
+   a lista unsubscribers (unsubscribers = SECOES.map(...)), e um push aqui
+   dentro seria engolido por ela e nunca encerrado no logout. */
+let backupUnsub=null;
 function iniciarBackupMeta(){
-  const unsub=backupMetaRef().onSnapshot(snap=>{
+  if(backupUnsub){try{backupUnsub();}catch(_){}backupUnsub=null;}
+  backupUnsub=backupMetaRef().onSnapshot(snap=>{
     backupUltimoMs=(snap.exists&&snap.data().ultimaExportacao)||null;
     backupPor=(snap.exists&&snap.data().por)||'';
     pintarBackup();
   },err=>{console.warn('Status de backup indisponível:',err);});
-  unsubscribers.push(unsub);
 }
 async function registrarBackup(){
   backupUltimoMs=Date.now();
