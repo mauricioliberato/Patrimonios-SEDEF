@@ -35,6 +35,9 @@
   12. A senha do switch ficou oculta na lista (••••••) e só aparece por
       alguns segundos quando a pessoa clica no olhinho - reduz exposição
       por olho de sobre-ombro, print e tela compartilhada.
+  13. Abertura sem internet: em vez de ficar 12s esperando e acusando erro,
+      o app abre na hora com a cópia local e avisa com calma. Ao voltar a
+      conexão, sincroniza sozinho e avisa.
 
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
@@ -1679,8 +1682,24 @@ async function sincronizarComNuvem(){
     if(syncPendente){syncPendente=false;sincronizarComNuvem();}
   }
 }
+/* Aviso de conexão. O "online" é o que empurra o que ficou pendente: sem
+   isso, uma alteração feita offline só iria para a nuvem na próxima edição.
+   (A fusão na largada ainda recupera o que sobrar, mas é melhor não deixar
+   acumular.) */
+window.addEventListener('offline',()=>{
+  if(!usuarioAtual)return;
+  toast('Conexão perdida — pode continuar navegando, a cópia local está guardada.','warn');
+});
+window.addEventListener('online',()=>{
+  if(!usuarioAtual)return;
+  toast('Conexão de volta — sincronizando com a nuvem…');
+  sincronizarComNuvem();
+});
 async function iniciarSincronizacao(){
   sincronizando=true;
+  /* Sem internet? Não adianta esperar nem acusar erro: abre já com a cópia
+     local, que é fundida com a nuvem quando a conexão voltar. */
+  const offline=(typeof navigator!=='undefined')&&navigator.onLine===false;
   for(const nome of SECOES){
     try{
       const snap=await docRefSecao(nome).get();
@@ -1695,7 +1714,7 @@ async function iniciarSincronizacao(){
         else if(nome==='listas')await docRefSecao(nome).set({tipos:[...DEFAULT_TIPOS],marcas:[...DEFAULT_MARCAS],modelos:[]});
         else await docRefSecao(nome).set(local);
       }
-    }catch(err){console.error('Erro ao preparar seção',nome,err);}
+    }catch(err){if(!offline)console.error('Erro ao preparar seção',nome,err);}
   }
   unsubscribers.forEach(u=>u());
   const secoesRecebidas=new Set();
@@ -1705,6 +1724,10 @@ async function iniciarSincronizacao(){
     appRevelado=true;
     garantirModelos();garantirGuias();
     revelarApp();
+  }
+  if(offline){
+    revelar();
+    toast('Sem conexão no momento — exibindo a cópia local. Sincroniza sozinho quando a internet voltar.','warn');
   }
   setTimeout(()=>{if(!appRevelado){revelar();toast('A sincronização inicial demorou mais que o normal — verifique sua internet.','warn');}},12000);
   unsubscribers=SECOES.map(nome=>docRefSecao(nome).onSnapshot(snap=>{
