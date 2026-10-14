@@ -1,0 +1,28 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /* Dados do sistema: as 11 seções do app mais o contador atômico de guias
+       (sistema/guiaContador). O curinga {secao} cobre todos eles.
+       Requer sessão: qualquer leitura ou escrita vem de quem autenticou. */
+    match /sistema/{secao} {
+      allow read, write: if request.auth != null;
+    }
+
+    /* Quem está online. O docId é o UID do usuário autenticado. */
+    match /presenca/{usuarioId} {
+      allow read, write: if request.auth != null;
+    }
+
+    /* Coleção legada de login - mantida fechada de propósito.
+       O login agora é resolvido pelo Firebase Auth. */
+    match /usuarios/{doc} {
+      allow read, write: if false;
+    }
+
+    /* Nada mais é público (inclui a coleção legada "meta"). */
+    match /{doc=**} {
+      allow read, write: if false;
+    }
+  }
+}
