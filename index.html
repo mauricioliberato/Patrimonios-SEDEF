@@ -18,6 +18,9 @@
    5. A criação de documento vazio não apaga mais o trabalho local.
    6. Corrigido "t.senha = undefined", que invalidava o lote de sincronização
       inteiro (o Firestore recusa campos undefined) ao editar um técnico.
+   7. Corrigido o erro "TITULOS[undefined][0]" ao clicar nos botões-pai de
+      submenu (Equipamento/Impressora/Switch/Rack/Licença). Bug pré-existente,
+      não relacionado à migração.
 
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
@@ -2118,7 +2121,10 @@ $$('.nav-group .nav-parent').forEach(p=>p.addEventListener('click',()=>{
   const aberto=g.classList.toggle('aberto');
   p.setAttribute('aria-expanded',aberto?'true':'false');
 }));
-$$('.nav-item:not(.sair-mobile)').forEach(b=>b.addEventListener('click',()=>{showView(b.dataset.view);fecharMenuMobile();}));
+/* [data-view] é obrigatório: os botões-pai de submenu (.nav-parent) não têm
+   view própria, e chamar showView(undefined) quebrava com
+   "TITULOS[undefined][0]" a cada clique. */
+$$('.nav-item[data-view]:not(.sair-mobile)').forEach(b=>b.addEventListener('click',()=>{showView(b.dataset.view);fecharMenuMobile();}));
 $('#btnMenuMobile').addEventListener('click',()=>{
   const aberto=$('#navPrincipal').classList.toggle('aberto');
   $('#btnMenuMobile').setAttribute('aria-expanded',aberto?'true':'false');
