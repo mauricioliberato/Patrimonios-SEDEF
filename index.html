@@ -32,6 +32,9 @@
   11. SheetJS atualizado de 0.18.5 para 0.20.3 (CVE-2023-30533) e todas as
       5 bibliotecas externas passaram a ter atributo "integrity" (SRI), que
       trava o conteúdo exato e recusa executar se a CDN mudar o arquivo.
+  12. A senha do switch ficou oculta na lista (••••••) e só aparece por
+      alguns segundos quando a pessoa clica no olhinho - reduz exposição
+      por olho de sobre-ombro, print e tela compartilhada.
 
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
@@ -4416,7 +4419,7 @@ function renderSwitches(){
       <td>${esc(setNome(s.local))}</td>
       <td class="mono">${s.ip?`<a href="http://${esc(s.ip)}" target="_blank" rel="noopener">${esc(s.ip)} ↗</a>`:'—'}</td>
       <td class="mono subtle">${esc(s.login||'—')}</td>
-      <td class="mono subtle">${esc(s.senha||'—')}</td>
+      <td class="mono subtle">${s.senha?`<span class="sw-valor" data-id="${s.id}">••••••</span> <button type="button" class="ibtn sw-ver-senha" data-id="${s.id}" title="Mostrar a senha por alguns segundos">👁</button>`:'—'}</td>
       <td class="td-r"><div class="actions">
         <button class="btn btn-ghost btn-sm" data-acao="sw-edit" data-id="${s.id}">✎ Editar</button>
         <button class="ibtn bad" title="Excluir" data-acao="sw-del" data-id="${s.id}">${TRASH_SVG}</button>
@@ -4429,6 +4432,28 @@ $('#swTbody').addEventListener('click',e=>{
   const s=db.switches.find(x=>x.id===b.dataset.id);if(!s)return;
   if(b.dataset.acao==='sw-edit')editarSwitch(s.id);
   if(b.dataset.acao==='sw-del')excluirSwitch(s.id);
+});
+/* A senha fica oculta na tabela e só aparece por alguns segundos quando a
+   pessoa clica no olhinho - evita olho de sobre-ombro, print e tela
+   compartilhada, que era a exposição mais provável.
+   ATENÇÃO: isso não é criptografia. Quem abrir o console do navegador ainda
+   enxerga o valor em db.switches. Serve para o olho, não para o invasor. */
+let swSenhaTimer=null;
+function ocultarSenhasMostradas(){
+  document.querySelectorAll('.sw-valor.mostrando').forEach(el=>{
+    el.textContent='••••••';el.classList.remove('mostrando');
+  });
+  if(swSenhaTimer){clearTimeout(swSenhaTimer);swSenhaTimer=null;}
+}
+$('#swTbody').addEventListener('click',e=>{
+  const b=e.target.closest('.sw-ver-senha');if(!b)return;
+  const s=db.switches.find(x=>x.id===b.dataset.id);if(!s)return;
+  const alvo=Array.from(document.querySelectorAll('.sw-valor')).find(el=>el.dataset.id===b.dataset.id);
+  if(!alvo)return;
+  ocultarSenhasMostradas();
+  alvo.textContent=s.senha||'—';
+  alvo.classList.add('mostrando');
+  swSenhaTimer=setTimeout(ocultarSenhasMostradas,8000);
 });
 
 /* ============== RACKS ============== */
