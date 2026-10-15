@@ -1875,6 +1875,21 @@ async function gravarAdmins(silencioso){
   /* Recusa gravar vazio: as duas listas juntas vazias = ninguém mais pode
      mexer no cadastro de pessoas (dá para consertar só pelo Console). */
   if(uids.length===0&&emails.length===0){console.warn('gravarAdmins: lista vazia recusada (evita trancar a gestão de pessoas).');return false;}
+  /* TRAVA DE AUTODESTRUIÇÃO: se a lista que prestaria a gravar não me
+     inclui, quem é administrador agora (a tela diz) sou eu — e essa
+     gravação me trancaria fora do cadastro de pessoas para sempre.
+     Acontece quando o cache local ainda está velho (navegador aberto pela
+     primeira vez depois de um tempo): a tela já me reconhece como admin
+     porque o login leu o cadastro fresco do servidor, mas o array local
+     ainda não tem os uids. Recusa e manda recarregar — no reload o
+     consertarAdmins() tenta de novo já com os dados do servidor em mãos. */
+  const meuUid=(usuarioAtual&&usuarioAtual.uid)||'';
+  const meuEmail=(usuarioAtual&&usuarioAtual.usuario)?emailDoLogin(usuarioAtual.usuario):'';
+  if((!meuUid||uids.indexOf(meuUid)<0)&&(!meuEmail||emails.indexOf(meuEmail)<0)){
+    console.warn('gravarAdmins: recusei gravar porque a lista resultante não conteria a sua conta (cache local desatualizado?).');
+    if(!silencioso)toast('Não atualizei a lista de administradores: ela não conteria a sua conta. Recarregue a página (F5) e tente de novo.','bad');
+    return false;
+  }
   try{
     const ref=docRefSecao('admins');
     const atual=await ref.get();
@@ -3415,7 +3430,7 @@ $('#formTecnico').addEventListener('submit',async ev=>{
   if(senha)senhaHash=await sha256(senha);
   if(id){
     const t=tecById(id);
-    const upd={nome,matricula:mat,usuario,senhaHash};
+    const upd={nome,matricula:mat,usuario,senhaHash,atualizadoEm:Date.now()};
     if(!senha){delete upd.senhaHash;delete upd.senha;}
     Object.assign(t,upd);
     if(!senha)delete t.senhaHash;
@@ -3486,6 +3501,11 @@ $('#tecTbody').addEventListener('click',e=>{
     const eu=t.uid&&usuarioAtual&&t.uid===usuarioAtual.uid;
     if(t.admin&&eu)return toast('Você não pode remover o <b>próprio</b> acesso de administrador. Peça a outro administrador.','warn');
     t.admin=!t.admin;
+    /* Carimbo de data/hora: é o que faz a fusão com o servidor respeitar
+       esta mexida. Sem ele o servidor podia vencer por estar mais novo e a
+       promoção sumia do cadastro — enquanto ficava gravada em
+       sistema/admins, deixando as duas fontes fora de sincronia. */
+    t.atualizadoEm=Date.now();
     toast(t.admin?'<b>'+esc(t.nome)+'</b> agora é <b>administrador</b>.':'<b>'+esc(t.nome)+'</b> voltou a ser técnico comum.');
     persistir();gravarAdmins();atualizarTudo();
   }
