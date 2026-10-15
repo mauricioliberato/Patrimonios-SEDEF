@@ -43,12 +43,15 @@
   15. Perfil de administrador: o admin cadastra/altera técnicos e decide
       quem é admin. O técnico comum vê tudo, menos os botões de excluir.
       No servidor isso também é recusado para o cadastro de técnicos.
+  16. Saída automática por inatividade: depois de 20 minutos sem mouse,
+      teclado, rolagem ou toque, um aviso com contagem regressiva aparece
+      e a sessão é encerrada. Computador compartilhado não fica com o
+      sistema aberto para o próximo. Prazo no código: INATIVIDADE_MS.
 
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
 -->
-
 
 <html lang="pt-BR">
 <head>
@@ -1336,6 +1339,20 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
   </main>
 </div>
 
+<!-- Saída automática por inatividade — prazo no JS: INATIVIDADE_MS -->
+<div class="modal-overlay" id="modalInatividade">
+  <div class="modal" style="width:min(440px,100%)">
+    <div class="modal-h"><h3>Sessão inativa</h3></div>
+    <div class="modal-b">
+      <p style="margin:0">Está há <b><span id="inatividadeMinutos">20</span> minutos</b> sem usar o sistema.
+      Para proteger o patrimônio em computadores compartilhados, a sessão será
+      encerrada em <b><span id="inatividadeConta">60</span> segundos</b>.</p>
+      <p class="subtle" style="margin:0">Mova o mouse, digite ou role a tela para continuar — ou use o botão abaixo.</p>
+    </div>
+    <div class="modal-f"><button class="btn btn-accent" id="btnContinuarSessao" type="button">Continuar trabalhando</button></div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modalLista">
   <div class="modal" style="width:min(470px,100%)">
     <div class="modal-h"><h3 id="listaTitulo">Gerenciar</h3><button class="x-close" data-close>&times;</button></div>
@@ -2005,6 +2022,68 @@ async function sair(){
 }
 $('#btnSair').addEventListener('click',sair);
 $('#btnSairMobile').addEventListener('click',sair);
+
+/* ============== SAÍDA AUTOMÁTICA POR INATIVIDADE ============== */
+/* O computador da secretaria é compartilhado: uma aba esquecida aberta é a
+   sua sessão à disposição de qualquer um. Sem ninguém tocar em nada por
+   INATIVIDADE_MS, um aviso entra com a contagem e a sessão é encerrada.
+   Conta como uso: mouse, teclado, rolagem, toque e digitação. NÃO conta as
+   marcações de presença — aquelas acontecem sozinhas, sem ninguém ali.
+   Em aba em segundo plano o navegador suspende os eventos, mas o relógio é
+   por data e continua andando: o desligamento acontece mesmo assim.
+   O plano gratuito não deixa invalidar a sessão de OUTRO aparelho daqui;
+   isto protege esta aba, que é o que dá para fazer sem pagar. */
+const INATIVIDADE_MS=20*60*1000;    /* 20 minutos — troque só o número aqui */
+const AVISO_INATIVIDADE_MS=60*1000; /* avisa 1 minuto antes de encerrar */
+let ultimaAtividadeDoUsuario=Date.now(),sessaoVigiada=false,avisoInatividadeOn=false;
+let inatividadeTimer=null;
+const campoMinutos=$('#inatividadeMinutos');
+if(campoMinutos)campoMinutos.textContent=String(Math.round(INATIVIDADE_MS/60000));
+function esconderAvisoInatividade(){
+  if(!avisoInatividadeOn)return;
+  avisoInatividadeOn=false;
+  const m=$('#modalInatividade');if(m)m.classList.remove('show');
+}
+function resetarRelogioInatividade(){
+  ultimaAtividadeDoUsuario=Date.now();
+  if(avisoInatividadeOn)esconderAvisoInatividade();
+}
+['click','keydown','mousemove','scroll','wheel','touchstart','input'].forEach(ev=>{
+  document.addEventListener(ev,resetarRelogioInatividade,{passive:true,capture:true});
+});
+const btnContinuar=$('#btnContinuarSessao');
+if(btnContinuar)btnContinuar.addEventListener('click',()=>{resetarRelogioInatividade();toast('Sessão mantida.');});
+function vigiarInatividade(){
+  const temSessao=!!(usuarioAtual&&typeof auth!=='undefined'&&auth.currentUser);
+  if(!temSessao){sessaoVigiada=false;esconderAvisoInatividade();return;}
+  /* sessão nova (ou primeira checagem) começa com o relógio zerado */
+  if(!sessaoVigiada){sessaoVigiada=true;ultimaAtividadeDoUsuario=Date.now();return;}
+  const restante=INATIVIDADE_MS-(Date.now()-ultimaAtividadeDoUsuario);
+  if(restante<=0){
+    esconderAvisoInatividade();
+    if(inatividadeTimer){clearInterval(inatividadeTimer);inatividadeTimer=null;}
+    /* só uma marca de interface para explicar a tela de login depois —
+       NADA de credencial ou sessão guardada aqui */
+    try{sessionStorage.setItem('saiuPorInatividade','1');}catch(_){}
+    sair();
+    return;
+  }
+  if(restante<=AVISO_INATIVIDADE_MS){
+    if(!avisoInatividadeOn){avisoInatividadeOn=true;const m=$('#modalInatividade');if(m)m.classList.add('show');}
+    const c=$('#inatividadeConta');if(c)c.textContent=String(Math.ceil(restante/1000));
+  }else{
+    esconderAvisoInatividade();
+  }
+}
+inatividadeTimer=setInterval(vigiarInatividade,1000);
+/* sair() recarrega a página; ao voltar, explica o motivo para ninguém achar
+   que o sistema deslogou por engano */
+try{
+  if(sessionStorage.getItem('saiuPorInatividade')){
+    sessionStorage.removeItem('saiuPorInatividade');
+    setTimeout(()=>toast('Sessão encerrada por <b>inatividade</b> após '+Math.round(INATIVIDADE_MS/60000)+' minutos sem uso. Entre de novo para continuar.','warn'),700);
+  }
+}catch(_){}
 
 /* O Firebase Auth dispara este listener quando:
    - a página abre e já existe uma sessão salva (entra sozinho);
