@@ -40,6 +40,9 @@
       conexão, sincroniza sozinho e avisa.
   14. A lista de equipamentos agora é paginada (50 por página). Antes,
       todas as linhas iam ao DOM de uma vez - e a lista só cresce.
+  15. Perfil de administrador: o admin cadastra/altera técnicos e decide
+      quem é admin. O técnico comum vê tudo, menos os botões de excluir.
+      No servidor isso também é recusado para o cadastro de técnicos.
 
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
@@ -202,6 +205,12 @@ tr:hover .ibtn,li:hover .ibtn,.cart-item:hover .ibtn{opacity:1}
 .pag-btn.ativo{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
 .pag-btn:disabled{opacity:.38;cursor:not-allowed}
 .pag-elips{padding:0 3px;color:var(--muted);font-size:13px}
+/* Não-admin: sem botões de excluir e sem gestão de pessoas.
+   Só esconde a ferramenta — o servidor também recusa (regras do Firestore),
+   então mexer pelo console do navegador não adianta. */
+body:not(.admin) [data-acao$="-del"]{display:none}
+body:not(.admin) [data-acao="tec-edit"]{display:none}
+body:not(.admin) .apenas-admin{display:none}
 table{width:100%;border-collapse:collapse;font-size:13.5px}
 thead th{position:sticky;top:0;z-index:2;background:#f6f8fa;font:600 10.5px var(--body);letter-spacing:.09em;text-transform:uppercase;color:var(--muted);text-align:left;padding:11px 14px;border-bottom:2px solid var(--line)}
 tbody td{padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
@@ -1232,7 +1241,7 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
       </section>
 
       <section class="view" id="view-tecnicos">
-        <div class="card">
+        <div class="card apenas-admin">
           <div class="card-h"><h3 id="tecFormTitle">Cadastro de técnico</h3><span class="sub">Os empréstimos usam esta lista</span></div>
           <div class="card-b">
             <form id="formTecnico" autocomplete="off">
@@ -1255,7 +1264,7 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
         <div class="card">
           <div class="card-h"><h3>Técnicos cadastrados</h3></div>
           <div class="card-b flush"><div class="table-wrap" style="max-height:none">
-            <table><thead><tr><th>Nome</th><th>Matrícula</th><th>Login</th><th>Equipamentos sob responsabilidade</th><th class="td-r">Ações</th></tr></thead>
+            <table><thead><tr><th>Nome</th><th>Matrícula</th><th>Login</th><th>Perfil</th><th>Equipamentos sob responsabilidade</th><th class="td-r">Ações</th></tr></thead>
             <tbody id="tecTbody"></tbody></table>
           </div></div>
         </div>
@@ -1839,9 +1848,13 @@ function montarSessao(fbUser,t){
     usuario:(t&&t.usuario)||String(fbUser.email||'').split('@')[0],
     nome:(t&&t.nome)||fbUser.displayName||fbUser.email||'',
     tecnicoId:t?t.id:null,
-    uid:fbUser.uid
+    uid:fbUser.uid,
+    admin:!!(t&&t.admin)
   };
 }
+/* Quem pode apagar e mexer no cadastro de pessoas. O Firestore também
+   recusa no servidor (regras) — aqui é só para não mostrar o botão. */
+function souAdmin(){return !!(usuarioAtual&&usuarioAtual.admin);}
 /* Traduz os códigos do Firebase Auth em orientação objetiva */
 function mensagemErroLogin(err){
   const c=(err&&err.code)?String(err.code):'';
@@ -1878,6 +1891,7 @@ function mostrarApp(u){
 function revelarApp(){
   $('#loginOverlay').classList.add('hidden');
   document.body.classList.add('logado');
+  document.body.classList.toggle('admin',souAdmin());
   $('#usuarioLogadoNome').textContent=usuarioAtual.nome;
   requestAnimationFrame(()=>{sigRet.resize();sigDev.resize();sigGuia.resize();sigGuiaPat.resize();sigGuiaDest.resize();});
 }
@@ -1963,7 +1977,7 @@ auth.onAuthStateChanged(async fbUser=>{
     sincronizando=false;   /* sem sessão nenhuma gravação pode ser tentada */
     _jaEntrou=false;
     /* Sem sessão: garante que o overlay de login está visível */
-    document.body.classList.remove('logado');
+    document.body.classList.remove('logado','admin');
     $('#loginOverlay').classList.remove('hidden');
     return;
   }
@@ -1978,6 +1992,17 @@ auth.onAuthStateChanged(async fbUser=>{
     const emailAlvo=String(fbUser.email||'').toLowerCase();
     t=lista.find(x=>emailDoLogin(x.usuario)===emailAlvo)||null;
   }catch(err){console.warn('Falha ao ler cadastro do técnico:',err);}
+  /* Se o cadastro ainda não tem o uid, grava agora. É o que permite as
+     regras do Firestore saberem quem é admin — e faz o sistema se
+     consertar sozinho quando entrar técnico novo. */
+  if(t&&!t.uid){
+    try{
+      const snapT=await docRefSecao('tecnicos').get();
+      const itens=(snapT.exists&&Array.isArray(snapT.data().items))?snapT.data().items:[];
+      const alvo=itens.find(x=>x.id===t.id);
+      if(alvo&&!alvo.uid){alvo.uid=fbUser.uid;await docRefSecao('tecnicos').set({items:itens});t.uid=fbUser.uid;}
+    }catch(err){console.warn('Não foi possível registrar o uid do técnico:',err);}
+  }
   const u=montarSessao(fbUser,t);
   console.log('[NII] sessão do Firebase Auth ativa para',u.usuario);
   mostrarApp(u);
@@ -3326,6 +3351,7 @@ $('#eqTbody').addEventListener('click',e=>{
 /* ============== TÉCNICOS ============== */
 $('#formTecnico').addEventListener('submit',async ev=>{
   ev.preventDefault();
+  if(!souAdmin())return toast('Só um administrador pode cadastrar ou alterar técnicos.','bad');
   const nome=$('#tecNome').value.trim(),mat=$('#tecMatricula').value.trim(),id=$('#tecId').value,
         usuario=$('#tecUsuario').value.trim(),senha=$('#tecSenha').value;
   if(!nome)return toast('Informe o nome do técnico.','bad');
@@ -3371,13 +3397,19 @@ function renderTecnicos(){
   if(!$('#tecId').value)$('#tecMatricula').value=proximaMatricula();
   $('#tecTbody').innerHTML=db.tecnicos.length?db.tecnicos.map(t=>{
     const n=db.equipamentos.filter(e=>e.tecnicoId===t.id).length;
-    return `<tr data-id="${t.id}"><td><b>${esc(t.nome)}</b></td><td class="mono subtle">${esc(t.matricula||'—')}</td>
+    const souEu=t.uid&&usuarioAtual&&t.uid===usuarioAtual.uid;
+    /* Só admin mexe. E ninguém pode remover o próprio acesso de admin —
+       senão um dia sobra um admin menos e ninguém conserta. */
+    const botaoAdmin=souAdmin()?`<button class="ibtn ${t.admin?'warn':'okk'}" title="${t.admin?'Remover administrador':'Tornar administrador'}" data-acao="tec-admin" data-id="${t.id}">${t.admin?BAN_SVG:CHK_SVG}</button>`:'';
+    return `<tr data-id="${t.id}"><td><b>${esc(t.nome)}</b>${souEu?' <span class="subtle">(você)</span>':''}</td><td class="mono subtle">${esc(t.matricula||'—')}</td>
     <td class="mono subtle">${t.usuario?esc(t.usuario):'<span class="subtle">não configurado</span>'}</td>
+    <td>${t.admin?'<span class="pill ok">Administrador</span>':'<span class="pill">Técnico</span>'}</td>
     <td>${n} equipamento(s)</td>
     <td class="td-r"><div class="actions">
+      ${botaoAdmin}
       <button class="btn btn-ghost btn-sm" data-acao="tec-edit" data-id="${t.id}">✎ Editar</button>
       <button class="ibtn bad" title="Excluir" data-acao="tec-del" data-id="${t.id}">${TRASH_SVG}</button>
-    </div></td></tr>`;}).join(''):'<tr><td colspan="5" class="empty"><span class="big">👤</span>Nenhum técnico cadastrado.</td></tr>';
+    </div></td></tr>`;}).join(''):'<tr><td colspan="6" class="empty"><span class="big">👤</span>Nenhum técnico cadastrado.</td></tr>';
 }
 $('#tecTbody').addEventListener('click',e=>{
   const b=e.target.closest('[data-acao]');if(!b)return;
@@ -3389,6 +3421,14 @@ $('#tecTbody').addEventListener('click',e=>{
     $('#btnTecSubmit').textContent='✔ Atualizar técnico';
     $('#btnTecCancel').style.display='inline-flex';
     $('#tecNome').focus();rolarTopo();
+  }
+  if(b.dataset.acao==='tec-admin'){
+    if(!souAdmin())return toast('Só um administrador pode mudar perfis.','bad');
+    const eu=t.uid&&usuarioAtual&&t.uid===usuarioAtual.uid;
+    if(t.admin&&eu)return toast('Você não pode remover o <b>próprio</b> acesso de administrador. Peça a outro administrador.','warn');
+    t.admin=!t.admin;
+    toast(t.admin?'<b>'+esc(t.nome)+'</b> agora é <b>administrador</b>.':'<b>'+esc(t.nome)+'</b> voltou a ser técnico comum.');
+    persistir();atualizarTudo();
   }
   if(b.dataset.acao==='tec-del'){
     if(db.equipamentos.some(x=>x.tecnicoId===t.id)||db.emprestimos.some(x=>x.tecnicoId===t.id))return toast('Não é possível excluir: há <b>registros vinculados</b>.','bad');
