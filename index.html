@@ -1855,6 +1855,41 @@ function montarSessao(fbUser,t){
 /* Quem pode apagar e mexer no cadastro de pessoas. O Firestore também
    recusa no servidor (regras) — aqui é só para não mostrar o botão. */
 function souAdmin(){return !!(usuarioAtual&&usuarioAtual.admin);}
+/* Mantém sistema/admins.uids em dia — a lista que as REGRAS do Firestore
+   usam para saber quem é administrador.
+
+   Ela existe porque a linguagem das regras não tem filter/map/iteração: não
+   dá para varrer o array de cadastros procurando quem tem admin=true. O
+   Firebase manda guardar um array chato de UIDs e usar "in".
+
+   Três travas contra se trancar fora:
+     - não grava se ainda não carregou os técnicos (evita apagar a lista);
+     - não grava lista vazia (seria perder o acesso para sempre);
+     - só admin pode gravar (as regras também barram). */
+async function gravarAdmins(silencioso){
+  if(!souAdmin())return false;
+  if(!db||!Array.isArray(db.tecnicos)||db.tecnicos.length===0)return false;
+  const alvos=db.tecnicos.filter(x=>x&&x.admin&&(x.uid||x.usuario));
+  const uids=alvos.filter(x=>x.uid).map(x=>x.uid).sort();
+  const emails=alvos.filter(x=>x.usuario).map(x=>emailDoLogin(x.usuario)).filter(Boolean).sort();
+  /* Recusa gravar vazio: as duas listas juntas vazias = ninguém mais pode
+     mexer no cadastro de pessoas (dá para consertar só pelo Console). */
+  if(uids.length===0&&emails.length===0){console.warn('gravarAdmins: lista vazia recusada (evita trancar a gestão de pessoas).');return false;}
+  try{
+    const ref=docRefSecao('admins');
+    const atual=await ref.get();
+    const d=(atual.exists&&atual.data())||{};
+    const igual=(a,b)=>Array.isArray(a)&&Array.isArray(b)&&a.length===b.length&&a.every((v,i)=>v===b[i]);
+    if(igual((d.uids||[]).slice().sort(),uids)&&igual((d.emails||[]).slice().sort(),emails))return true;
+    await ref.set({uids:uids,emails:emails,atualizadoEm:Date.now()});
+    if(!silencioso)toast('Lista de administradores atualizada.');
+    return true;
+  }catch(err){
+    console.error('Falha ao gravar a lista de administradores:',err);
+    if(!silencioso)toast('Não consegui atualizar a lista de administradores.','bad');
+    return false;
+  }
+}
 /* Traduz os códigos do Firebase Auth em orientação objetiva */
 function mensagemErroLogin(err){
   const c=(err&&err.code)?String(err.code):'';
@@ -1992,20 +2027,39 @@ auth.onAuthStateChanged(async fbUser=>{
     const emailAlvo=String(fbUser.email||'').toLowerCase();
     t=lista.find(x=>emailDoLogin(x.usuario)===emailAlvo)||null;
   }catch(err){console.warn('Falha ao ler cadastro do técnico:',err);}
-  /* Se o cadastro ainda não tem o uid, grava agora. É o que permite as
-     regras do Firestore saberem quem é admin — e faz o sistema se
-     consertar sozinho quando entrar técnico novo. */
-  if(t&&!t.uid){
+  /* Completa o uid no cadastro (e cria o flag admin, se faltar). Hoje é
+     conforto, não mais exigência das regras — elas passaram a decidir quem
+     é admin por sistema/admins e não tocam mais no array de cadastros.
+     Completa assim mesmo porque é o uid que gravarAdmins() usa para levar
+     a pessoa à lista de administradores.
+     Só passa para quem já é admin; para os outros falha silenciosa (catch
+     abaixo) e o cadastro segue com uid vazio, sem efeito colateral. */
+  if(t&&(!t.uid||!('admin' in t))){
     try{
       const snapT=await docRefSecao('tecnicos').get();
       const itens=(snapT.exists&&Array.isArray(snapT.data().items))?snapT.data().items:[];
       const alvo=itens.find(x=>x.id===t.id);
-      if(alvo&&!alvo.uid){alvo.uid=fbUser.uid;await docRefSecao('tecnicos').set({items:itens});t.uid=fbUser.uid;}
+      if(alvo&&(!alvo.uid||!('admin' in alvo))){
+        if(!alvo.uid)alvo.uid=fbUser.uid;
+        if(!('admin' in alvo))alvo.admin=false;
+        await docRefSecao('tecnicos').set({items:itens});
+        t.uid=alvo.uid;
+      }
     }catch(err){console.warn('Não foi possível registrar o uid do técnico:',err);}
   }
   const u=montarSessao(fbUser,t);
   console.log('[NII] sessão do Firebase Auth ativa para',u.usuario);
   mostrarApp(u);
+  /* Confere a lista de administradores que as REGRAS consultam
+     (sistema/admins) e conserta se sair de sincronia com o campo `admin`
+     dos cadastros — ex.: depois de restaurar um backup. Silencioso, e só
+     grava quando está diferente. Repete enquanto os técnicos ainda não
+     chegaram do servidor (gravarAdmins devolve false nesse caso). */
+  if(u.admin){
+    (function consertarAdmins(n){
+      gravarAdmins(true).then(ok=>{ if(!ok&&n<20)setTimeout(()=>consertarAdmins(n+1),1500); });
+    })(0);
+  }
 });
 
 /* ============== BANCO LOCAL ============== */
@@ -3369,12 +3423,17 @@ $('#formTecnico').addEventListener('submit',async ev=>{
                        o Firestore recusa campos undefined e derruba o lote inteiro) */
     toast('Técnico atualizado.');
   }else{
-    const novo={id:uid(),nome,matricula:mat,usuario};
+    /* uid e admin nascem em todo cadastro novo. As regras do Firestore NÃO
+       leem estes campos (a linguagem não tem filter para varrer o array) —
+       elas consultam sistema/admins. Continuam importantes assim mesmo: o
+       uid identifica a pessoa e é o que gravarAdmins() leva para a lista de
+       administradores, e o flag admin é o que a tela exibe. */
+    const novo={id:uid(),nome,matricula:mat,usuario,uid:'',admin:false};
     if(senhaHash)novo.senhaHash=senhaHash;
     db.tecnicos.push(novo);
     toast('Técnico <b>'+esc(nome)+'</b> cadastrado.');
   }
-  persistir();resetTec();atualizarTudo();
+  persistir();gravarAdmins();resetTec();atualizarTudo();
 });
 function proximaMatricula(){
   let max=0;
@@ -3428,13 +3487,13 @@ $('#tecTbody').addEventListener('click',e=>{
     if(t.admin&&eu)return toast('Você não pode remover o <b>próprio</b> acesso de administrador. Peça a outro administrador.','warn');
     t.admin=!t.admin;
     toast(t.admin?'<b>'+esc(t.nome)+'</b> agora é <b>administrador</b>.':'<b>'+esc(t.nome)+'</b> voltou a ser técnico comum.');
-    persistir();atualizarTudo();
+    persistir();gravarAdmins();atualizarTudo();
   }
   if(b.dataset.acao==='tec-del'){
     if(db.equipamentos.some(x=>x.tecnicoId===t.id)||db.emprestimos.some(x=>x.tecnicoId===t.id))return toast('Não é possível excluir: há <b>registros vinculados</b>.','bad');
     confirmar('Excluir técnico','Excluir <b>'+esc(t.nome)+'</b>?',()=>{
       db.tecnicos=db.tecnicos.filter(x=>x.id!==t.id);
-      persistir();resetTec();atualizarTudo();toast('Técnico excluído.','warn');});
+      persistir();gravarAdmins();resetTec();atualizarTudo();toast('Técnico excluído.','warn');});
   }
 });
 
