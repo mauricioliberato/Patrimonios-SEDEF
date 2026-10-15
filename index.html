@@ -51,6 +51,9 @@
       "há registros vinculados", o aviso conta e nomeia o que está
       ligado ("Há 1 impressora (Kyocera MA5500ifx) usando este setor")
       e diz o que fazer. Vale para setor e para técnico.
+  18. O IP na lista de impressoras virou link: um clique abre a
+      interface da impressora em nova aba do navegador, no mesmo
+      desenho que já existia na lista de switches.
 
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
@@ -4658,7 +4661,7 @@ function renderImpressoras(){
       <td><b>🖨️ ${esc(p.modelo)}</b></td>
       <td class="mono">${esc(p.host||'—')}</td>
       <td>${esc(setNome(p.localSetorId))}</td>
-      <td class="mono">${esc(p.ip||'—')}</td>
+      <td class="mono">${p.ip?`<a href="http://${esc(p.ip)}" target="_blank" rel="noopener" title="Abrir a interface desta impressora em nova aba">${esc(p.ip)} ↗</a>`:'—'}</td>
       <td class="mono">${esc(p.patrimonio||'—')}</td>
       <td class="mono subtle">${esc(p.serie||'—')}</td>
       <td class="mono subtle">${esc(p.loginWeb||'—')}</td>
