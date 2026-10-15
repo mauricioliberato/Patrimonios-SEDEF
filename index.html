@@ -54,6 +54,12 @@
   18. O IP na lista de impressoras virou link: um clique abre a
       interface da impressora em nova aba do navegador, no mesmo
       desenho que já existia na lista de switches.
+  19. Cadastro de impressora ganhou campo de SENHA ao lado do login,
+      no mesmo padrão do switch: tipo "password" (não fica legível a
+      olho nu), olhinho que mostra/esconde, a senha entra em branco
+      ao abrir a edição de outra impressora, e a planilha exportada
+      passa a ter as colunas "Login" e "Senha". O campo que era
+      "Login para acesso Web" passou a se chamar só "Login".
 
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
@@ -994,7 +1000,7 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
             <div class="table-wrap">
               <table>
                 <thead><tr>
-                  <th>Modelo</th><th>Host</th><th>Local</th><th>IP</th><th>Patrimônio</th><th>Série</th><th>Login Web</th><th class="td-r">Ações</th>
+                  <th>Modelo</th><th>Host</th><th>Local</th><th>IP</th><th>Patrimônio</th><th>Série</th><th>Login</th><th class="td-r">Ações</th>
                 </tr></thead>
                 <tbody id="impTbody"></tbody>
               </table>
@@ -1025,21 +1031,32 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
                   <label>Local (setor)</label>
                   <select id="impLocal"></select>
                 </div>
-                <div class="field c3">
+                <div class="field c4">
                   <label>IP</label>
                   <input type="text" id="impIP" class="mono" placeholder="Ex.: 10.61.40.21">
                 </div>
-                <div class="field c3">
+                <div class="field c4">
                   <label>Patrimônio</label>
                   <input type="text" id="impPatrimonio" class="mono" inputmode="numeric" placeholder="Somente números">
                 </div>
-                <div class="field c3">
+                <div class="field c4">
                   <label>Série</label>
                   <input type="text" id="impSerie" class="mono" placeholder="S/N">
                 </div>
-                <div class="field c3">
-                  <label>Login para acesso Web</label>
+                <div class="field c6">
+                  <label>Login</label>
                   <input type="text" id="impLogin" class="mono" placeholder="Ex.: admin">
+                </div>
+                <div class="field c6">
+                  <label>Senha</label>
+                  <!-- Mesmo padrão do cadastro de switch: type="password" para não
+                       ficar legível a olho nu, e o olhinho mostra/esconde só quando
+                       a pessoa escolher. -->
+                  <div style="position:relative">
+                    <input type="password" id="impSenha" class="mono" placeholder="Senha de acesso" autocomplete="off" style="width:100%;padding-right:34px">
+                    <button type="button" id="btnImpSenhaVer" title="Mostrar ou ocultar a senha"
+                      style="position:absolute;right:4px;top:50%;transform:translateY(-50%);background:none;border:0;cursor:pointer;font-size:15px;line-height:1;padding:4px">👁</button>
+                  </div>
                 </div>
                 <div class="c12 form-actions">
                   <button type="submit" class="btn btn-accent" id="btnImpSubmit">✔ Salvar impressora</button>
@@ -3807,9 +3824,9 @@ const PLANILHA_MODULOS={
   impressoras:{
     label:'Impressoras',
     campos:[{h:'Modelo *',f:'modelo'},{h:'Host',f:'host'},{h:'Setor',f:'setorNome'},{h:'IP',f:'ip'},
-      {h:'Patrimônio',f:'patrimonio'},{h:'Série',f:'serie'},{h:'Login Web',f:'loginWeb'}],
+      {h:'Patrimônio',f:'patrimonio'},{h:'Série',f:'serie'},{h:'Login',f:'loginWeb'},{h:'Senha',f:'senhaWeb'}],
     lista:()=>db.impressoras,
-    linhaExport:p=>({modelo:p.modelo,host:p.host,setorNome:nomeSetorExport(p.localSetorId),ip:p.ip,patrimonio:p.patrimonio,serie:p.serie,loginWeb:p.loginWeb}),
+    linhaExport:p=>({modelo:p.modelo,host:p.host,setorNome:nomeSetorExport(p.localSetorId),ip:p.ip,patrimonio:p.patrimonio,serie:p.serie,loginWeb:p.loginWeb,senhaWeb:p.senhaWeb}),
     chave:o=>String(o.patrimonio||o.host||'').trim().toLowerCase(),
     finalizar(o){
       if(!o.modelo)return null;
@@ -4591,11 +4608,20 @@ function sanitizarImpPatrimonio(){
 }
 $('#impPatrimonio').addEventListener('input',sanitizarImpPatrimonio);
 $('#impPatrimonio').addEventListener('blur',sanitizarImpPatrimonio);
+/* Olhinho da senha da impressora: mesmo comportamento do switch. */
+if($('#btnImpSenhaVer'))$('#btnImpSenhaVer').addEventListener('click',()=>{
+  const el=$('#impSenha');if(!el)return;
+  const passouAPrever=el.type==='password';
+  el.type=passouAPrever?'text':'password';
+  $('#btnImpSenhaVer').textContent=passouAPrever?'🙈':'👁';
+});
 let lastResetImp=0;
 $('#formImpressora').addEventListener('reset',e=>{const n=Date.now();if(n-lastResetImp<400)return;lastResetImp=n;setTimeout(resetImpForm,0);});
 function resetImpForm(){
   impEditId=null;
-  ['impModelo','impHost','impIP','impPatrimonio','impSerie','impLogin'].forEach(id=>{const el=$('#'+id);if(el)el.value='';});
+  ['impModelo','impHost','impIP','impPatrimonio','impSerie','impLogin','impSenha'].forEach(id=>{const el=$('#'+id);if(el)el.value='';});
+  const ps=$('#impSenha');if(ps)ps.type='password';   /* volta a ficar oculta */
+  const bt=$('#btnImpSenhaVer');if(bt)bt.textContent='👁';
   $('#impLocal').value='';
   $('#impFormTitle').textContent='Cadastro de impressora';
   $('#btnImpSubmit').textContent='✔ Salvar impressora';
@@ -4608,18 +4634,18 @@ $('#formImpressora').addEventListener('submit',ev=>{
   ev.preventDefault();
   const modelo=$('#impModelo').value.trim(),host=$('#impHost').value.trim(),local=$('#impLocal').value,
         ip=$('#impIP').value.trim(),pat=soDigitos($('#impPatrimonio').value),serie=$('#impSerie').value.trim(),
-        login=$('#impLogin').value.trim(),id=$('#impId').value;
+        login=$('#impLogin').value.trim(),senha=$('#impSenha').value.trim(),id=$('#impId').value;
   if(!modelo)return toast('Informe o <b>Modelo</b>.','bad');
   if(ip&&!/^(\d{1,3}\.){3}\d{1,3}$/.test(ip))return toast('IP inválido.','bad');
   if(pat&&db.impressoras.some(p=>p.patrimonio===pat&&p.id!==id))return toast('Já existe com este patrimônio.','bad');
   let salvoId=id;
   if(id){
     const p=db.impressoras.find(x=>x.id===id);if(!p)return;
-    Object.assign(p,{modelo,host,localSetorId:local,ip,patrimonio:pat,serie,loginWeb:login});
+    Object.assign(p,{modelo,host,localSetorId:local,ip,patrimonio:pat,serie,loginWeb:login,senhaWeb:senha});
     salvoId=id;
     toast('Impressora atualizada.');
   }else{
-    const novo={id:uid(),modelo,host,localSetorId:local,ip,patrimonio:pat,serie,loginWeb:login,criadoEm:Date.now()};
+    const novo={id:uid(),modelo,host,localSetorId:local,ip,patrimonio:pat,serie,loginWeb:login,senhaWeb:senha,criadoEm:Date.now()};
     db.impressoras.push(novo);salvoId=novo.id;
     toast('Impressora cadastrada.');
   }
@@ -4636,6 +4662,11 @@ function editarImpressora(id){
   $('#impPatrimonio').value=p.patrimonio||'';
   $('#impSerie').value=p.serie||'';
   $('#impLogin').value=p.loginWeb||'';
+  $('#impSenha').value=p.senhaWeb||'';
+  /* Sempre reabre oculta: sem isso, quem tivesse revelado a senha de uma
+     impressora veria a de outra em texto claro ao editar a seguinte. */
+  const psImp=$('#impSenha');if(psImp)psImp.type='password';
+  const btImp=$('#btnImpSenhaVer');if(btImp)btImp.textContent='👁';
   $('#impFormTitle').textContent='Editando impressora';
   $('#btnImpSubmit').textContent='✔ Atualizar impressora';
   $('#btnImpCancel').style.display='inline-flex';
