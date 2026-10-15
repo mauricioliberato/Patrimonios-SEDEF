@@ -47,6 +47,10 @@
       teclado, rolagem ou toque, um aviso com contagem regressiva aparece
       e a sessão é encerrada. Computador compartilhado não fica com o
       sistema aberto para o próximo. Prazo no código: INATIVIDADE_MS.
+  17. A exclusão bloqueada agora explica o motivo: em vez do genérico
+      "há registros vinculados", o aviso conta e nomeia o que está
+      ligado ("Há 1 impressora (Kyocera MA5500ifx) usando este setor")
+      e diz o que fazer. Vale para setor e para técnico.
 
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
@@ -1911,6 +1915,22 @@ async function gravarAdmins(silencioso){
     const ref=docRefSecao('admins');
     const atual=await ref.get();
     const d=(atual.exists&&atual.data())||{};
+    /* PROTEÇÃO CONTRA CACHE VELHO (a que trancou o administrador DUAS vezes).
+       A lista não pode DERRUBAR quem o servidor ainda trata como admin, a
+       menos que o cache local CONHEÇA essa pessoa (mesmo uid) e a tenha com
+       admin=false de propósito. Cache de antes da migração dos uid não
+       conhece ninguém — então o derrubamento é recusado. Antes a trava só
+       protegia quem estava escrevendo: se escrevia outro admin, o que saía
+       da lista era o terceiro, sem ninguém perceber. */
+    const fora=(a,b)=>(Array.isArray(a)?a:[]).filter(v=>b.indexOf(v)<0);
+    const semConfirmacaoLocal=
+      fora(d.uids,uids).filter(u=>!(db.tecnicos||[]).some(y=>y&&y.uid===u&&y.admin===false))
+      .concat(fora(d.emails,emails).filter(e=>{const l=(db.tecnicos||[]).filter(y=>y&&emailDoLogin(y.usuario)===e)[0];return !(l&&l.admin===false);}));
+    if(semConfirmacaoLocal.length){
+      console.warn('gravarAdmins: recusei porque derrubaria administrador sem confirmação local:',semConfirmacaoLocal.join(', '));
+      if(!silencioso)toast('Não atualizei a lista de administradores: ela derrubaria alguém sem confirmação local. Recarregue a página e tente de novo.','bad');
+      return false;
+    }
     const igual=(a,b)=>Array.isArray(a)&&Array.isArray(b)&&a.length===b.length&&a.every((v,i)=>v===b[i]);
     if(igual((d.uids||[]).slice().sort(),uids)&&igual((d.emails||[]).slice().sort(),emails))return true;
     await ref.set({uids:uids,emails:emails,atualizadoEm:Date.now()});
@@ -2150,8 +2170,12 @@ auth.onAuthStateChanged(async fbUser=>{
      grava quando está diferente. Repete enquanto os técnicos ainda não
      chegaram do servidor (gravarAdmins devolve false nesse caso). */
   if(u.admin){
+    /* Só repete enquanto os técnicos ainda não chegaram do servidor — é o
+       único caso em que adianta tentar de novo. Uma recusa por permissão ou
+       por trava não muda repetindo, e 20 tentativas viravam 20 erros no
+       console (foi o que aconteceu quando o administrador ficou trancado). */
     (function consertarAdmins(n){
-      gravarAdmins(true).then(ok=>{ if(!ok&&n<20)setTimeout(()=>consertarAdmins(n+1),1500); });
+      gravarAdmins(true).then(ok=>{ if(!ok&&n<20&&!db.tecnicos.length)setTimeout(()=>consertarAdmins(n+1),1500); });
     })(0);
   }
 });
@@ -3589,7 +3613,14 @@ $('#tecTbody').addEventListener('click',e=>{
     persistir();gravarAdmins();atualizarTudo();
   }
   if(b.dataset.acao==='tec-del'){
-    if(db.equipamentos.some(x=>x.tecnicoId===t.id)||db.emprestimos.some(x=>x.tecnicoId===t.id))return toast('Não é possível excluir: há <b>registros vinculados</b>.','bad');
+    /* Conta e nomeia, como no setor — o genérico "há registros vinculados"
+       só empurrava a busca para o administrador. */
+    const eqs=db.equipamentos.filter(x=>x.tecnicoId===t.id);
+    const emps=(db.emprestimos||[]).filter(x=>x.tecnicoId===t.id);
+    const partes=[];
+    if(eqs.length)partes.push(eqs.length+' equipamento'+(eqs.length>1?'s':'')+' ('+eqs.slice(0,3).map(x=>x.patrimonio||x.nome||'s/n').join(', ')+(eqs.length>3?',…':'')+')');
+    if(emps.length)partes.push(emps.length+' empréstimo'+(emps.length>1?'s':''));
+    if(partes.length)return toast('Não é possível excluir <b>'+esc(t.nome)+'</b>. Há '+partes.join(', ')+' sob responsabilidade dele. Reatribua e tente de novo.','bad');
     confirmar('Excluir técnico','Excluir <b>'+esc(t.nome)+'</b>?',()=>{
       db.tecnicos=db.tecnicos.filter(x=>x.id!==t.id);
       persistir();gravarAdmins();resetTec();atualizarTudo();toast('Técnico excluído.','warn');});
@@ -3697,7 +3728,21 @@ $('#setTbody').addEventListener('click',e=>{
     $('#setNome').focus();rolarTopo();
   }
   if(b.dataset.acao==='set-del'){
-    if(db.equipamentos.some(x=>x.setorId===s.id)||db.emprestimos.some(x=>x.setorId===s.id)||(db.guias||[]).some(g=>g.origemSetorId===s.id||g.destinoSetorId===s.id)||(db.impressoras||[]).some(p=>p.localSetorId===s.id))return toast('Não é possível excluir: há <b>registros vinculados</b>.','bad');
+    /* Conta e NOMEIA o que impede a exclusão. A mensagem genérica "há
+       registros vinculados" transformava a exclusão numa caça ao tesouro:
+       não dizia se eram 1 ou 40 registros, nem onde olhar. Foi assim que 26
+       setores duplicados ficaram presos por 23 impressoras que nem estavam
+       cadastradas no setor certo. */
+    const eqs=db.equipamentos.filter(x=>x.setorId===s.id);
+    const emps=(db.emprestimos||[]).filter(x=>x.setorId===s.id);
+    const gss=(db.guias||[]).filter(g=>g.origemSetorId===s.id||g.destinoSetorId===s.id);
+    const imps=(db.impressoras||[]).filter(p=>p.localSetorId===s.id);
+    const partes=[];
+    if(eqs.length)partes.push(eqs.length+' equipamento'+(eqs.length>1?'s':'')+' ('+eqs.slice(0,3).map(x=>x.patrimonio||x.nome||'s/n').join(', ')+(eqs.length>3?',…':'')+')');
+    if(emps.length)partes.push(emps.length+' empréstimo'+(emps.length>1?'s':''));
+    if(gss.length)partes.push(gss.length+' guia'+(gss.length>1?'s':''));
+    if(imps.length)partes.push(imps.length+' impressora'+(imps.length>1?'s':'')+' ('+imps.slice(0,3).map(x=>x.modelo||x.nome||'s/n').join(', ')+(imps.length>3?',…':'')+')');
+    if(partes.length)return toast('Não é possível excluir <b>'+esc(s.nome)+'</b>. Há '+partes.join(', ')+' usando este setor. Transfira-os para outro e tente de novo.','bad');
     confirmar('Excluir setor','Excluir <b>'+esc(s.nome)+'</b>?',()=>{
       db.setores=db.setores.filter(x=>x.id!==s.id);
       persistir();resetSet();atualizarTudo();toast('Setor excluído.','warn');});
