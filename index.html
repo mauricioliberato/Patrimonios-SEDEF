@@ -103,6 +103,18 @@
       (um link javascript: seria um golpe pronto contra quem
       clicasse) e grava os dois atributos junto, para o link
       continuar em aba nova para sempre.
+  25. PRINT DA WIKI VAI PARA O REPOSITÓRIO: antes, colar um print
+      só mostrava aviso (o Cloud Storage do Firebase exige o
+      plano pago — o sistema é Spark). Agora o print colado
+      (Ctrl+V) ou arrastado é REDUZIDO para 1600 px, enviado pelo
+      Worker para imagens/wiki/ no GitHub e inserido o endereço
+      de lá. O token do GitHub fica NO WORKER (GITHUB_TOKEN),
+      nunca no navegador, e só quem está logado com e-mail
+      @sedef.pr.gov.br envia. O botão 🖼 aceita endereço ou, ao
+      cancelar, escolher o arquivo; imagem embutida do Word
+      (base64) também é enviada; e a página não salva enquanto
+      houver imagem embutida pendente. Requer o Worker com o
+      endereço /api/imagens (ver worker-wiki-imagem.js).
 
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
@@ -1511,7 +1523,7 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
                     <button type="button" data-cmd="code" title="Bloco de código ou comando">&lt;/&gt; Código</button>
                     <span class="wiki-sep"></span>
                     <button type="button" data-cmd="link" title="Inserir link">🔗 Link</button>
-                    <button type="button" data-cmd="img" title="Inserir imagem pelo endereço">🖼 Imagem</button>
+                    <button type="button" data-cmd="img" title="Imagem: cole o print direto (vai para o repositório) ou cole um endereço">🖼 Imagem</button>
                     <button type="button" data-cmd="remove" title="Limpar a formatação do texto selecionado">Tx Limpar</button>
                     <span class="wiki-sep"></span>
                     <button type="button" data-cmd="undo" title="Desfazer">↶</button>
@@ -5625,7 +5637,19 @@ function wikiCmd(cmd){
     wikiLinksNovaAba($('#wikiEditor'));   /* já nasce em aba nova */
     return;
   }
-  if(cmd==='img'){const u=prompt('Endereço da imagem:','http://');if(u)document.execCommand('insertImage',false,u);return;}
+  if(cmd==='img'){
+    const u=prompt('Endereço da imagem (ou CANCELE para escolher um arquivo do computador):','http://');
+    if(u===null){
+      const inp=document.createElement('input');
+      inp.type='file';inp.accept='image/*';
+      inp.onchange=()=>{const f=inp.files&&inp.files[0];if(f){wikiGuardarSelecao();wikiEnviarArquivos([f]);}};
+      inp.click();return;
+    }
+    if(!u)return;
+    if(!/^https?:\/\//i.test(u)){toast('Use um endereço começando com <b>http://</b> ou <b>https://</b>.','bad');return;}
+    document.execCommand('insertImage',false,u);
+    return;
+  }
 }
 /* --- o que entra de fora (colagem) ----------------------------------------
    Colar de um site ou do Word traz style/class de todo lado e, em pior caso,
@@ -5673,14 +5697,93 @@ function wikiHigienizar(html){
 }
 /* --- imagem ---------------------------------------------------------------
    O Cloud Storage do Firebase EXIGE o plano Blaze (no site oficial, a linha
-   "Storage" do Spark está como "Not applicable"), e o sistema é Spark — então
-   o print NÃO é enviado para lugar nenhum. Os caminhos, na ordem:
-   (a) copiar a imagem de um site e colar: entra o <img> de origem normal;
-   (b) colar o ENDEREÇO de um print já hospedado: vira imagem sozinho;
-   (c) botão 🖼 Imagem, colando o endereço.
-   Colar ou arrastar ARQUIVO só avisa — sem isso, o pessoal acha que subiu. */
-function avisoImagemNaoSalva(){
-  toast('Imagem não fica salva neste sistema: hospede o print em algum lugar e use <b>🖼 Imagem</b> com o endereço.','warn');
+   "Storage" do Spark está como "Not applicable"), e o sistema é Spark —
+   então o print NÃO vai para o Firebase. Vai para o REPOSITÓRIO do GitHub:
+   o navegador manda a imagem para o Worker (/api/imagens), o Worker confere
+   a sessão do Firebase e grava o arquivo em imagens/wiki/ usando o TOKEN do
+   GitHub — que fica guardado no Worker, nunca no navegador.
+   Caminhos, na ordem:
+   (a) colar ou arrastar o ARQUIVO do print: REDUZ para 1600 px, envia e
+       insere o endereço curto do repositório;
+   (b) colar o ENDEREÇO de uma imagem já hospedada: vira imagem na hora;
+   (c) botão 🖼 Imagem: endereço, ou cancelar e escolher o arquivo.
+   Imagem embutida no HTML colado (Word traz em base64): também é enviada —
+   base64 no banco estouraria o tamanho do documento.
+   A imagem é reduzida antes do envio para o repositório não encher. */
+const WIKI_URL_ENVIO=(location.hostname==='localhost'||location.hostname==='127.0.0.1')
+  ?'https://patrimonios-sedef.mauricioliberato.workers.dev/api/imagens'
+  :'/api/imagens';
+function wikiReduzirImagem(arquivo){
+  return new Promise((res,rei)=>{
+    const img=new Image();
+    const url=URL.createObjectURL(arquivo);
+    img.onload=()=>{
+      const max=1600;
+      let w=img.naturalWidth,h=img.naturalHeight;
+      if(w>max||h>max){const f=max/Math.max(w,h);w=Math.round(w*f);h=Math.round(h*f);}
+      const c=document.createElement('canvas');c.width=w;c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      URL.revokeObjectURL(url);
+      res(c.toDataURL('image/jpeg',0.82));
+    };
+    img.onerror=()=>{URL.revokeObjectURL(url);rei(new Error('não consegui ler este arquivo como imagem.'));};
+    img.src=url;
+  });
+}
+async function wikiEnviarImagem(arquivo){
+  if(!arquivo||!/^image\//.test(arquivo.type||''))throw new Error('o arquivo não é uma imagem.');
+  if(!usuarioAtual||!auth.currentUser)throw new Error('entre no sistema para enviar imagens.');
+  const dataUrl=await wikiReduzirImagem(arquivo);
+  const base64=String(dataUrl).split(',')[1]||'';
+  if(!base64)throw new Error('a imagem ficou vazia depois da redução.');
+  if(base64.length>1300000)throw new Error('imagem grande demais (máximo 1 MB).');
+  const r=await fetch(WIKI_URL_ENVIO,{
+    method:'POST',
+    headers:{'Authorization':'Bearer '+(await auth.currentUser.getIdToken()),'Content-Type':'application/json'},
+    body:JSON.stringify({dados:base64,extensao:'jpg'})
+  });
+  let saida={};try{saida=await r.json();}catch(err){}
+  if(!r.ok||!saida.url)throw new Error(saida.erro||('falha no envio (HTTP '+r.status+').'));
+  return saida.url;
+}
+let wikiSelecaoSalva=null;
+function wikiGuardarSelecao(){
+  const ed=$('#wikiEditor');const sel=getSelection();
+  wikiSelecaoSalva=(sel&&sel.rangeCount&&ed.contains(sel.anchorNode))?sel.getRangeAt(0).cloneRange():null;
+}
+function wikiInserirImagem(url){
+  const ed=$('#wikiEditor');ed.focus();
+  if(wikiSelecaoSalva){
+    const sel=getSelection();sel.removeAllRanges();sel.addRange(wikiSelecaoSalva);
+  }
+  document.execCommand('insertImage',false,url);
+}
+async function wikiEnviarArquivos(arquivos){
+  toast('Enviando imagem para o repositório…');
+  for(const arq of arquivos){
+    try{
+      const url=await wikiEnviarImagem(arq);
+      wikiInserirImagem(url);
+      toast('Imagem enviada e inserida.');
+    }catch(erro){
+      toast('Não deu para enviar a imagem: '+esc(erro.message)+' — hospede em algum lugar e use <b>🖼 Imagem</b> com o endereço.','bad');
+    }
+  }
+}
+/* Imagem embutida no HTML colado (Word): o endereço é gigante e não pode ir
+   para o banco — então ela é enviada para o repositório e o <img> passa a
+   apontar para o endereço curto de lá. */
+async function wikiEnviarImagensEmbutidas(){
+  const imgs=Array.from($('#wikiEditor').querySelectorAll('img[src^="data:"]'));
+  for(const el of imgs){
+    try{
+      const blob=await (await fetch(el.src)).blob();
+      el.src=await wikiEnviarImagem(blob);
+    }catch(erro){
+      if(el.parentNode)el.parentNode.removeChild(el);
+      toast('Imagem colada não foi enviada: '+esc(erro.message),'bad');
+    }
+  }
 }
 /* --- eventos ------------------------------------------------------------ */
 $('#wikiBusca').addEventListener('input',debounce(renderWiki,150));
@@ -5709,6 +5812,11 @@ $('#formWiki').addEventListener('submit',e=>{
   const quem=(usuarioAtual&&usuarioAtual.nome)||'';
   const categoria=$('#wikiCategoria').value.trim();
   const conteudo=$('#wikiEditor').innerHTML.trim();
+  /* Imagem embutida (data:) que ainda não terminou de ser enviada não pode
+     ir para o banco: é base64 gigante e estouraria o documento. */
+  if(/<img[^>]+src=["']data:/i.test(conteudo)){
+    toast('Há imagem colada que ainda não terminou de ser enviada — aguarde o aviso ou remova a imagem.','bad');return;
+  }
   const id=$('#wikiId').value;
   const w=id?db.wiki.find(x=>x.id===id):null;
   let salvoId=id;
@@ -5731,10 +5839,20 @@ $('#formWiki').addEventListener('submit',e=>{
 });
 $('#wikiEditor').addEventListener('paste',e=>{
   const cd=e.clipboardData;if(!cd)return;
-  const arquivos=Array.from(cd.items||[]).filter(it=>it.kind==='file'&&/^image\//.test(it.type||''));
-  if(arquivos.length){e.preventDefault();avisoImagemNaoSalva();return;}
+  /* Print colado direto (Ctrl+V da tela): REDUZ, ENVIA para o repositório
+     e insere o endereço curto de lá. */
+  const arquivos=Array.from(cd.items||[])
+    .filter(it=>it.kind==='file'&&/^image\//.test(it.type||''))
+    .map(it=>it.getAsFile()).filter(Boolean);
+  if(arquivos.length){e.preventDefault();wikiGuardarSelecao();wikiEnviarArquivos(arquivos);return;}
   const html=cd.getData('text/html');
-  if(html){e.preventDefault();document.execCommand('insertHTML',false,wikiHigienizar(html));return;}
+  if(html){
+    e.preventDefault();
+    document.execCommand('insertHTML',false,wikiHigienizar(html));
+    /* Word traz a imagem embutida em base64: envia e troca pelo endereço. */
+    wikiEnviarImagensEmbutidas();
+    return;
+  }
   /* colou o ENDEREÇO de uma imagem já hospedada? Entra como imagem na hora. */
   const texto=(cd.getData('text/plain')||'').trim();
   if(texto&&/^https?:\/\/\S+\.(png|jpe?g|gif|webp)(\?\S*)?$/i.test(texto)){
@@ -5745,9 +5863,8 @@ $('#wikiEditor').addEventListener('paste',e=>{
 });
 $('#wikiEditor').addEventListener('drop',e=>{
   const dt=e.dataTransfer;if(!dt)return;
-  if(Array.from(dt.files||[]).some(f=>/^image\//.test(f.type||''))){
-    e.preventDefault();avisoImagemNaoSalva();
-  }
+  const arquivos=Array.from(dt.files||[]).filter(f=>/^image\//.test(f.type||''));
+  if(arquivos.length){e.preventDefault();wikiGuardarSelecao();wikiEnviarArquivos(arquivos);}
 });
 
 /* ============== INICIALIZAÇÃO ============== */
