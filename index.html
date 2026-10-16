@@ -83,6 +83,17 @@
       direto no texto também já vira imagem sozinho). Busca no título
       E no conteúdo, filtro por categoria, ordenação da mais recente,
       badge no menu e seção "wiki" já sincronizando (SECOES).
+  23. CONSERTO NA SINCRONIZAÇÃO (afetava TODOS os módulos): quem
+      salvava e EXCLUÍA na sequência imediata podia ficar com a
+      exclusão só no local. O fim da rodada limpava a flag "sujo"
+      às cegas; se o usuário mexia na seção ENQUANTO a gravação
+      rodava, a gravação saía com a versão antiga (o local é lido
+      no começo da rodada) e a mudança nova era engolida — o
+      re-run via tudo limpo e não gravava nada. Outro usuário
+      continuava vendo o que tinha sido apagado. Agora o "sujo" é
+      calculado comparando o local de agora com o da ENTRADA da
+      rodada: mudou durante a gravação, continua sujo, e o re-run
+      empurra. No caso normal nada muda (false, como antes).
 
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
@@ -1878,6 +1889,9 @@ async function sincronizarComNuvem(){
       try{
         const ref=docRefSecao(nome);
         const local=dadosDaSecao(nome);
+        /* O que o usuário tinha no local quando a rodada começou — serve para
+           detectar mexida feita DURANTE a gravação (ver sujo logo abaixo). */
+        const sigLocalNaEntrada=JSON.stringify(canonica(local));
         const vistos=idsRemoto[nome]||new Set();
         let servidores=null;
         await fsdb.runTransaction(async tx=>{
@@ -1895,7 +1909,18 @@ async function sincronizarComNuvem(){
         });
         idsRemoto[nome]=idsDe(extrairItens(nome,servidores));
         assinatura[nome]=JSON.stringify(canonica(ehListaObjeto(nome)?servidores:local));
-        sujo[nome]=false;
+        /* ANTES: sujo[nome]=false — limpo às cegas. Se o usuário mexia na seção
+           ENQUANTO a rodada rodava (salvar e, na sequência imediata, EXCLUIR),
+           a gravação partia da versão antiga e a flag da exclusão era engolida
+           pelo fim da rodada da edição: o re-run do syncPendente (finally
+           abaixo) via tudo "limpo", nada era gravado, e a exclusão só saía do
+           local na próxima gravação qualquer de qualquer módulo — outro
+           usuário continuava vendo a página apagada.
+           Agora compara o local DE AGORA com o da entrada da rodada: mudou,
+           continua sujo, e o re-run empurra de verdade. No caso normal nada
+           mudou durante a rodada → false, exatamente como antes. (É a mesma
+           conta que aplicarSecao() já fazia.) */
+        sujo[nome]=JSON.stringify(canonica(dadosDaSecao(nome)))!==sigLocalNaEntrada;
         ultimaLeituraRemota[nome]=Date.now();
       }catch(err){
         console.error('Falha ao sincronizar',nome,err);
