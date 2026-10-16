@@ -60,6 +60,9 @@
       ao abrir a edição de outra impressora, e a planilha exportada
       passa a ter as colunas "Login" e "Senha". O campo que era
       "Login para acesso Web" passou a se chamar só "Login".
+  20. A lista de impressoras passa a ter a coluna SENHA mascarada
+      (••••••) com olhinho que revela por 8 segundos, igual à lista de
+      switches. Uma só máscara fica aberta por vez, entre as DUAS listas.
 
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
@@ -1000,7 +1003,7 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
             <div class="table-wrap">
               <table>
                 <thead><tr>
-                  <th>Modelo</th><th>Host</th><th>Local</th><th>IP</th><th>Patrimônio</th><th>Série</th><th>Login</th><th class="td-r">Ações</th>
+                  <th>Modelo</th><th>Host</th><th>Local</th><th>IP</th><th>Patrimônio</th><th>Série</th><th>Login</th><th>Senha</th><th class="td-r">Ações</th>
                 </tr></thead>
                 <tbody id="impTbody"></tbody>
               </table>
@@ -4696,11 +4699,12 @@ function renderImpressoras(){
       <td class="mono">${esc(p.patrimonio||'—')}</td>
       <td class="mono subtle">${esc(p.serie||'—')}</td>
       <td class="mono subtle">${esc(p.loginWeb||'—')}</td>
+      <td class="mono subtle">${p.senhaWeb?`<span class="imp-valor" data-id="${p.id}">••••••</span> <button type="button" class="ibtn imp-ver-senha" data-id="${p.id}" title="Mostrar a senha por alguns segundos">👁</button>`:'—'}</td>
       <td class="td-r"><div class="actions">
         <button class="btn btn-ghost btn-sm" data-acao="imp-edit" data-id="${p.id}">✎ Editar</button>
         <button class="ibtn bad" title="Excluir" data-acao="imp-del" data-id="${p.id}">${TRASH_SVG}</button>
       </div></td>
-    </tr>`).join(''):'<tr><td colspan="8" class="empty"><span class="big">🖨️</span>Nenhuma impressora cadastrada.</td></tr>';
+    </tr>`).join(''):'<tr><td colspan="9" class="empty"><span class="big">🖨️</span>Nenhuma impressora cadastrada.</td></tr>';
   const comIp=db.impressoras.filter(p=>p.ip).length;
   $('#impResumo').textContent=`${db.impressoras.length} impressora(s) · ${comIp} com IP definido`;
 }
@@ -4709,6 +4713,21 @@ $('#impTbody').addEventListener('click',e=>{
   const p=db.impressoras.find(x=>x.id===b.dataset.id);if(!p)return;
   if(b.dataset.acao==='imp-edit')editarImpressora(p.id);
   if(b.dataset.acao==='imp-del')excluirImpressora(p.id);
+});
+/* Olhinho da senha na lista de impressoras — mesmo comportamento do switch:
+   a máscara some sozinha depois de 8 segundos. A procura fica RESTRITA ao
+   tbody da linha (b.closest('tbody')), diferente do switch, que varre a
+   página inteira: assim um id repetido entre as duas listas nunca aponta
+   para o valor errado. */
+$('#impTbody').addEventListener('click',e=>{
+  const b=e.target.closest('.imp-ver-senha');if(!b)return;
+  const p=db.impressoras.find(x=>x.id===b.dataset.id);if(!p)return;
+  const alvo=Array.from(b.closest('tbody').querySelectorAll('.imp-valor')).find(el=>el.dataset.id===b.dataset.id);
+  if(!alvo)return;
+  ocultarSenhasMostradas();
+  alvo.textContent=p.senhaWeb||'—';
+  alvo.classList.add('mostrando');
+  swSenhaTimer=setTimeout(ocultarSenhasMostradas,8000);
 });
 
 /* ============== SWITCHS ============== */
@@ -4813,7 +4832,9 @@ $('#swTbody').addEventListener('click',e=>{
    enxerga o valor em db.switches. Serve para o olho, não para o invasor. */
 let swSenhaTimer=null;
 function ocultarSenhasMostradas(){
-  document.querySelectorAll('.sw-valor.mostrando').forEach(el=>{
+  /* Vale para switch E impressora: é a mesma máscara, e só uma pode estar
+     aberta por vez — um único timer para as duas listas. */
+  document.querySelectorAll('.sw-valor.mostrando, .imp-valor.mostrando').forEach(el=>{
     el.textContent='••••••';el.classList.remove('mostrando');
   });
   if(swSenhaTimer){clearTimeout(swSenhaTimer);swSenhaTimer=null;}
