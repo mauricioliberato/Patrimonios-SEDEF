@@ -94,6 +94,15 @@
       calculado comparando o local de agora com o da ENTRADA da
       rodada: mudou durante a gravação, continua sujo, e o re-run
       empurra. No caso normal nada muda (false, como antes).
+  24. LINK DA WIKI ABRE EM ABA NOVA: quem está lendo a página não
+      perde a wiki ao clicar num link. O alvo ganha
+      target="_blank" + rel="noopener" em três pontos — no botão
+      🔗 (já nasce assim), na LEITURA e no EDITOR (assim também
+      corrige os links gravados antes). O higienizador passa a
+      jogar fora endereço que não seja http/https/mailto/tel
+      (um link javascript: seria um golpe pronto contra quem
+      clicasse) e grava os dois atributos junto, para o link
+      continuar em aba nova para sempre.
 
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
@@ -5557,6 +5566,7 @@ function abrirWikiLeitura(id){
   $('#wikiLeituraTitulo').textContent=w.titulo||'Sem título';
   $('#wikiLeituraMeta').textContent=(w.categoria?w.categoria+' · ':'')+wikiData(w.atualizadoEm||w.criadoEm);
   $('#wikiLeituraConteudo').innerHTML=w.conteudo||'<p class="subtle">Esta página ainda não tem conteúdo.</p>';
+  wikiLinksNovaAba($('#wikiLeituraConteudo'));   /* link abria na MESMA aba */
   const partes=[];
   if(w.criadoPor)partes.push('criada por '+w.criadoPor);
   if(w.atualizadoPor&&w.atualizadoPor!==w.criadoPor)partes.push('última edição por '+w.atualizadoPor);
@@ -5571,6 +5581,7 @@ function abrirWikiEditor(id,retorno){
   $('#wikiTitulo').value=w?(w.titulo||''):'';
   $('#wikiCategoria').value=w?(w.categoria||''):'';
   $('#wikiEditor').innerHTML=w?(w.conteudo||''):'';
+  wikiLinksNovaAba($('#wikiEditor'));            /* o mesmo vale enquanto se edita */
   $('#wikiEditorTitulo').textContent=w?'Editar página':'Nova página';
   $('#wikiEditBadge').style.display=w?'':'none';
   setWikiPainel('editor');
@@ -5606,7 +5617,14 @@ function wikiCmd(cmd){
   if(simples[cmd]){document.execCommand(simples[cmd],false,null);return;}
   const blocos={h2:'<h2>',h3:'<h3>',p:'<p>',quote:'<blockquote>',code:'<pre>'};
   if(blocos[cmd]){document.execCommand('formatBlock',false,blocos[cmd]);return;}
-  if(cmd==='link'){const u=prompt('Endereço do link:','https://');if(u)document.execCommand('createLink',false,u);return;}
+  if(cmd==='link'){
+    const u=prompt('Endereço do link:','https://');
+    if(!u)return;
+    if(!/^(https?:|mailto:|tel:)/i.test(u)){toast('Use um endereço começando com <b>http://</b>, <b>https://</b>, <b>mailto:</b> ou <b>tel:</b>.','bad');return;}
+    document.execCommand('createLink',false,u);
+    wikiLinksNovaAba($('#wikiEditor'));   /* já nasce em aba nova */
+    return;
+  }
   if(cmd==='img'){const u=prompt('Endereço da imagem:','http://');if(u)document.execCommand('insertImage',false,u);return;}
 }
 /* --- o que entra de fora (colagem) ----------------------------------------
@@ -5618,7 +5636,16 @@ const WIKI_LIXO={SCRIPT:1,STYLE:1,IFRAME:1,OBJECT:1,EMBED:1,LINK:1,META:1,BASE:1
 const WIKI_TAGS={P:1,BR:1,B:1,STRONG:1,I:1,EM:1,U:1,S:1,DEL:1,INS:1,SUB:1,SUP:1,
   H1:1,H2:1,H3:1,H4:1,H5:1,H6:1,UL:1,OL:1,LI:1,BLOCKQUOTE:1,PRE:1,CODE:1,KBD:1,
   A:1,IMG:1,TABLE:1,THEAD:1,TBODY:1,TFOOT:1,TR:1,TD:1,TH:1,CAPTION:1,DIV:1,SPAN:1};
-const WIKI_ATRIBUTOS={A:['href','target'],IMG:['src','alt','width','height']};
+const WIKI_ATRIBUTOS={A:['href','target','rel'],IMG:['src','alt','width','height']};
+/* Todo link da wiki abre em ABA NOVA — inclusive os gravados antes desta regra.
+   Sem rel="noopener" o destino poderia trocar esta aba por um golpe (tabnabbing). */
+function wikiLinksNovaAba(alvo){
+  if(!alvo)return;
+  alvo.querySelectorAll('a[href]').forEach(a=>{
+    a.setAttribute('target','_blank');
+    a.setAttribute('rel','noopener');
+  });
+}
 function wikiHigienizar(html){
   const d=document.createElement('div');
   d.innerHTML=html||'';
@@ -5631,6 +5658,16 @@ function wikiHigienizar(html){
     }
     const permitidos=WIKI_ATRIBUTOS[el.tagName]||[];
     Array.from(el.attributes||[]).forEach(a=>{if(permitidos.indexOf(a.name)<0)el.removeAttribute(a.name);});
+    /* Link: sempre em aba nova (já que o leitor está lendo a wiki) e com o
+       rel que impede o destino de se passar por esta aba. Endereço que não
+       seja http/https/mailto/tel é JOGADO FORA — javascript: aqui dentro
+       seria um golpe pronto contra quem clicasse. */
+    if(el.tagName==='A'){
+      const href=el.getAttribute('href')||'';
+      if(!/^(https?:|mailto:|tel:)/i.test(href)){if(el.parentNode)el.parentNode.removeChild(el);return;}
+      el.setAttribute('target','_blank');
+      el.setAttribute('rel','noopener');
+    }
   });
   return d.innerHTML;
 }
