@@ -63,6 +63,11 @@
   20. A lista de impressoras passa a ter a coluna SENHA mascarada
       (••••••) com olhinho que revela por 8 segundos, igual à lista de
       switches. Uma só máscara fica aberta por vez, entre as DUAS listas.
+  21. A lista de licenças do Office passa a se ordenar pelo E-MAIL
+      VINCULADO (sedef-office1, sedef-office2, ...), que era a ordem
+      que o setor usava - antes ordenava por host. Os números são
+      comparados como número, então "office10" vem depois de
+      "office2"; licença sem e-mail vai para o fim da lista.
 
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
@@ -5066,7 +5071,20 @@ function excluirLicenca(id){
 }
 function renderLicencas(){
   const busca=($('#licBusca').value||'').toLowerCase();
-  let lista=[...db.licencas].sort((a,b)=>String(a.host||'').localeCompare(String(b.host||'')));
+  /* Ordena pelo E-MAIL VINCULADO, que é a sequência que o setor usa
+     (sedef-office1, sedef-office2, ...). Antes ordenava por host, e a
+     sequência dos office ficava embaralhada.
+     "numeric:true" faz o localeCompare comparar os dígitos como NÚMERO, não
+     como texto — sem ele, "office10" viria antes de "office2", porque "1" < "2".
+     Registro sem e-mail vai para o FIM, em vez de abrir a lista. */
+  const chaveEmail=x=>String(x.email||'').trim();
+  let lista=[...db.licencas].sort((a,b)=>{
+    const ea=chaveEmail(a),eb=chaveEmail(b);
+    if(!ea&&!eb)return String(a.host||'').localeCompare(String(b.host||''),'pt-BR',{sensitivity:'base'});
+    if(!ea)return 1;
+    if(!eb)return -1;
+    return ea.localeCompare(eb,'pt-BR',{numeric:true,sensitivity:'base'});
+  });
   if(busca)lista=lista.filter(l=>((l.host||'')+' '+(l.chave||'')+' '+(l.email||'')+' '+(l.obs||'')).toLowerCase().includes(busca));
   $('#licTbody').innerHTML=lista.length?lista.map(l=>`
     <tr data-id="${l.id}">
