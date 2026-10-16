@@ -68,6 +68,21 @@
       que o setor usava - antes ordenava por host. Os números são
       comparados como número, então "office10" vem depois de
       "office2"; licença sem e-mail vai para o fim da lista.
+  22. MENU NOVO: WIKI — base de dicas e tutoriais de instalação e
+      configuração. Todo mundo logado cria e edita; EXCLUIR é só
+      administrador (botão já oculto e conferido de novo no código).
+      Editor visual estilo Word (negrito, títulos, listas, citação,
+      bloco de código, link) guardando HTML. O que é colado de fora
+      (site/Word) passa por um higienizador que mantém só as tags da
+      wiki e joga fora style, class e script. IMAGEM: o Cloud Storage do
+      Firebase exigiu o plano Blaze (a linha "Storage" do Spark está
+      como "Not applicable" no site oficial do Firebase) e o sistema é
+      Spark — por isso o print NÃO é enviado: colar ou arrastar o
+      arquivo avisa na hora, e o caminho é hospedar o print e usar o
+      botão de imagem com o endereço (colar o endereço de imagem
+      direto no texto também já vira imagem sozinho). Busca no título
+      E no conteúdo, filtro por categoria, ordenação da mais recente,
+      badge no menu e seção "wiki" já sincronizando (SECOES).
 
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
@@ -437,6 +452,33 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
   .c2,.c3,.c4,.c5,.c6,.c7,.c8{grid-column:span 12}
   .dt-row input[type=time]{width:130px;flex:0 0 130px}
 }
+/* ============== WIKI ============== */
+.wiki-barra{display:flex;flex-wrap:wrap;gap:3px;align-items:center;padding:8px;border:1px solid var(--line);
+  border-bottom:0;border-radius:8px 8px 0 0;background:var(--bg)}
+.wiki-barra button{border:1px solid var(--line2);background:var(--card);color:var(--ink);border-radius:6px;
+  padding:5px 9px;font:600 12px var(--body);cursor:pointer;line-height:1.2;white-space:nowrap}
+.wiki-barra button:hover{background:var(--accent-soft);border-color:var(--accent)}
+.wiki-sep{width:1px;height:20px;background:var(--line2);margin:0 5px}
+.wiki-editor{min-height:360px;max-height:64vh;overflow:auto;padding:16px 18px;border:1px solid var(--line);
+  border-radius:0 0 8px 8px;background:var(--card);line-height:1.65;font-size:15px}
+.wiki-editor:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.wiki-editor:empty:before{content:attr(data-placeholder);color:var(--muted);pointer-events:none}
+.wiki-editor img{max-width:100%;height:auto;border-radius:8px;display:block;margin:10px 0}
+.wiki-editor blockquote,.wiki-conteudo blockquote{border-left:4px solid var(--accent);margin:12px 0;padding:2px 14px;
+  color:var(--ink-soft);background:var(--accent-soft);border-radius:0 8px 8px 0}
+.wiki-editor pre,.wiki-conteudo pre{background:#0d1f2d;color:#e6eef5;padding:12px 14px;border-radius:8px;
+  overflow:auto;font-size:13.5px;margin:12px 0}
+.wiki-conteudo{line-height:1.7;font-size:15.5px;min-height:80px}
+.wiki-conteudo h2{font-size:22px;margin:20px 0 8px}
+.wiki-conteudo h3{font-size:18px;margin:16px 0 6px}
+.wiki-conteudo img{max-width:100%;height:auto;border-radius:8px;display:block;margin:12px 0;border:1px solid var(--line)}
+.wiki-conteudo a{color:var(--accent-dk);font-weight:600}
+.wiki-conteudo ul,.wiki-conteudo ol{padding-left:26px;margin:8px 0}
+.wiki-conteudo li{margin:3px 0}
+.wiki-conteudo table{border-collapse:collapse;width:100%;margin:12px 0}
+.wiki-conteudo td,.wiki-conteudo th{border:1px solid var(--line2);padding:7px 10px;text-align:left}
+.wiki-conteudo th{background:var(--bg)}
+.wiki-conteudo p:first-child{margin-top:0}
 </style>
 </head>
 <body>
@@ -526,6 +568,10 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
         Setores <span class="nav-badge" id="badge-set">0</span>
       </button>
       <div class="nav-sep">Ferramentas</div>
+      <button class="nav-item" data-view="wiki">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+        Wiki <span class="nav-badge" id="badge-wiki">0</span>
+      </button>
       <button class="nav-item" data-view="planilhas">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
         Importar/Exportar
@@ -1367,6 +1413,110 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
         </div>
       </section>
 
+      <section class="view" id="view-wiki">
+        <!-- ============ LISTA DE PÁGINAS ============ -->
+        <div class="card wiki-panel" id="cardWikiLista">
+          <div class="card-h">
+            <h3>Páginas da wiki</h3>
+            <div class="toolbar">
+              <input type="text" id="wikiBusca" placeholder="🔍 Buscar no título ou no conteúdo…">
+              <select id="wikiFiltroCat" title="Filtrar por categoria"><option value="">Todas as categorias</option></select>
+              <button class="btn btn-accent" type="button" id="btnWikiNova">+ Nova página</button>
+            </div>
+          </div>
+          <div class="card-b flush">
+            <div class="table-wrap">
+              <table>
+                <thead><tr>
+                  <th>Título</th><th>Categoria</th><th>Atualizada</th><th>Última edição por</th><th class="td-r">Ações</th>
+                </tr></thead>
+                <tbody id="wikiTbody"></tbody>
+              </table>
+            </div>
+          </div>
+          <div style="padding:10px 20px;border-top:1px solid var(--line)"><span class="subtle" id="wikiResumo"></span></div>
+        </div>
+
+        <!-- ============ LEITURA DE UMA PÁGINA ============ -->
+        <div class="card wiki-panel" id="cardWikiLeitura" style="display:none">
+          <div class="card-h">
+            <div style="min-width:0">
+              <h3 id="wikiLeituraTitulo">—</h3>
+              <span class="subtle" id="wikiLeituraMeta"></span>
+            </div>
+            <div class="toolbar">
+              <button class="btn btn-ghost btn-sm" type="button" id="btnWikiVoltar">← Voltar</button>
+              <button class="btn btn-ghost btn-sm" type="button" id="btnWikiEditar">✎ Editar</button>
+              <button class="btn btn-ghost btn-sm apenas-admin" type="button" id="btnWikiExcluir">🗑 Excluir</button>
+            </div>
+          </div>
+          <div class="card-b"><div class="wiki-conteudo" id="wikiLeituraConteudo"></div></div>
+          <div style="padding:10px 20px;border-top:1px solid var(--line)">
+            <span class="subtle" id="wikiLeituraRodape"></span>
+          </div>
+        </div>
+
+        <!-- ============ EDITOR ============ -->
+        <div class="card wiki-panel" id="cardWikiEditor" style="display:none">
+          <div class="card-h">
+            <h3 id="wikiEditorTitulo">Nova página</h3>
+            <span class="pill warn" id="wikiEditBadge" style="display:none">✎ EDITANDO</span>
+          </div>
+          <div class="card-b">
+            <form id="formWiki" autocomplete="off">
+              <input type="hidden" id="wikiId">
+              <div class="fgrid">
+                <div class="field c6">
+                  <label>Título <b>*</b></label>
+                  <input type="text" id="wikiTitulo" placeholder="Ex.: Instalar o TeamViewer no PC do setor">
+                </div>
+                <div class="field c6">
+                  <label>Categoria</label>
+                  <input type="text" id="wikiCategoria" list="wikiCategorias" placeholder="Ex.: Instalação, Configuração, Dica">
+                  <datalist id="wikiCategorias"></datalist>
+                </div>
+                <div class="c12">
+                  <div class="wiki-barra" id="wikiBarra" role="toolbar" aria-label="Formatação do texto">
+                    <button type="button" data-cmd="bold" title="Negrito (Ctrl+B)"><b>B</b></button>
+                    <button type="button" data-cmd="italic" title="Itálico (Ctrl+I)"><i>I</i></button>
+                    <button type="button" data-cmd="underline" title="Sublinhado (Ctrl+U)"><u>S</u></button>
+                    <span class="wiki-sep"></span>
+                    <button type="button" data-cmd="h2" title="Título grande">Título</button>
+                    <button type="button" data-cmd="h3" title="Subtítulo">Subtítulo</button>
+                    <button type="button" data-cmd="p" title="Voltar ao texto normal">Parágrafo</button>
+                    <span class="wiki-sep"></span>
+                    <button type="button" data-cmd="ul" title="Lista com marcadores">• Lista</button>
+                    <button type="button" data-cmd="ol" title="Lista numerada">1. Lista</button>
+                    <button type="button" data-cmd="quote" title="Citação / observação">❝ Nota</button>
+                    <button type="button" data-cmd="code" title="Bloco de código ou comando">&lt;/&gt; Código</button>
+                    <span class="wiki-sep"></span>
+                    <button type="button" data-cmd="link" title="Inserir link">🔗 Link</button>
+                    <button type="button" data-cmd="img" title="Inserir imagem pelo endereço">🖼 Imagem</button>
+                    <button type="button" data-cmd="remove" title="Limpar a formatação do texto selecionado">Tx Limpar</button>
+                    <span class="wiki-sep"></span>
+                    <button type="button" data-cmd="undo" title="Desfazer">↶</button>
+                    <button type="button" data-cmd="redo" title="Refazer">↷</button>
+                  </div>
+                  <div class="wiki-editor" id="wikiEditor" contenteditable="true" spellcheck="true"
+                       data-placeholder="Escreva aqui a dica, o tutorial ou o passo a passo…"></div>
+                  <p class="subtle" style="margin:7px 0 0">
+                    Ctrl+B / Ctrl+I / Ctrl+U funcionam. Para mostrar uma tela, hospede o print
+                    em algum lugar e use <b>🖼 Imagem</b> com o endereço — ou <b>cole o endereço
+                    da imagem</b> direto no texto, que ele já entra como imagem. Colar o
+                    <i>arquivo</i> do print não é salvo: o armazenamento de imagens do Firebase
+                    não existe mais no plano gratuito.
+                  </p>
+                </div>
+                <div class="c12 form-actions">
+                  <button type="submit" class="btn btn-accent" id="btnWikiSubmit">✔ Salvar página</button>
+                  <button type="button" class="btn btn-ghost" id="btnWikiCancelar">Cancelar</button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      </section>
+
     </div></div>
   </main>
 </div>
@@ -1533,6 +1683,10 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js" integrity="sha384-+65NgAKqXr1Nb7sBmV6O09pL8ASqZsi29OE718meKinGAWaa70VE5V6LNjXVBjIA" crossorigin="anonymous"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js" integrity="sha384-I1LYojsZ5RM1cOda44Z2h42Qa6YfsQ1XkXxREnhp4ueYBR/4d1pG1K+NZM537Vsj" crossorigin="anonymous"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js" integrity="sha384-YHSscHG455M7b+d6r5ibTMznxrZxV272bMjXT9ndTgmx05fLR7HsdmcVklhpBSyt" crossorigin="anonymous"></script>
+<!-- SEM firebase-storage: o Cloud Storage deixou de existir no plano gratuito
+     (no site oficial do Firebase, a linha "Storage" do Spark está como
+     "Not applicable"; só o Blaze tem os 5 GB). O sistema roda em Spark, então
+     a WIKI não guarda imagem — só endereço. -->
 <!-- SheetJS 0.20.3: a 0.18.5 tinha a CVE-2023-30533 (poluição de protótipo ao
      ler planilha XLSX). Ela saiu do cdnjs — o CDN oficial é o cdn.sheetjs.com. -->
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" integrity="sha384-EnyY0/GSHQGSxSgMwaIPzSESbqoOLSexfnSMN2AP+39Ckmn92stwABZynq1JyzdT" crossorigin="anonymous"></script>
@@ -1616,7 +1770,7 @@ let assinatura={};  /* por seção: como o servidor estava quando pela última v
 let sujo={};        /* por seção: tem alteração local ainda não enviada */
 let syncRodando=false, syncPendente=false;
 
-const SECOES=['equipamentos','tecnicos','setores','emprestimos','guias','impressoras','switches','racks','licencas','listas','eqSnap'];
+const SECOES=['equipamentos','tecnicos','setores','emprestimos','guias','impressoras','switches','racks','licencas','listas','wiki','eqSnap'];
 function docRefSecao(nome){return fsdb.collection('sistema').doc(nome);}
 /* 'listas' e 'eqSnap' não são listas de itens com id — são tratados por extenso */
 function ehListaObjeto(nome){return nome!=='listas'&&nome!=='eqSnap';}
@@ -2211,7 +2365,7 @@ auth.onAuthStateChanged(async fbUser=>{
 /* ============== BANCO LOCAL ============== */
 const LS='sget-db-v1';
 function seed(){
-  return {tipos:[...DEFAULT_TIPOS],marcas:[...DEFAULT_MARCAS],modelos:[],tecnicos:[],setores:[],equipamentos:[],emprestimos:[],guias:[],impressoras:[],switches:[],racks:[],licencas:[],eqSnap:{}};
+  return {tipos:[...DEFAULT_TIPOS],marcas:[...DEFAULT_MARCAS],modelos:[],tecnicos:[],setores:[],equipamentos:[],emprestimos:[],guias:[],impressoras:[],switches:[],racks:[],licencas:[],wiki:[],eqSnap:{}};
 }
 let db;
 try{const raw=localStorage.getItem(LS);db=raw?JSON.parse(raw):null;}catch(e){db=null;}
@@ -2239,6 +2393,7 @@ function normalizarSetores(list){
   if(!Array.isArray(db.switches)){db.switches=[];mig=true;}
   if(!Array.isArray(db.racks)){db.racks=[];mig=true;}
   if(!Array.isArray(db.licencas)){db.licencas=[];mig=true;}
+  if(!Array.isArray(db.wiki)){db.wiki=[];mig=true;}
   (db.guias||[]).forEach(g=>{if(g&&!g.recebimento){g.recebimento={data:g.origemData||hojeISO(),hora:'',respNome:'',assinatura:null,atualizouSetor:false,ts:g.emitidaEm||Date.now()};mig=true;}});
   const antes=JSON.stringify(db.setores||[]);
   normalizarSetores(db.setores);
@@ -2282,6 +2437,7 @@ window.addEventListener('storage',e=>{
         if(!Array.isArray(db.switches))db.switches=[];
         if(!Array.isArray(db.racks))db.racks=[];
         if(!Array.isArray(db.licencas))db.licencas=[];
+        if(!Array.isArray(db.wiki))db.wiki=[];
         normalizarSetores(db.setores);
         garantirModelos();garantirGuias();
         selSig='';atualizarTudo();
@@ -2350,6 +2506,7 @@ const TITULOS={
   racks:['Racks de Redes','Mapeamento de racks, patch panel, portas de switch e setor'],
   tecnicos:['Técnicos','Equipe técnica — alimenta os demais módulos'],
   licencas:['Licenças Office 2024','Controle de chaves do Office 2024'],
+  wiki:['Wiki','Dicas, tutoriais e passo a passo de instalação e configuração'],
   setores:['Setores','Estrutura de setores — alimenta os demais módulos'],
   planilhas:['Importar/Exportar','Baixe modelos, exporte dados ou importe planilhas']
 };
@@ -5275,6 +5432,7 @@ $('#fileImport').addEventListener('change',e=>{
       d.emprestimos.forEach(x=>{if(!Array.isArray(x.equipIds)){x.equipIds=x.equipId?[x.equipId]:[];delete x.equipId;}});
       if(!d.eqSnap||typeof d.eqSnap!=='object')d.eqSnap={};
       if(!Array.isArray(d.impressoras))d.impressoras=[];
+      if(!Array.isArray(d.wiki))d.wiki=[];
       (d.guias||[]).forEach(g=>{if(g&&!g.recebimento){g.recebimento={data:g.origemData||hojeISO(),hora:'',respNome:'',assinatura:null,atualizouSetor:false,ts:g.emitidaEm||Date.now()};}});
       normalizarSetores(d.setores);
       db=d;
@@ -5304,6 +5462,7 @@ function atualizarBadges(){
   $('#badge-sw').textContent=(db.switches||[]).length;
   $('#badge-racks').textContent=(db.racks||[]).length;
   $('#badge-lic').textContent=(db.licencas||[]).length;
+  $('#badge-wiki').textContent=(db.wiki||[]).length;
   $('#badge-tec').textContent=db.tecnicos.length;
   $('#badge-set').textContent=db.setores.length;
 }
@@ -5311,10 +5470,223 @@ function atualizarTudo(){
   [
     preencherSelects,renderModelos,renderEquipamentos,renderTecnicos,renderSetores,
     renderEmprestimos,renderGuias,renderImpressoras,renderSwitches,renderRacks,
-    renderLicencas,renderPlanilhasHub,atualizarCartaoEmp,atualizarBadges
+    renderLicencas,renderWiki,renderPlanilhasHub,atualizarCartaoEmp,atualizarBadges
   ].forEach(f=>{try{f();}catch(err){console.error('NII render:',err);}});
   if(currentView==='dashboard'){try{renderDashboard();}catch(err){console.error('NII render:',err);}}
 }
+
+/* ============== WIKI ==============
+   Páginas de dicas e tutoriais. Todo mundo logado CRIA e EDITA; EXCLUIR é só
+   administrador (o botão já some pela classe .apenas-admin, e a chamada aqui
+   confere de novo — o CSS sozinho não é barreira). O conteúdo é HTML gerado
+   pelo editor visual; o que vem de FORA (colagem) é higienizado antes de entrar. */
+let wikiIdAberto=null;    /* página aberta na leitura/edição */
+let wikiRetorno='lista';  /* para onde "Cancelar" volta: lista ou leitura */
+const WIKI_PAINEIS={lista:'#cardWikiLista',leitura:'#cardWikiLeitura',editor:'#cardWikiEditor'};
+function setWikiPainel(p){
+  Object.keys(WIKI_PAINEIS).forEach(k=>{
+    document.querySelector(WIKI_PAINEIS[k]).style.display=(k===p?'block':'none');
+  });
+}
+function wikiData(ms){
+  if(!ms)return '—';
+  const d=new Date(ms);
+  return d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+}
+function wikiTextoSemHtml(html){
+  const d=document.createElement('div');d.innerHTML=html||'';
+  return (d.textContent||'').replace(/\s+/g,' ').trim();
+}
+function renderWiki(){
+  if(!Array.isArray(db.wiki))db.wiki=[];
+  const busca=($('#wikiBusca').value||'').toLowerCase();
+  const cat=$('#wikiFiltroCat').value||'';
+  /* categorias distintas, para o filtro e para o datalist do editor */
+  const cats=db.wiki.map(w=>String(w.categoria||'').trim()).filter(Boolean)
+    .filter((v,i,a)=>a.indexOf(v)===i).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+  $('#wikiFiltroCat').innerHTML='<option value="">Todas as categorias</option>'+
+    cats.map(c=>'<option value="'+esc(c)+'"'+(c===cat?' selected':'')+'>'+esc(c)+'</option>').join('');
+  $('#wikiCategorias').innerHTML=cats.map(c=>'<option value="'+esc(c)+'">').join('');
+  /* mais recente primeiro: wiki se lê do que acabou de mudar */
+  let lista=[...db.wiki].sort((a,b)=>(b.atualizadoEm||b.criadoEm||0)-(a.atualizadoEm||a.criadoEm||0));
+  if(cat)lista=lista.filter(w=>String(w.categoria||'').trim()===cat);
+  if(busca)lista=lista.filter(w=>((w.titulo||'')+' '+(w.categoria||'')+' '+wikiTextoSemHtml(w.conteudo)).toLowerCase().includes(busca));
+  $('#wikiTbody').innerHTML=lista.length?lista.map(w=>`
+    <tr data-id="${w.id}">
+      <td><b>📘 ${esc(w.titulo||'Sem título')}</b></td>
+      <td>${w.categoria?`<span class="pill info">${esc(w.categoria)}</span>`:'<span class="subtle">—</span>'}</td>
+      <td class="subtle">${wikiData(w.atualizadoEm||w.criadoEm)}</td>
+      <td class="subtle">${esc(w.atualizadoPor||w.criadoPor||'—')}</td>
+      <td class="td-r"><div class="actions">
+        <button class="btn btn-ghost btn-sm" data-acao="wiki-abrir" data-id="${w.id}">📖 Ler</button>
+        <button class="btn btn-ghost btn-sm" data-acao="wiki-editar" data-id="${w.id}">✎ Editar</button>
+        <button class="ibtn bad apenas-admin" title="Excluir página" data-acao="wiki-del" data-id="${w.id}">${TRASH_SVG}</button>
+      </div></td>
+    </tr>`).join(''):'<tr><td colspan="5" class="empty"><span class="big">📘</span>Nenhuma página encontrada.</td></tr>';
+  $('#wikiResumo').textContent=db.wiki.length+' página(s) · '+lista.length+' exibida(s)'+(cat?' · '+cat:'');
+}
+function abrirWikiLeitura(id){
+  const w=db.wiki.find(x=>x.id===id);
+  if(!w){toast('Esta página não existe mais.','warn');setWikiPainel('lista');renderWiki();return;}
+  wikiIdAberto=id;
+  $('#wikiLeituraTitulo').textContent=w.titulo||'Sem título';
+  $('#wikiLeituraMeta').textContent=(w.categoria?w.categoria+' · ':'')+wikiData(w.atualizadoEm||w.criadoEm);
+  $('#wikiLeituraConteudo').innerHTML=w.conteudo||'<p class="subtle">Esta página ainda não tem conteúdo.</p>';
+  const partes=[];
+  if(w.criadoPor)partes.push('criada por '+w.criadoPor);
+  if(w.atualizadoPor&&w.atualizadoPor!==w.criadoPor)partes.push('última edição por '+w.atualizadoPor);
+  $('#wikiLeituraRodape').textContent=partes.join(' · ');
+  setWikiPainel('leitura');
+}
+function abrirWikiEditor(id,retorno){
+  const w=id?db.wiki.find(x=>x.id===id):null;
+  wikiIdAberto=w?w.id:null;
+  wikiRetorno=retorno||'lista';
+  $('#wikiId').value=w?w.id:'';
+  $('#wikiTitulo').value=w?(w.titulo||''):'';
+  $('#wikiCategoria').value=w?(w.categoria||''):'';
+  $('#wikiEditor').innerHTML=w?(w.conteudo||''):'';
+  $('#wikiEditorTitulo').textContent=w?'Editar página':'Nova página';
+  $('#wikiEditBadge').style.display=w?'':'none';
+  setWikiPainel('editor');
+  setTimeout(()=>{$('#wikiTitulo').focus();},0);
+}
+function cancelarWikiEditor(){
+  /* sai sem gravar: nada foi para o servidor, então não há o que desfazer */
+  const volta=wikiRetorno;
+  const aberta=wikiIdAberto;
+  $('#formWiki').reset();
+  $('#wikiEditor').innerHTML='';
+  wikiIdAberto=null;
+  if(volta==='leitura'&&aberta){abrirWikiLeitura(aberta);}
+  else{setWikiPainel('lista');renderWiki();}
+}
+function excluirWiki(id){
+  if(!souAdmin()){toast('Só um <b>administrador</b> pode excluir páginas da wiki.','bad');return;}
+  const w=db.wiki.find(x=>x.id===id);if(!w)return;
+  confirmar('Excluir página','Excluir <b>'+esc(w.titulo||'Sem título')+'</b>? O conteúdo não pode ser recuperado depois.',()=>{
+    db.wiki=db.wiki.filter(x=>x.id!==id);
+    if(wikiIdAberto===id)wikiIdAberto=null;
+    persistir();setWikiPainel('lista');atualizarTudo();toast('Página excluída.','warn');
+  });
+}
+/* --- barra de ferramentas do editor ---------------------------------------
+   document.execCommand está "descontinuado" na especificação, mas continua
+   implementado em todo navegador (não existe substituto equivalente ainda).
+   formatBlock recebe os colchetes porque o Firefox só aceita "<h2>". */
+function wikiCmd(cmd){
+  $('#wikiEditor').focus();
+  const simples={bold:'bold',italic:'italic',underline:'underline',
+    ul:'insertUnorderedList',ol:'insertOrderedList',undo:'undo',redo:'redo',remove:'removeFormat'};
+  if(simples[cmd]){document.execCommand(simples[cmd],false,null);return;}
+  const blocos={h2:'<h2>',h3:'<h3>',p:'<p>',quote:'<blockquote>',code:'<pre>'};
+  if(blocos[cmd]){document.execCommand('formatBlock',false,blocos[cmd]);return;}
+  if(cmd==='link'){const u=prompt('Endereço do link:','https://');if(u)document.execCommand('createLink',false,u);return;}
+  if(cmd==='img'){const u=prompt('Endereço da imagem:','http://');if(u)document.execCommand('insertImage',false,u);return;}
+}
+/* --- o que entra de fora (colagem) ----------------------------------------
+   Colar de um site ou do Word traz style/class de todo lado e, em pior caso,
+   scripts. Guardamos só a ESTRUTURA da wiki: sem isso a página fica enorme,
+   sai do padrão visual e a formatação de fora sobrescreve a do sistema. */
+const WIKI_LIXO={SCRIPT:1,STYLE:1,IFRAME:1,OBJECT:1,EMBED:1,LINK:1,META:1,BASE:1,
+  FORM:1,INPUT:1,BUTTON:1,TEXTAREA:1,SELECT:1,VIDEO:1,AUDIO:1,APPLET:1};
+const WIKI_TAGS={P:1,BR:1,B:1,STRONG:1,I:1,EM:1,U:1,S:1,DEL:1,INS:1,SUB:1,SUP:1,
+  H1:1,H2:1,H3:1,H4:1,H5:1,H6:1,UL:1,OL:1,LI:1,BLOCKQUOTE:1,PRE:1,CODE:1,KBD:1,
+  A:1,IMG:1,TABLE:1,THEAD:1,TBODY:1,TFOOT:1,TR:1,TD:1,TH:1,CAPTION:1,DIV:1,SPAN:1};
+const WIKI_ATRIBUTOS={A:['href','target'],IMG:['src','alt','width','height']};
+function wikiHigienizar(html){
+  const d=document.createElement('div');
+  d.innerHTML=html||'';
+  Array.from(d.querySelectorAll('*')).forEach(el=>{
+    if(WIKI_LIXO[el.tagName]){if(el.parentNode)el.parentNode.removeChild(el);return;}
+    if(!WIKI_TAGS[el.tagName]){
+      if(el.parentNode){while(el.firstChild)el.parentNode.insertBefore(el.firstChild,el);}
+      if(el.parentNode)el.parentNode.removeChild(el);
+      return;
+    }
+    const permitidos=WIKI_ATRIBUTOS[el.tagName]||[];
+    Array.from(el.attributes||[]).forEach(a=>{if(permitidos.indexOf(a.name)<0)el.removeAttribute(a.name);});
+  });
+  return d.innerHTML;
+}
+/* --- imagem ---------------------------------------------------------------
+   O Cloud Storage do Firebase EXIGE o plano Blaze (no site oficial, a linha
+   "Storage" do Spark está como "Not applicable"), e o sistema é Spark — então
+   o print NÃO é enviado para lugar nenhum. Os caminhos, na ordem:
+   (a) copiar a imagem de um site e colar: entra o <img> de origem normal;
+   (b) colar o ENDEREÇO de um print já hospedado: vira imagem sozinho;
+   (c) botão 🖼 Imagem, colando o endereço.
+   Colar ou arrastar ARQUIVO só avisa — sem isso, o pessoal acha que subiu. */
+function avisoImagemNaoSalva(){
+  toast('Imagem não fica salva neste sistema: hospede o print em algum lugar e use <b>🖼 Imagem</b> com o endereço.','warn');
+}
+/* --- eventos ------------------------------------------------------------ */
+$('#wikiBusca').addEventListener('input',debounce(renderWiki,150));
+$('#wikiFiltroCat').addEventListener('change',renderWiki);
+$('#btnWikiNova').addEventListener('click',()=>abrirWikiEditor(null,'lista'));
+$('#btnWikiVoltar').addEventListener('click',()=>{setWikiPainel('lista');renderWiki();});
+$('#btnWikiEditar').addEventListener('click',()=>{if(wikiIdAberto)abrirWikiEditor(wikiIdAberto,'leitura');});
+$('#btnWikiExcluir').addEventListener('click',()=>{if(wikiIdAberto)excluirWiki(wikiIdAberto);});
+$('#btnWikiCancelar').addEventListener('click',cancelarWikiEditor);
+$('#wikiTbody').addEventListener('click',e=>{
+  const b=e.target.closest('[data-acao]');if(!b)return;
+  const id=b.dataset.id;
+  if(b.dataset.acao==='wiki-abrir')abrirWikiLeitura(id);
+  if(b.dataset.acao==='wiki-editar')abrirWikiEditor(id,'lista');
+  if(b.dataset.acao==='wiki-del')excluirWiki(id);
+});
+$('#wikiBarra').addEventListener('click',e=>{
+  const b=e.target.closest('[data-cmd]');if(!b)return;
+  wikiCmd(b.dataset.cmd);
+});
+$('#formWiki').addEventListener('submit',e=>{
+  e.preventDefault();
+  const titulo=$('#wikiTitulo').value.trim();
+  if(!titulo){toast('Dê um <b>título</b> à página antes de salvar.','bad');$('#wikiTitulo').focus();return;}
+  const agora=Date.now();
+  const quem=(usuarioAtual&&usuarioAtual.nome)||'';
+  const categoria=$('#wikiCategoria').value.trim();
+  const conteudo=$('#wikiEditor').innerHTML.trim();
+  const id=$('#wikiId').value;
+  const w=id?db.wiki.find(x=>x.id===id):null;
+  let salvoId=id;
+  if(w){
+    w.titulo=titulo;w.categoria=categoria;w.conteudo=conteudo;
+    w.atualizadoEm=agora;w.atualizadoPor=quem;
+  }else{
+    /* id de página que já foi apagada por outra pessoa: cria de novo em vez
+       de sumir com o que você acabou de escrever. */
+    const novo={id:uid(),titulo:titulo,categoria:categoria,conteudo:conteudo,
+      criadoEm:agora,criadoPor:quem,atualizadoEm:agora,atualizadoPor:quem};
+    db.wiki.push(novo);salvoId=novo.id;
+  }
+  persistir();
+  $('#formWiki').reset();
+  $('#wikiEditor').innerHTML='';
+  atualizarTudo();
+  abrirWikiLeitura(salvoId);
+  toast('Página salva.');
+});
+$('#wikiEditor').addEventListener('paste',e=>{
+  const cd=e.clipboardData;if(!cd)return;
+  const arquivos=Array.from(cd.items||[]).filter(it=>it.kind==='file'&&/^image\//.test(it.type||''));
+  if(arquivos.length){e.preventDefault();avisoImagemNaoSalva();return;}
+  const html=cd.getData('text/html');
+  if(html){e.preventDefault();document.execCommand('insertHTML',false,wikiHigienizar(html));return;}
+  /* colou o ENDEREÇO de uma imagem já hospedada? Entra como imagem na hora. */
+  const texto=(cd.getData('text/plain')||'').trim();
+  if(texto&&/^https?:\/\/\S+\.(png|jpe?g|gif|webp)(\?\S*)?$/i.test(texto)){
+    e.preventDefault();
+    document.execCommand('insertImage',false,texto);
+    toast('Imagem inserida pelo endereço.');
+  }
+});
+$('#wikiEditor').addEventListener('drop',e=>{
+  const dt=e.dataTransfer;if(!dt)return;
+  if(Array.from(dt.files||[]).some(f=>/^image\//.test(f.type||''))){
+    e.preventDefault();avisoImagemNaoSalva();
+  }
+});
 
 /* ============== INICIALIZAÇÃO ============== */
 $('#eqData').value=hojeISO();
