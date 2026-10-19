@@ -275,6 +275,22 @@
        ignorar chaves "_" para não contar os próprios controles como
        arquivo.
 
+   37. 🗑 EXCLUIR ARQUIVO DA WIKI (controlar espaço): cada linha do
+       painel 📁 Arquivos ganhou um botão de lixeira (só aparece para
+       administrador; o handler confere de novo). O clique abre a
+       confirmação com nome, tamanho e — se alguma página ainda usa
+       o arquivo — o aviso de qual página vai ficar com link
+       quebrado. O POST /api/arquivos apaga da KV, BAIXA o contador
+       de uso na hora (o cartão do Painel desce sem precisar de
+       ?recalc=1), invalida a listagem em cache e devolve quantos
+       bytes foram liberados. A trava de verdade é NO SERVIDOR: o
+       Worker lê sistema/admins no Firestore com o MESMO token da
+       requisição (uid ou e-mail na lista; o uid do admin principal
+       vale sozinho, igual à regra do Firestore) e recusa quem não é
+       admin com 403 — se a conferência falhar, fecha (não exclui).
+       Chave aceita: só wiki-[letras/números . _ -] — nada de
+       _uso/_lista ou endereço solto.
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -282,7 +298,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261019-165215">
+<meta name="nii-build" content="20261019-171041">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -6605,6 +6621,7 @@ function pintarWikiArquivos(){
       <td class="subtle">${quando}</td>
       <td class="td-r"><div class="actions">
         <a class="btn btn-ghost btn-sm" href="${url}" target="_blank" rel="noopener">Abrir ↗</a>
+        <button class="ibtn bad apenas-admin" title="Excluir arquivo e liberar espaço" data-acao="arq-excluir" data-chave="${esc(a.chave)}">${TRASH_SVG}</button>
       </div></td>
     </tr>`;
   }).join(''):'<tr><td colspan="5" class="empty"><span class="big">📁</span>'+(wikiArquivos?'Nenhum arquivo enviado ainda — dentro de uma página, use 🖼 Imagem ou 📎 Documento.':'Sem informação de arquivos — toque em 🔄 Atualizar.')+'</td></tr>';
@@ -6618,6 +6635,42 @@ $('#btnWikiArquivos').addEventListener('click',()=>{setWikiPainel('arquivos');ca
 $('#btnWikiArqVoltar').addEventListener('click',()=>{setWikiPainel('lista');renderWiki();});
 $('#btnWikiArqAtualizar').addEventListener('click',()=>{carregarWikiArquivos(true);});
 $('#wikiArqFiltro').addEventListener('change',()=>pintarWikiArquivos());
+/* --- 🗑 excluir arquivo (só administrador) --------------------------------
+   O botão já some pela classe .apenas-admin, e a chamada aqui confere de
+   novo — mas a trava de verdade é o servidor: o POST /api/arquivos lê
+   sistema/admins com o MESMO token e recusa quem não estiver na lista.
+   Confirmar antes: excluir não desfaz, e se a página ainda usa o arquivo,
+   o link/imagem dela vai ficar quebrado (mostramos quais páginas). */
+$('#wikiArqTbody').addEventListener('click',ev=>{
+  const bt=ev.target.closest('[data-acao="arq-excluir"]');
+  if(!bt)return;
+  if(!souAdmin()){toast('Só um <b>administrador</b> pode excluir arquivos da wiki.','bad');return;}
+  const chave=String(bt.getAttribute('data-chave')||'');
+  const lista=(wikiArquivos&&Array.isArray(wikiArquivos.arquivos))?wikiArquivos.arquivos:[];
+  const arq=lista.find(a=>a.chave===chave);
+  if(!arq)return;
+  const ehDoc=arq.tipo==='documento';
+  const usadas=(db.wiki||[]).filter(w=>String(w.conteudo||'').indexOf(chave)>-1);
+  const avisoUsado=usadas.length?('<p style="margin:8px 0 0;color:var(--bad)"><b>⚠ Ainda é usado em '+usadas.length+' página(s) da wiki:</b> '+esc(usadas.slice(0,3).map(w=>w.titulo||'Sem título').join(', '))+(usadas.length>3?'…':'')+'. A imagem ou o link vai ficar quebrado lá — edite a página antes se não quiser isso.</p>'):'';
+  confirmar(ehDoc?'Excluir documento?':'Excluir print?',
+    '<p style="margin:0"><b>'+esc(arq.nome||chave)+'</b> · '+fmtBytes(arq.bytes||0)+'<br>O arquivo é apagado da nuvem e o espaço volta a ficar livre.'+avisoUsado+'</p>',
+    async()=>{
+      try{
+        if(!usuarioAtual||!auth.currentUser)throw new Error('entre no sistema de novo.');
+        const r=await fetch('/api/arquivos',{method:'POST',headers:{'Authorization':'Bearer '+(await auth.currentUser.getIdToken()),'Content-Type':'application/json'},body:JSON.stringify({chave:chave})});
+        let saida={};try{saida=await r.json();}catch(err){}
+        if(!r.ok)throw new Error(saida.erro||('falha ao excluir (HTTP '+r.status+').'));
+        toast('Arquivo excluído — <b>'+fmtBytes(saida.liberado||0)+'</b> liberados.','ok');
+        /* a contagem do Painel também desce na hora: limpa o cache local e refaz */
+        try{localStorage.removeItem(LS_USO);}catch(err){}
+        carregarUsoNuvem(true);
+        await carregarWikiArquivos(true);
+      }catch(err){
+        toast('Não deu para excluir: '+esc(err.message),'bad');
+        await carregarWikiArquivos(true);  /* re-sincroniza — pode já ter sido excluído em outra aba */
+      }
+    });
+});
 $('#btnWikiEditar').addEventListener('click',()=>{
   if(!wikiIdAberto)return;
   const w=db.wiki.find(x=>x.id===wikiIdAberto);

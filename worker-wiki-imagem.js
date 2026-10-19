@@ -369,9 +369,10 @@ async function rotaArquivos(request, env) {
     'Content-Type': 'application/json; charset=utf-8',
     'Access-Control-Allow-Origin': origem || '*',
     'Access-Control-Allow-Headers': 'Authorization, Content-Type',
-    'Access-Control-Allow-Methods': 'GET, OPTIONS'
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
   };
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: headers });
+  if (request.method === 'POST') return rotaExcluirArquivo(request, env);
   if (!env || !env.WIKI_IMAGENS) {
     return new Response(JSON.stringify({ erro: 'Worker sem o binding WIKI_IMAGENS.' }), { status: 500, headers: headers });
   }
@@ -400,6 +401,88 @@ async function rotaArquivos(request, env) {
   } catch (e) {
     return new Response(JSON.stringify({ erro: String((e && e.message) || e) }), { status: 500, headers: headers });
   }
+}
+
+/* POST /api/arquivos — exclui um arquivo (print ou documento) e libera o
+   espaço de verdade: apaga da KV, BAIXA o contador de uso na hora (sem
+   isso o cartão do Painel só voltaria ao lugar certo com ?recalc=1) e
+   invalida a listagem em cache.
+
+   Só ADMIN — conferido NO SERVIDOR, no próprio Firestore: o Worker lê
+   sistema/admins com o MESMO token da requisição (as regras permitem a
+   leitura a qualquer autenticado). O uid do admin principal vale sozinho,
+   igual à regra do Firestore, para uma lista corrompida nunca trancar a
+   limpeza. Se qualquer etapa falhar, NÃO exclui — fecha por padrão. */
+const UID_ADMIN_PRINCIPAL = 'Go5FiE8ukfSTdBfs4F3Ik4Q2mQy2';
+function listaDoCampo(campo) {
+  /* formato REST do Firestore: fields.uids.arrayValue.values = [{stringValue}] */
+  if (!campo || !campo.arrayValue || !Array.isArray(campo.arrayValue.values)) return [];
+  return campo.arrayValue.values.map(function (v) { return v.stringValue || ''; }).filter(Boolean);
+}
+async function ehAdminFirestore(token, usuario) {
+  const uid = usuario.user_id || usuario.sub || '';
+  if (uid === UID_ADMIN_PRINCIPAL) return true;
+  try {
+    const r = await fetch('https://firestore.googleapis.com/v1/projects/' + PROJETO_FIREBASE +
+      '/databases/(default)/documents/sistema/admins',
+      { headers: { 'Authorization': 'Bearer ' + token } });
+    if (!r.ok) return false;                 /* inclui 404: doc ainda não existe */
+    const doc = await r.json();
+    const f = (doc && doc.fields) || {};
+    if (uid && listaDoCampo(f.uids).indexOf(uid) >= 0) return true;
+    const email = String(usuario.email || '').toLowerCase();
+    return !!(email && listaDoCampo(f.emails).indexOf(email) >= 0);
+  } catch (e) { return false; }
+}
+async function rotaExcluirArquivo(request, env) {
+  const origem = request.headers.get('Origin') || '';
+  const headers = {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Access-Control-Allow-Origin': origem || '*',
+    'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS'
+  };
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: headers });
+  if (!env || !env.WIKI_IMAGENS) {
+    return new Response(JSON.stringify({ erro: 'Worker sem o binding WIKI_IMAGENS.' }), { status: 500, headers: headers });
+  }
+  const autoriza = request.headers.get('Authorization') || '';
+  let usuario = null;
+  try { usuario = await usuarioDoToken(request); } catch (e) { usuario = null; }
+  if (!usuario) {
+    return new Response(JSON.stringify({ erro: 'Sessão necessária: entre no sistema.' }), { status: 401, headers: headers });
+  }
+  if (!(await ehAdminFirestore(autoriza.slice(7), usuario))) {
+    return new Response(JSON.stringify({ erro: 'Só um administrador pode excluir arquivos da wiki.' }), { status: 403, headers: headers });
+  }
+  let chave = '';
+  try { const corpo = await request.json(); chave = String((corpo && corpo.chave) || ''); } catch (e) { }
+  /* chave de ARQUIVO de verdade: prefixo wiki-, nada de `_uso`/`_lista` */
+  if (!/^wiki-[A-Za-z0-9._-]{1,120}$/.test(chave)) {
+    return new Response(JSON.stringify({ erro: 'Chave de arquivo inválida.' }), { status: 400, headers: headers });
+  }
+  let par = null;
+  try { par = await env.WIKI_IMAGENS.getWithMetadata(chave, 'arrayBuffer'); } catch (e) { par = null; }
+  const valor = par && par.value;
+  if (!valor) {
+    return new Response(JSON.stringify({ erro: 'Arquivo não encontrado — talvez já tenha sido excluído.' }), { status: 404, headers: headers });
+  }
+  const meta = par.metadata || {};
+  const bytes = (typeof meta.tamanho === 'number') ? meta.tamanho : valor.byteLength;
+  const ehDoc = chave.indexOf('wiki-doc-') === 0;
+  await env.WIKI_IMAGENS.delete(chave);
+  try {                                          /* contador de uso desce na hora (piso zero) */
+    const uso = await lerUso(env);
+    const grupo = ehDoc ? 'documentos' : 'imagens';
+    uso[grupo] = uso[grupo] || { qtd: 0, bytes: 0 };
+    uso[grupo].qtd = Math.max(0, (uso[grupo].qtd || 0) - 1);
+    uso[grupo].bytes = Math.max(0, (uso[grupo].bytes || 0) - bytes);
+    await salvarUso(env, uso);
+  } catch (e) { }
+  try { await env.WIKI_IMAGENS.delete(CHAVE_LISTA); } catch (e) { }   /* listagem nova */
+  return new Response(JSON.stringify({
+    ok: true, chave: chave, liberado: bytes, tipo: ehDoc ? 'documento' : 'imagem'
+  }), { headers: headers });
 }
 
 /* ---- rota única: /api/imagens (enviar) e /wiki-img/... (servir) ---------- */
