@@ -187,6 +187,18 @@
           intactos; excluir continua disponível e continua barrado
           enquanto houver equipamento/empréstimo sob responsabilidade.
 
+   30. PERMISSÃO DA WIKI + OLHO DA SENHA DOS SWITCHES:
+       a) WIKI: só quem CRIOU a página edita — técnico comum vê "Ler" e
+          "✎ Editar" apenas nas páginas com o criadoPor dele
+          (administrador continua editando tudo). A barreira está em
+          quatro lugares: some o botão na lista, some o Editar na
+          leitura, o clique confere de novo e o salvar confere (esconder
+          não é regra). Excluir na wiki já era só administrador.
+       b) SWITCHES: o olho da linha virou LIGA/DESLIGA — 1º clique mostra
+          a senha (o olho vira 🙈), 2º clique no mesmo olho oculta (volta
+          a 👁). Acabou o "some sozinho em 8 s". A impressora da lista
+          manteve os 8 s e o olho do formulário já alternava.
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -5289,7 +5301,7 @@ function renderSwitches(){
       <td>${esc(setNome(s.local))}</td>
       <td class="mono">${s.ip?`<a href="http://${esc(s.ip)}" target="_blank" rel="noopener">${esc(s.ip)} ↗</a>`:'—'}</td>
       <td class="mono subtle">${esc(s.login||'—')}</td>
-      <td class="mono subtle">${s.senha?`<span class="sw-valor" data-id="${s.id}">••••••</span> <button type="button" class="ibtn sw-ver-senha" data-id="${s.id}" title="Mostrar a senha por alguns segundos">👁</button>`:'—'}</td>
+      <td class="mono subtle">${s.senha?`<span class="sw-valor" data-id="${s.id}">••••••</span> <button type="button" class="ibtn sw-ver-senha" data-id="${s.id}" title="Mostrar ou ocultar a senha">👁</button>`:'—'}</td>
       <td class="td-r"><div class="actions">
         <button class="btn btn-ghost btn-sm" data-acao="sw-edit" data-id="${s.id}">✎ Editar</button>
         <button class="ibtn bad" title="Excluir" data-acao="sw-del" data-id="${s.id}">${TRASH_SVG}</button>
@@ -5303,17 +5315,22 @@ $('#swTbody').addEventListener('click',e=>{
   if(b.dataset.acao==='sw-edit')editarSwitch(s.id);
   if(b.dataset.acao==='sw-del')excluirSwitch(s.id);
 });
-/* A senha fica oculta na tabela e só aparece por alguns segundos quando a
-   pessoa clica no olhinho - evita olho de sobre-ombro, print e tela
-   compartilhada, que era a exposição mais provável.
+/* A senha fica oculta na tabela e aparece quando a pessoa clica no olhinho —
+   e some de novo no segundo clique no MESMO olho: liga/desliga puro, sem
+   relógio (quem abriu fecha quando quiser). Evita olho de sobre-ombro, print
+   e tela compartilhada, que era a exposição mais provável.
    ATENÇÃO: isso não é criptografia. Quem abrir o console do navegador ainda
    enxerga o valor em db.switches. Serve para o olho, não para o invasor. */
 let swSenhaTimer=null;
 function ocultarSenhasMostradas(){
   /* Vale para switch E impressora: é a mesma máscara, e só uma pode estar
-     aberta por vez — um único timer para as duas listas. */
+     aberta por vez — um único timer para as duas listas (o timer só é
+     armado pela impressora; o switch fecha no segundo clique). */
   document.querySelectorAll('.sw-valor.mostrando, .imp-valor.mostrando').forEach(el=>{
     el.textContent='••••••';el.classList.remove('mostrando');
+  });
+  document.querySelectorAll('.sw-ver-senha.ativo').forEach(bt=>{
+    bt.textContent='👁';bt.classList.remove('ativo');
   });
   if(swSenhaTimer){clearTimeout(swSenhaTimer);swSenhaTimer=null;}
 }
@@ -5322,10 +5339,17 @@ $('#swTbody').addEventListener('click',e=>{
   const s=db.switches.find(x=>x.id===b.dataset.id);if(!s)return;
   const alvo=Array.from(document.querySelectorAll('.sw-valor')).find(el=>el.dataset.id===b.dataset.id);
   if(!alvo)return;
-  ocultarSenhasMostradas();
-  alvo.textContent=s.senha||'—';
+  if(alvo.classList.contains('mostrando')){
+    /* segundo clique no mesmo olho: só fecha — não reabre em cima */
+    ocultarSenhasMostradas();
+    return;
+  }
+  ocultarSenhasMostradas();   /* uma senha aberta por vez */
+  alvo.textContent=s.senha||'••••••';
   alvo.classList.add('mostrando');
-  swSenhaTimer=setTimeout(ocultarSenhasMostradas,8000);
+  b.textContent='🙈';b.classList.add('ativo');
+  /* sem setTimeout aqui: o segundo clique é quem fecha. A impressora
+     continua com os 8 s — o pedido foi só sobre o switch. */
 });
 
 /* ============== RACKS ============== */
@@ -5808,10 +5832,20 @@ function atualizarTudo(){
 }
 
 /* ============== WIKI ==============
-   Páginas de dicas e tutoriais. Todo mundo logado CRIA e EDITA; EXCLUIR é só
-   administrador (o botão já some pela classe .apenas-admin, e a chamada aqui
-   confere de novo — o CSS sozinho não é barreira). O conteúdo é HTML gerado
-   pelo editor visual; o que vem de FORA (colagem) é higienizado antes de entrar. */
+   Páginas de dicas e tutoriais. Todo mundo logado CRIA; EDITAR é só para
+   quem criou a página — administrador edita tudo (pedido do dono: técnico
+   não mexe no registro dos outros). EXCLUIR continua só administrador (o
+   botão já some pela classe .apenas-admin, e a chamada aqui confere de novo
+   — o CSS sozinho não é barreira). O conteúdo é HTML gerado pelo editor
+   visual; o que vem de FORA (colagem) é higienizado antes de entrar. */
+function wikiPodeEditar(w){
+  /* Não-admin só edita página cujo criadoPor bate com o nome logado.
+     Sem nome não edita nada — a falha é para o lado seguro. */
+  if(!w)return false;
+  if(souAdmin())return true;
+  const meu=(usuarioAtual&&usuarioAtual.nome)||'';
+  return !!meu&&(w.criadoPor||'')===meu;
+}
 let wikiIdAberto=null;    /* página aberta na leitura/edição */
 let wikiRetorno='lista';  /* para onde "Cancelar" volta: lista ou leitura */
 const WIKI_PAINEIS={lista:'#cardWikiLista',leitura:'#cardWikiLeitura',editor:'#cardWikiEditor'};
@@ -5851,7 +5885,7 @@ function renderWiki(){
       <td class="subtle">${esc(w.atualizadoPor||w.criadoPor||'—')}</td>
       <td class="td-r"><div class="actions">
         <button class="btn btn-ghost btn-sm" data-acao="wiki-abrir" data-id="${w.id}">📖 Ler</button>
-        <button class="btn btn-ghost btn-sm" data-acao="wiki-editar" data-id="${w.id}">✎ Editar</button>
+        ${wikiPodeEditar(w)?`<button class="btn btn-ghost btn-sm" data-acao="wiki-editar" data-id="${w.id}">✎ Editar</button>`:''}
         <button class="ibtn bad apenas-admin" title="Excluir página" data-acao="wiki-del" data-id="${w.id}">${TRASH_SVG}</button>
       </div></td>
     </tr>`).join(''):'<tr><td colspan="5" class="empty"><span class="big">📘</span>Nenhuma página encontrada.</td></tr>';
@@ -5869,6 +5903,9 @@ function abrirWikiLeitura(id){
   if(w.criadoPor)partes.push('criada por '+w.criadoPor);
   if(w.atualizadoPor&&w.atualizadoPor!==w.criadoPor)partes.push('última edição por '+w.atualizadoPor);
   $('#wikiLeituraRodape').textContent=partes.join(' · ');
+  /* Some o Editar na leitura quando a página não é sua (só-admin continua
+     vendo sempre — o Excluir já é escondido pela classe .apenas-admin). */
+  $('#btnWikiEditar').style.display=wikiPodeEditar(w)?'':'none';
   setWikiPainel('leitura');
 }
 function abrirWikiEditor(id,retorno){
@@ -6241,14 +6278,24 @@ $('#wikiBusca').addEventListener('input',debounce(renderWiki,150));
 $('#wikiFiltroCat').addEventListener('change',renderWiki);
 $('#btnWikiNova').addEventListener('click',()=>abrirWikiEditor(null,'lista'));
 $('#btnWikiVoltar').addEventListener('click',()=>{setWikiPainel('lista');renderWiki();});
-$('#btnWikiEditar').addEventListener('click',()=>{if(wikiIdAberto)abrirWikiEditor(wikiIdAberto,'leitura');});
+$('#btnWikiEditar').addEventListener('click',()=>{
+  if(!wikiIdAberto)return;
+  const w=db.wiki.find(x=>x.id===wikiIdAberto);
+  if(!wikiPodeEditar(w)){toast('Você só pode editar páginas que <b>você criou</b>.','bad');return;}
+  abrirWikiEditor(wikiIdAberto,'leitura');
+});
 $('#btnWikiExcluir').addEventListener('click',()=>{if(wikiIdAberto)excluirWiki(wikiIdAberto);});
 $('#btnWikiCancelar').addEventListener('click',cancelarWikiEditor);
 $('#wikiTbody').addEventListener('click',e=>{
   const b=e.target.closest('[data-acao]');if(!b)return;
   const id=b.dataset.id;
   if(b.dataset.acao==='wiki-abrir')abrirWikiLeitura(id);
-  if(b.dataset.acao==='wiki-editar')abrirWikiEditor(id,'lista');
+  if(b.dataset.acao==='wiki-editar'){
+    /* Mesma barreira do botão some: esconder não é regra, o clique é. */
+    const w=db.wiki.find(x=>x.id===id);
+    if(!wikiPodeEditar(w)){toast('Você só pode editar páginas que <b>você criou</b>.','bad');return;}
+    abrirWikiEditor(id,'lista');
+  }
   if(b.dataset.acao==='wiki-del')excluirWiki(id);
 });
 $('#wikiBarra').addEventListener('click',e=>{
@@ -6281,6 +6328,11 @@ $('#formWiki').addEventListener('submit',e=>{
   }
   const id=$('#wikiId').value;
   const w=id?db.wiki.find(x=>x.id===id):null;
+  if(w&&!wikiPodeEditar(w)){
+    /* Última linha de defesa: chegou a gravar, mas a página não é sua —
+       servidor não guarda dono por item, então quem barra é aqui. */
+    toast('Você só pode editar páginas que <b>você criou</b>.','bad');return;
+  }
   let salvoId=id;
   if(w){
     w.titulo=titulo;w.categoria=categoria;w.conteudo=conteudo;
