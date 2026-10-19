@@ -220,6 +220,19 @@
        "NII" em #201302 Chakra Petch bold, raio proporcional ao do
        logo). Nada de arquivo solto: o app segue sendo um arquivo só.
 
+   33. LÁPIDES CONTRA A RESSURREIÇÃO (wiki e todas as seções): quando
+       o dono excluía um registro e o item voltava no F5, era a fusão
+       tratando o item morto como "novidade" — a dedução de exclusão
+       usa a memória `vistos`, e sem o id lá (memória perdida ou
+       corrompida, edição de antes a memória existir) o item
+       ressuscitava em silêncio. Agora a exclusão grava a LÁPIDE do
+       id na hora (localStorage ao lado do db, sincronizada entre
+       abas): a fusão não aceita o id de volta em NENHUM dos dois
+       ramos, e como o servidor ainda tem o item a seção fica "suja"
+       sozinha — o próximo push limpa também a nuvem. Ganchos em
+       TODAS as exclusões de item: wiki, técnicos, setores,
+       empréstimos, guias, impressoras, switches, racks e licenças.
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -1962,6 +1975,35 @@ function restaurarVistos(){
     Object.keys(s).forEach(k=>{ if(Array.isArray(s[k])) idsRemoto[k]=unirIds(idsRemoto[k],s[k]); });
   }catch(_){}
 }
+/* LÁPIDES (tombstones): os ids que EU apaguei, guardados NA HORA da exclusão.
+   A fusão deduz exclusão pela memória `vistos` — mas quando a memória não
+   tem o id (arquivo perdido/corrompido, edição feita antes da memória
+   existir, navegador zerado), o item morto voltava no F5 como "novidade" e
+   ressuscitava (o problema da wiki que "volta ao atualizar"). Com a lápide
+   gravada junto com o db, o item morto não ressuscita em NENHUM rumo: nem
+   o ramo local, nem o ramo remoto da fusão o aceita de volta — e como o
+   servidor ainda tem o item, a seção fica "suja" sozinha e o próximo push
+   limpa a nuvem também. União que só cresce, no mesmo disco da memória. */
+const LS_REMOVIDOS='sget-db-v1-removidos';
+const removidos={};
+function guardarRemovidos(){
+  try{
+    const s={};
+    Object.keys(removidos).forEach(k=>{s[k]=Array.from(removidos[k]);});
+    localStorage.setItem(LS_REMOVIDOS,JSON.stringify(s));
+  }catch(_){}
+}
+function restaurarRemovidos(){
+  try{
+    const s=JSON.parse(localStorage.getItem(LS_REMOVIDOS)||'{}')||{};
+    Object.keys(s).forEach(k=>{ if(Array.isArray(s[k])) removidos[k]=unirIds(removidos[k],s[k]); });
+  }catch(_){}
+}
+function marcarRemovido(nome,id){
+  if(!id)return;
+  removidos[nome]=unirIds(removidos[nome],[id]);
+  guardarRemovidos();
+}
 function extrairItens(nome,dados){
   if(!dados||!ehListaObjeto(nome))return [];
   return Array.isArray(dados.items)?dados.items:[];
@@ -2001,10 +2043,11 @@ function maisRecente(local,remoto){
    ramo remoto). Sem isso a exclusão da wiki — e de qualquer seção — não
    chegava aos demais usuários: o item morto continuava no local e era
    regravado na nuvem na próxima gravação de qualquer módulo (ressurreição). */
-function fundirSecao(local,remoto,vistos){
+function fundirSecao(local,remoto,vistos,mortos){
   local=Array.isArray(local)?local:[];
   remoto=Array.isArray(remoto)?remoto:[];
   vistos=vistos||new Set();
+  mortos=mortos||new Set();
   /* EMERGÊNCIA 18/10: dois lados nunca se apagam POR COMPLETO. A regra
      "está em `vistos` e não está aqui = foi apagado" é certa ITEM A ITEM,
      mas uma cópia local perdida ou defasada (F5 com memória armada e
@@ -2021,6 +2064,7 @@ function fundirSecao(local,remoto,vistos){
   const res=[];
   local.forEach(x=>{
     if(!x||!x.id)return;
+    if(mortos.has(x.id))return;  /* lápide: apaguei aqui, não volta nem pelo ramo local */
     const r=rPorId.get(x.id);
     if(!r){
       if(vistos.has(x.id))return;  /* existia lá e sumiu de lá → apagado lá */
@@ -2031,6 +2075,7 @@ function fundirSecao(local,remoto,vistos){
   });
   remoto.forEach(r=>{
     if(!r||!r.id)return;
+    if(mortos.has(r.id))return;   /* lápide: apaguei aqui, não ressuscita pelo ramo remoto */
     if(lPorId.has(r.id))return;   /* já entrou pela lista anterior */
     if(vistos.has(r.id))return;   /* existia antes e sumiu do local → apagado */
     res.push(r);                  /* novidade que chegou de outro usuário */
@@ -2092,7 +2137,7 @@ function aplicarSecao(nome,dados){
   }
   /* funde em vez de substituir: trabalho local não enviado não é engolido;
      item que esteve em `vistos` e sumiu do servidor também sai daqui. */
-  db[nome]=fundirSecao(db[nome]||[],remoto,vistos);
+  db[nome]=fundirSecao(db[nome]||[],remoto,vistos,removidos[nome]);
   /* Disco junto com a memória (conserto do "some no F5"): o `vistos` logo
      abaixo é gravado no localStorage, mas o db fusionado ficava SÓ na
      memória — o snapshot não salvava. Depois do F5, o navegador "lembrava"
@@ -2162,7 +2207,7 @@ async function sincronizarComNuvem(){
              Documento sem `snap.exists` não tem "antes" para comparar →
              vistos vazio, para a união histórica não apagar tudo à toa. */
           vistosEfetivo=snap.exists?vistos:new Set();
-          const fundido=fundirSecao(local.items,extrairItens(nome,remoto),vistosEfetivo);
+          const fundido=fundirSecao(local.items,extrairItens(nome,remoto),vistosEfetivo,removidos[nome]);
           tx.set(ref,{items:fundido});
           servidores={items:fundido};
         });
@@ -2174,7 +2219,7 @@ async function sincronizarComNuvem(){
            gravação seguinte os apagava do servidor para TODO MUNDO. (A memória
            usada aqui é a de ANTES da rodada: assim o item só-servidor vale
            como novidade e entra no local.) */
-        if(ehListaObjeto(nome))db[nome]=fundirSecao(db[nome]||[],extrairItens(nome,servidores),vistosEfetivo);
+        if(ehListaObjeto(nome))db[nome]=fundirSecao(db[nome]||[],extrairItens(nome,servidores),vistosEfetivo,removidos[nome]);
         idsRemoto[nome]=unirIds(vistos,idsDe(extrairItens(nome,servidores)));
         /* Mesma garantia do aplicarSecao: esta fusão de volta mudou o db e a
            memória — grava os DOIS no disco agora. Sem isso, o F5 perdia o
@@ -2238,6 +2283,7 @@ window.addEventListener('online',()=>{
 });
 async function iniciarSincronizacao(){
   restaurarVistos();   /* memória das exclusões de sessões anteriores */
+  restaurarRemovidos(); /* lápides das exclusões de sessões anteriores */
   sincronizando=true;
   /* Sem internet? Não adianta esperar nem acusar erro: abre já com a cópia
      local, que é fundida com a nuvem quando a conexão voltar. */
@@ -2760,6 +2806,7 @@ function persistir(){
   sincronizarComNuvem();
 }
 window.addEventListener('storage',e=>{
+  if(e.key===LS_REMOVIDOS){restaurarRemovidos();return;}
   if(e.key===LS&&e.newValue){
     try{
       const d=JSON.parse(e.newValue);
@@ -4165,7 +4212,7 @@ $('#tecTbody').addEventListener('click',e=>{
     if(emps.length)partes.push(emps.length+' empréstimo'+(emps.length>1?'s':''));
     if(partes.length)return toast('Não é possível excluir <b>'+esc(t.nome)+'</b>. Há '+partes.join(', ')+' sob responsabilidade dele. Reatribua e tente de novo.','bad');
     confirmar('Excluir técnico','Excluir <b>'+esc(t.nome)+'</b>?',()=>{
-      db.tecnicos=db.tecnicos.filter(x=>x.id!==t.id);
+      marcarRemovido('tecnicos',t.id);db.tecnicos=db.tecnicos.filter(x=>x.id!==t.id);
       persistir();gravarAdmins();resetTec();atualizarTudo();toast('Técnico excluído.','warn');});
   }
 });
@@ -4287,7 +4334,7 @@ $('#setTbody').addEventListener('click',e=>{
     if(imps.length)partes.push(imps.length+' impressora'+(imps.length>1?'s':'')+' ('+imps.slice(0,3).map(x=>x.modelo||x.nome||'s/n').join(', ')+(imps.length>3?',…':'')+')');
     if(partes.length)return toast('Não é possível excluir <b>'+esc(s.nome)+'</b>. Há '+partes.join(', ')+' usando este setor. Transfira-os para outro e tente de novo.','bad');
     confirmar('Excluir setor','Excluir <b>'+esc(s.nome)+'</b>?',()=>{
-      db.setores=db.setores.filter(x=>x.id!==s.id);
+      marcarRemovido('setores',s.id);db.setores=db.setores.filter(x=>x.id!==s.id);
       persistir();resetSet();atualizarTudo();toast('Setor excluído.','warn');});
   }
 });
@@ -4771,7 +4818,7 @@ $('#empTbody').addEventListener('click',e=>{
   if(b.dataset.acao==='emp-print')imprimirOS(emp);
   if(b.dataset.acao==='emp-del')confirmar('Excluir O.S.','Excluir a ordem <b class="mono">'+esc(emp.os||'(sem número)')+'</b>? Os equipamentos voltarão a ficar disponíveis.',()=>{
     if(!emp.devolucao)(emp.equipIds||[]).forEach(id=>{const q=eqById(id);if(q){q.indisponivel=false;q.atualizadoEm=Date.now();}});
-    db.emprestimos=db.emprestimos.filter(x=>x.id!==emp.id);
+    marcarRemovido('emprestimos',emp.id);db.emprestimos=db.emprestimos.filter(x=>x.id!==emp.id);
     persistir();
     if(empEditId===emp.id)resetEmpForm();
     atualizarTudo();toast('Ordem excluída.','warn');});
@@ -5113,7 +5160,7 @@ $('#guiaTbody').addEventListener('click',e=>{
   if(b.dataset.acao==='guia-edit')editarGuia(g.id);
   if(b.dataset.acao==='guia-print')imprimirGuia(g);
   if(b.dataset.acao==='guia-del')confirmar('Excluir guia','Excluir a guia nº <b class="mono">'+g.numero+'</b>?',()=>{
-    db.guias=db.guias.filter(x=>x.id!==g.id);
+    marcarRemovido('guias',g.id);db.guias=db.guias.filter(x=>x.id!==g.id);
     persistir();
     if(guiaEditId===g.id)resetGuiaForm();
     atualizarTudo();toast('Guia excluída.','warn');});
@@ -5201,7 +5248,7 @@ function editarImpressora(id){
 function excluirImpressora(id){
   const p=db.impressoras.find(x=>x.id===id);if(!p)return;
   confirmar('Excluir impressora','Excluir <b>'+esc(p.modelo)+'</b>'+(p.host?' ('+esc(p.host)+')':'')+'?',()=>{
-    db.impressoras=db.impressoras.filter(x=>x.id!==id);
+    marcarRemovido('impressoras',id);db.impressoras=db.impressoras.filter(x=>x.id!==id);
     persistir();
     if(impEditId===id)resetImpForm();
     atualizarTudo();toast('Impressora excluída.','warn');});
@@ -5323,7 +5370,7 @@ function editarSwitch(id){
 function excluirSwitch(id){
   const s=db.switches.find(x=>x.id===id);if(!s)return;
   confirmar('Excluir switch','Excluir '+(s.nome?'<b>'+esc(s.nome)+'</b> ':'')+'(<span class="mono">'+esc(s.ip)+'</span>)?',()=>{
-    db.switches=db.switches.filter(x=>x.id!==id);
+    marcarRemovido('switches',id);db.switches=db.switches.filter(x=>x.id!==id);
     persistir();
     if(swEditId===id)resetSwitchForm();
     atualizarTudo();toast('Switch excluído.','warn');});
@@ -5447,7 +5494,7 @@ function editarRack(id){
 function excluirRack(id){
   const p=db.racks.find(x=>x.id===id);if(!p)return;
   confirmar('Excluir ponto','Excluir este ponto de rack?',()=>{
-    db.racks=db.racks.filter(x=>x.id!==id);
+    marcarRemovido('racks',id);db.racks=db.racks.filter(x=>x.id!==id);
     persistir();
     if(rkEditId===id)resetRackForm();
     atualizarTudo();toast('Ponto excluído.','warn');});
@@ -5597,7 +5644,7 @@ function editarLicenca(id){
 function excluirLicenca(id){
   const l=db.licencas.find(x=>x.id===id);if(!l)return;
   confirmar('Excluir licença','Excluir a licença de <b class="mono">'+esc(l.host||'')+'</b>?',()=>{
-    db.licencas=db.licencas.filter(x=>x.id!==id);
+    marcarRemovido('licencas',id);db.licencas=db.licencas.filter(x=>x.id!==id);
     persistir();
     if(licEditId===id)resetLicencaForm();
     atualizarTudo();toast('Licença excluída.','warn');});
@@ -5972,7 +6019,7 @@ function excluirWiki(id){
   if(!souAdmin()){toast('Só um <b>administrador</b> pode excluir páginas da wiki.','bad');return;}
   const w=db.wiki.find(x=>x.id===id);if(!w)return;
   confirmar('Excluir página','Excluir <b>'+esc(w.titulo||'Sem título')+'</b>? O conteúdo não pode ser recuperado depois.',()=>{
-    db.wiki=db.wiki.filter(x=>x.id!==id);
+    marcarRemovido('wiki',id);db.wiki=db.wiki.filter(x=>x.id!==id);
     if(wikiIdAberto===id)wikiIdAberto=null;
     persistir();setWikiPainel('lista');atualizarTudo();toast('Página excluída.','warn');
   });
