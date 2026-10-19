@@ -485,6 +485,177 @@ async function rotaExcluirArquivo(request, env) {
   }), { headers: headers });
 }
 
+/* GET /api/backup-wiki — ZIP com TODOS os prints e documentos guardados.
+   É o irmão do "⬇ Exportar backup" do menu: o JSON leva as seções do
+   Firestore, este ZIP leva os BINÁRIOS da KV (que o JSON nunca alcança).
+   Mesma sessão dos envios. O ZIP é montado na mão, sem compressão
+   (STORED): o projeto não tem build nem bibliotecas, e deflate não
+   valeria o trabalho — os arquivos são poucos e pequenos. Limites
+   defensivos (1.000 arquivos ou 64 MB) mandam quem passar baixar pela
+   lista, um a um. */
+const TABELA_CRC = (function () {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    t[n] = c;
+  }
+  return t;
+})();
+function crc32(bytes) {
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < bytes.length; i++) c = TABELA_CRC[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+function junta(lista) {
+  let total = 0;
+  for (let i = 0; i < lista.length; i++) total += lista[i].length;
+  const saida = new Uint8Array(total);
+  let off = 0;
+  for (let i = 0; i < lista.length; i++) { saida.set(lista[i], off); off += lista[i].length; }
+  return saida;
+}
+function dosDataHora(d) {
+  const ano = Math.max(1980, d.getFullYear());
+  const data = ((ano - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
+  const hora = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1);
+  return { data: data, hora: hora };
+}
+function montarZip(itens) {
+  const encoder = new TextEncoder();
+  const dh = dosDataHora(new Date());
+  const corpo = [], central = [];
+  let offset = 0;
+  for (let i = 0; i < itens.length; i++) {
+    const nomeB = encoder.encode(itens[i].nome);
+    const bytes = itens[i].bytes;
+    const crc = crc32(bytes), tam = bytes.length;
+    /* header local (30 bytes) + nome */
+    const local = new Uint8Array(30 + nomeB.length);
+    const dv = new DataView(local.buffer);
+    dv.setUint32(0, 0x04034b50, true);   /* assinatura "PK\x03\x04" */
+    dv.setUint16(4, 20, true);           /* versão que criou */
+    dv.setUint16(6, 0x0800, true);       /* flags: nomes em UTF-8 */
+    dv.setUint16(8, 0, true);            /* método 0 = STORED (sem compactar) */
+    dv.setUint16(10, dh.hora, true);
+    dv.setUint16(12, dh.data, true);
+    dv.setUint32(14, crc, true);
+    dv.setUint32(18, tam, true);         /* tamanho já compactado */
+    dv.setUint32(22, tam, true);         /* tamanho original */
+    dv.setUint16(26, nomeB.length, true);
+    dv.setUint16(28, 0, true);           /* extra */
+    local.set(nomeB, 30);
+    corpo.push(local, bytes);
+    /* entrada do diretório central (46 bytes) + nome */
+    const c = new Uint8Array(46 + nomeB.length);
+    const cv = new DataView(c.buffer);
+    cv.setUint32(0, 0x02014b50, true);   /* "PK\x01\x02" */
+    cv.setUint16(4, 20, true);           /* versão por */
+    cv.setUint16(6, 20, true);           /* versão mínimo */
+    cv.setUint16(8, 0x0800, true);
+    cv.setUint16(10, 0, true);           /* método */
+    cv.setUint16(12, dh.hora, true);
+    cv.setUint16(14, dh.data, true);
+    cv.setUint32(16, crc, true);
+    cv.setUint32(20, tam, true);
+    cv.setUint32(24, tam, true);
+    cv.setUint16(28, nomeB.length, true);
+    cv.setUint16(30, 0, true);           /* extra */
+    cv.setUint16(32, 0, true);           /* comentário */
+    cv.setUint16(34, 0, true);           /* disco */
+    cv.setUint16(36, 0, true);           /* atributos internos */
+    cv.setUint32(38, 0, true);           /* atributos externos */
+    cv.setUint32(42, offset, true);      /* offset do header local */
+    c.set(nomeB, 46);
+    central.push(c);
+    offset += local.length + tam;
+  }
+  const dirCentral = junta(central);
+  /* fim do diretório central (22 bytes) */
+  const fim = new Uint8Array(22);
+  const ev = new DataView(fim.buffer);
+  ev.setUint32(0, 0x06054b50, true);     /* "PK\x05\x06" */
+  ev.setUint16(4, 0, true);
+  ev.setUint16(6, 0, true);
+  ev.setUint16(8, itens.length, true);
+  ev.setUint16(10, itens.length, true);
+  ev.setUint32(12, dirCentral.length, true);
+  ev.setUint32(16, offset, true);
+  ev.setUint16(20, 0, true);
+  return junta(corpo.concat([dirCentral, fim]));
+}
+function respostaZipErro(json, status, origem) {
+  const headers = {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Access-Control-Allow-Origin': origem || '*',
+    'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS'
+  };
+  return new Response(JSON.stringify(json), { status: status, headers: headers });
+}
+async function rotaBackupWiki(request, env) {
+  const origem = request.headers.get('Origin') || '';
+  const headers = {
+    'Content-Type': 'application/zip',
+    'Access-Control-Allow-Origin': origem || '*',
+    'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS'
+  };
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: headers });
+  if (!env || !env.WIKI_IMAGENS) {
+    return respostaZipErro({ erro: 'Worker sem o binding WIKI_IMAGENS.' }, 500, origem);
+  }
+  let usuario = null;
+  try { usuario = await usuarioDoToken(request); } catch (e) { usuario = null; }
+  if (!usuario) {
+    return respostaZipErro({ erro: 'Entre no sistema para baixar os arquivos da wiki.' }, 401, origem);
+  }
+  try {
+    const lista = await montarListaArquivos(env);
+    if (!lista.length) {
+      return respostaZipErro({ erro: 'Não há nenhum arquivo guardado para baixar.' }, 404, origem);
+    }
+    if (lista.length > 1000) {
+      return respostaZipErro({ erro: 'Backup com ' + lista.length + ' arquivos — baixe pela lista 📁, um a um.' }, 413, origem);
+    }
+    const itens = [];
+    const usados = {};
+    let total = 0;
+    for (const a of lista) {
+      let buf = null;
+      try { buf = await env.WIKI_IMAGENS.get(a.chave, 'arrayBuffer'); } catch (e) { buf = null; }
+      if (!buf) continue;
+      total += buf.byteLength;
+      if (total > 67108864) {                                /* 64 MB */
+        return respostaZipErro({ erro: 'Backup passaria de 64 MB (' + fmtZip(total) + ') — baixe pela lista 📁, um a um.' }, 413, origem);
+      }
+      /* nome legível dentro do ZIP: o original, sem caracteres proibidos, e sem colisão */
+      let nome = String(a.nome || a.chave).replace(/[\\/:*?"<>|]/g, '_').slice(0, 120);
+      if (!nome) nome = a.chave;
+      let final = nome, k = 2;
+      while (usados[final]) {
+        const ponto = nome.lastIndexOf('.');
+        final = (ponto > 0) ? nome.slice(0, ponto) + ' (' + k + ')' + nome.slice(ponto) : nome + ' (' + k + ')';
+        k++;
+      }
+      usados[final] = 1;
+      itens.push({ nome: final, bytes: new Uint8Array(buf) });
+    }
+    if (!itens.length) {
+      return respostaZipErro({ erro: 'Não deu para ler nenhum arquivo para o backup.' }, 500, origem);
+    }
+    const zip = montarZip(itens);
+    const hoje = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    headers['Content-Disposition'] = 'attachment; filename="backup-wiki-' + hoje + '.zip"';
+    return new Response(zip, { headers: headers });
+  } catch (e) {
+    return respostaZipErro({ erro: String((e && e.message) || e) }, 500, origem);
+  }
+}
+function fmtZip(bytes) {
+  return (bytes >= 1048576) ? (Math.round(bytes / 104857.6) / 10) + ' MB' : Math.ceil(bytes / 1024) + ' KB';
+}
+
 /* ---- rota única: /api/imagens (enviar) e /wiki-img/... (servir) ---------- */
 async function rotaImagemWiki(request, env) {
   const url = new URL(request.url);
@@ -693,6 +864,9 @@ export default {
       }
       if (url.pathname === '/api/arquivos') {
         return await rotaArquivos(request, env);
+      }
+      if (url.pathname === '/api/backup-wiki') {
+        return await rotaBackupWiki(request, env);
       }
       /* qualquer outro endereço volta para os arquivos estáticos do projeto */
       return await env.ASSETS.fetch(request);

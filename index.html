@@ -291,6 +291,18 @@
        Chave aceita: só wiki-[letras/números . _ -] — nada de
        _uso/_lista ou endereço solto.
 
+   38. ⬇ BACKUP DOS ARQUIVOS DA NUVEM (ZIP): o "⬇ Exportar backup" do
+       menu leva as seções do Firestore em JSON — mas os prints e
+       PDFs da wiki são BINÁRIOS na Workers KV e ficam de fora. O
+       painel 📁 Arquivos ganhou o botão "⬇ Tudo (ZIP)", que chama o
+       novo GET /api/backup-wiki (mesma sessão dos envios) e baixa
+       tudo em backup-wiki-AAAAMMDD.zip. O Worker monta o ZIP na
+       mão, sem compressão (STORED, CRC-32 próprio — projeto não tem
+       build nem bibliotecas), usa o nome original de cada arquivo
+       (com " (2)"/" (3)" quando repete, e sem caracteres proibidos)
+       e recusa com 413 se passar de 1.000 arquivos ou 64 MB
+       (manda baixar pela lista, um a um).
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -298,7 +310,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261019-171041">
+<meta name="nii-build" content="20261019-173549">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -1750,6 +1762,7 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
                 <option value="imagem">🖼 Prints</option>
                 <option value="documento">📄 Documentos</option>
               </select>
+              <button class="btn btn-ghost btn-sm" type="button" id="btnWikiArqZip" title="Baixar todos os prints e documentos de uma vez — o lado do backup que o JSON não cobre">⬇ Tudo (ZIP)</button>
               <button class="btn btn-ghost btn-sm" type="button" id="btnWikiArqAtualizar">🔄 Atualizar</button>
               <button class="btn btn-ghost btn-sm" type="button" id="btnWikiArqVoltar">← Voltar</button>
             </div>
@@ -6634,6 +6647,29 @@ function pintarWikiArquivos(){
 $('#btnWikiArquivos').addEventListener('click',()=>{setWikiPainel('arquivos');carregarWikiArquivos(false);});
 $('#btnWikiArqVoltar').addEventListener('click',()=>{setWikiPainel('lista');renderWiki();});
 $('#btnWikiArqAtualizar').addEventListener('click',()=>{carregarWikiArquivos(true);});
+/* --- ⬇ Tudo (ZIP): o backup dos BINÁRIOS da nuvem -------------------------
+   O "⬇ Exportar backup" do menu leva as seções do Firestore (texto); os
+   prints e PDFs vivem na Workers KV e ficam de fora dele. Esta rota
+   monta um ZIP com tudo lá de dentro (mesma sessão dos envios). */
+$('#btnWikiArqZip').addEventListener('click',async()=>{
+  try{
+    if(!usuarioAtual||!auth.currentUser)throw new Error('entre no sistema para baixar os arquivos.');
+    const r=await fetch('/api/backup-wiki',{cache:'no-store',headers:{'Authorization':'Bearer '+(await auth.currentUser.getIdToken())}});
+    if(!r.ok){
+      let e={};try{e=await r.json();}catch(err){}
+      throw new Error(e.erro||('falha ao montar o ZIP (HTTP '+r.status+').'));
+    }
+    const blob=await r.blob();
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='backup-wiki-'+hojeISO().replace(/-/g,'')+'.zip';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    toast('ZIP baixado — <b>'+fmtBytes(blob.size)+'</b> com os arquivos da wiki.','ok');
+  }catch(err){
+    toast('Não deu para baixar o ZIP: '+esc(err.message),'bad');
+  }
+});
 $('#wikiArqFiltro').addEventListener('change',()=>pintarWikiArquivos());
 /* --- 🗑 excluir arquivo (só administrador) --------------------------------
    O botão já some pela classe .apenas-admin, e a chamada aqui confere de
