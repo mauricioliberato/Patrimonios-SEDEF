@@ -201,6 +201,95 @@ function nomeAscii(txt, reserva) {
   return limpo || reserva;
 }
 
+/* ---- medidor de uso (auto-contagem na própria KV) -------------------------
+   A Workers KV de conta grátis não expõe o espaço usado em API — então o
+   próprio Worker contabiliza: cada gravação soma no registro `_uso`, e o
+   endpoint GET /api/uso devolve os totais para o Painel do sistema. O
+   pedido /api/uso?recalc=1 varre a namespace inteira (list + get por
+   arquivo) e semeia a base — protegido a 1 varredura por hora, para a
+   cota de leituras (100.000/dia) não ser gasta à toa. */
+const CHAVE_USO = '_uso';
+async function lerUso(env) {
+  try {
+    const v = await env.WIKI_IMAGENS.get(CHAVE_USO, 'json');
+    if (v && typeof v === 'object') return v;
+  } catch (e) { }
+  return { imagens: { qtd: 0, bytes: 0 }, documentos: { qtd: 0, bytes: 0 }, enviosHoje: 0, dataEnvios: '' };
+}
+async function salvarUso(env, uso) {
+  await env.WIKI_IMAGENS.put(CHAVE_USO, JSON.stringify(uso));
+}
+async function registrarEnvio(env, bytes, tipo) {
+  /* O envio já está gravado: o medidor nunca pode derrubar a resposta. */
+  try {
+    const uso = await lerUso(env);
+    const hoje = new Date().toISOString().slice(0, 10);
+    if (uso.dataEnvios !== hoje) { uso.dataEnvios = hoje; uso.enviosHoje = 0; }
+    uso[tipo] = uso[tipo] || { qtd: 0, bytes: 0 };
+    uso[tipo].qtd++;
+    uso[tipo].bytes += bytes;
+    uso.enviosHoje = (uso.enviosHoje || 0) + 1;
+    await salvarUso(env, uso);
+  } catch (e) { }
+}
+/* GET /api/uso — quanto de espaço as imagens e os documentos ocupam */
+async function rotaUso(request, env) {
+  const headers = {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS'
+  };
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers });
+  if (!env || !env.WIKI_IMAGENS) {
+    return new Response(JSON.stringify({ erro: 'Worker sem o binding WIKI_IMAGENS.' }), { status: 500, headers });
+  }
+  const url = new URL(request.url);
+  let uso = await lerUso(env);
+  if (url.searchParams.get('recalc') === '1') {
+    const agora = Date.now();
+    const jaVarreu = uso.recalcEm && (agora - uso.recalcEm) < 3600e3;
+    if (!jaVarreu) {
+      const imagens = { qtd: 0, bytes: 0 }, documentos = { qtd: 0, bytes: 0 };
+      let cursor, total = 0;
+      do {
+        const pag = await env.WIKI_IMAGENS.list({ prefix: '', cursor: cursor });
+        for (const par of (pag.keys || [])) {
+          if (par.name === CHAVE_USO) continue;
+          try {
+            const buf = await env.WIKI_IMAGENS.get(par.name, 'arrayBuffer');
+            const n = buf ? buf.byteLength : 0;
+            total++;
+            if (par.name.indexOf('wiki-doc-') === 0) { documentos.qtd++; documentos.bytes += n; }
+            else { imagens.qtd++; imagens.bytes += n; }
+          } catch (e) { }
+        }
+        cursor = pag.list_complete ? undefined : pag.cursor;
+      } while (cursor && total < 20000);
+      const hoje = new Date().toISOString().slice(0, 10);
+      uso = {
+        imagens: imagens, documentos: documentos,
+        enviosHoje: uso.enviosHoje || 0, dataEnvios: uso.dataEnvios || hoje,
+        recalculadoEm: new Date().toISOString(), recalcEm: agora
+      };
+      try { await salvarUso(env, uso); } catch (e) { }
+    }
+  }
+  const resposta = {
+    espacoTotal: 1073741824,          /* 1 GB — cota grátis da Workers KV */
+    gravacoesDia: 1000,
+    imagens: uso.imagens || { qtd: 0, bytes: 0 },
+    documentos: uso.documentos || { qtd: 0, bytes: 0 },
+    enviosHoje: uso.enviosHoje || 0,
+    dataEnvios: uso.dataEnvios || '',
+    recalculadoEm: uso.recalculadoEm || ''
+  };
+  resposta.total = {
+    qtd: (resposta.imagens.qtd || 0) + (resposta.documentos.qtd || 0),
+    bytes: (resposta.imagens.bytes || 0) + (resposta.documentos.bytes || 0)
+  };
+  return new Response(JSON.stringify(resposta), { headers: headers });
+}
+
 /* ---- rota única: /api/imagens (enviar) e /wiki-img/... (servir) ---------- */
 async function rotaImagemWiki(request, env) {
   const url = new URL(request.url);
@@ -261,8 +350,9 @@ async function enviarImagem(request, env) {
   }
 
   const nome = 'wiki-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7) + '.' + extensao;
+  const bytes = b64ParaBytes(dados);
   try {
-    await env.WIKI_IMAGENS.put(nome, b64ParaBytes(dados), {
+    await env.WIKI_IMAGENS.put(nome, bytes, {
       metadata: { por: usuario.email, em: new Date().toISOString() }
     });
   } catch (e) {
@@ -272,6 +362,7 @@ async function enviarImagem(request, env) {
     }, 502, origem);
   }
 
+  await registrarEnvio(env, bytes.length, 'imagens');
   return respostaImagem({
     url: new URL(request.url).origin + '/wiki-img/' + nome,
     nome: nome,
@@ -354,8 +445,9 @@ async function enviarDocumento(request, env) {
   }
 
   const nome = 'wiki-doc-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7) + '.' + extensao;
+  const bytes = b64ParaBytes(dados);
   try {
-    await env.WIKI_IMAGENS.put(nome, b64ParaBytes(dados), {
+    await env.WIKI_IMAGENS.put(nome, bytes, {
       metadata: {
         por: usuario.email,
         em: new Date().toISOString(),
@@ -370,6 +462,7 @@ async function enviarDocumento(request, env) {
     }, 502, origem);
   }
 
+  await registrarEnvio(env, bytes.length, 'documentos');
   return respostaImagem({
     url: new URL(request.url).origin + '/wiki-doc/' + nome,
     nome: nomeOriginal || nome,
@@ -395,6 +488,9 @@ export default {
       }
       if (url.pathname === '/api/anexos' || url.pathname.indexOf('/wiki-doc/') === 0) {
         return await rotaAnexoWiki(request, env);
+      }
+      if (url.pathname === '/api/uso') {
+        return await rotaUso(request, env);
       }
       /* qualquer outro endereço volta para os arquivos estáticos do projeto */
       return await env.ASSETS.fetch(request);

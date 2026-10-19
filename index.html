@@ -791,6 +791,14 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
               </div>
             </div>
           </div>
+          <div class="card">
+            <div class="card-h"><h3>Armazenamento da nuvem</h3><span class="sub" id="usoNuvemQuando"></span></div>
+            <div class="card-b">
+              <div class="chart-track"><div class="chart-bar" id="usoNuvemBarra" style="width:0%"></div></div>
+              <div id="usoNuvemLinhas" style="margin-top:10px"><div class="empty">Carregando…</div></div>
+              <div class="q-actions"><button class="btn btn-ghost btn-sm" id="usoNuvemAtualizar">🔄 Atualizar contagem</button></div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -3572,10 +3580,76 @@ function renderDashboard(){
     <div class="who"><b>${esc(first?first.patrimonio:'?')}${first&&first.excluido?' <span style="color:var(--bad)">(excl.)</span>':''}${eqs.length>1?` <span style="color:var(--muted)">(+${eqs.length-1})</span>`:''}</b>
     <span>${esc(e.solicitante)}${e.dataReserva?' · reserva '+fmtData(e.dataReserva):''}</span></div>
     <span class="pill ${st.k}">${st.label}</span></li>`;}).join(''):'<li class="empty">Nenhum empréstimo registrado.</li>';
+  pintarUsoNuvem();carregarUsoNuvem(false);
 }
 $('#qNovoEmp').addEventListener('click',()=>{showView('emprestimos');resetEmpForm();setTimeout(()=>$('#empEqSel').focus(),120);});
 $('#qNovoEq').addEventListener('click',()=>{showView('equipamentos');setEqTab('cadastro');setTimeout(()=>$('#eqPatrimonio').focus(),120);});
 $('#qNovaGuia').addEventListener('click',()=>{showView('guias');resetGuiaForm();setTimeout(()=>$('#guiaSetorOriTxt').focus(),120);});
+
+/* ============== ARMAZENAMENTO DA NUVEM (Workers KV) ==============
+   Prints e documentos da Wiki não ficam no GitHub — ficam na Workers KV
+   do Cloudflare (1 GB grátis). O Worker conta sozinho cada gravação e o
+   endpoint /api/uso devolve os totais; aqui só se formata e se exibe,
+   com cópia em localStorage (30 min) para não bater no servidor a cada
+   visita ao Painel. */
+const LS_USO='sget-db-v1-uso';
+let usoNuvem=null;
+function fmtBytes(n){
+  n=Number(n)||0;
+  if(n<1024)return n+' B';
+  if(n<1048576)return (n/1024).toFixed(n<10240?1:0)+' KB';
+  if(n<1073741824)return (n/1048576).toFixed(n<10485760?1:0)+' MB';
+  return (n/1073741824).toFixed(2)+' GB';
+}
+function pintarUsoNuvem(){
+  const alvo=$('#usoNuvemLinhas');if(!alvo)return;
+  const quando=$('#usoNuvemQuando'),barra=$('#usoNuvemBarra');
+  if(!usoNuvem){alvo.innerHTML='<div class="empty">Sem a contagem ainda — toque em 🔄 Atualizar.</div>';if(quando)quando.textContent='';return;}
+  const img=usoNuvem.imagens||{qtd:0,bytes:0},doc=usoNuvem.documentos||{qtd:0,bytes:0};
+  const tot=(usoNuvem.total&&typeof usoNuvem.total==='object')?usoNuvem.total:
+            {qtd:(img.qtd||0)+(doc.qtd||0),bytes:(img.bytes||0)+(doc.bytes||0)};
+  const quota=Number(usoNuvem.espacoTotal)||1073741824;
+  const pct=Math.min(100,(tot.bytes/quota)*100);
+  if(barra){
+    /* largura mínima visível: hoje o uso é minúsculo perto de 1 GB */
+    barra.style.width=(tot.bytes>0?Math.max(pct,0.6):0).toFixed(2)+'%';
+    barra.style.background=pct>90?'var(--bad)':pct>70?'var(--warn)':'var(--accent)';
+  }
+  alvo.innerHTML=`
+    <div class="chart-row"><div class="cl">Usado no total</div><div class="cv"><b>${fmtBytes(tot.bytes)}</b> de ${fmtBytes(quota)} (${pct.toFixed(1)}%)</div></div>
+    <div class="chart-row"><div class="cl">🖼️ Prints (imagens da wiki)</div><div class="cv">${img.qtd||0} arquivo(s) · ${fmtBytes(img.bytes||0)}</div></div>
+    <div class="chart-row"><div class="cl">📄 Documentos anexados</div><div class="cv">${doc.qtd||0} arquivo(s) · ${fmtBytes(doc.bytes||0)}</div></div>
+    <div class="chart-row"><div class="cl">Envios hoje</div><div class="cv">${usoNuvem.enviosHoje||0} de ${usoNuvem.gravacoesDia||1000}/dia</div></div>`;
+  if(quando){
+    quando.textContent=usoNuvem.lidoEm?('atualizado '+new Date(usoNuvem.lidoEm).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})):'';
+  }
+}
+async function carregarUsoNuvem(forcar){
+  try{
+    if(!forcar&&usoNuvem)return;   /* já em memória: nada a fazer */
+    if(!forcar){
+      try{
+        const salvo=JSON.parse(localStorage.getItem(LS_USO)||'null');
+        if(salvo&&salvo.d&&Date.now()-salvo.em<30*60*1000){
+          usoNuvem=salvo.d;usoNuvem.lidoEm=salvo.em;pintarUsoNuvem();return;
+        }
+      }catch(_){}
+    }
+    const r=await fetch(location.origin+'/api/uso',{cache:'no-store'});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const d=await r.json();
+    if(d&&d.erro)throw new Error(d.erro);
+    usoNuvem=d;usoNuvem.lidoEm=Date.now();
+    try{localStorage.setItem(LS_USO,JSON.stringify({em:usoNuvem.lidoEm,d:d}));}catch(_){}
+  }catch(err){
+    console.warn('Contagem da nuvem indisponível:',err);
+    if(!usoNuvem){   /* última cópia salva, mesmo vencida, é melhor que nada */
+      try{const s=JSON.parse(localStorage.getItem(LS_USO)||'null');if(s&&s.d){usoNuvem=s.d;usoNuvem.lidoEm=s.em;}}catch(_){}
+    }
+  }
+  pintarUsoNuvem();
+}
+$('#usoNuvemAtualizar').addEventListener('click',()=>{carregarUsoNuvem(true);});
 
 /* ============== TIPOS E MARCAS ============== */
 let listaAtual=null;
