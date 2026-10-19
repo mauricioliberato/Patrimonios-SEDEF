@@ -238,6 +238,16 @@
        de uma seção era ressuscitado na hora (caso real: a wiki com
        uma página só, em que toda exclusão "voltava no F5").
 
+   34. ESPAÇO DA NUVEM NO PAINEL: cartão "Armazenamento da nuvem" na
+       página principal com barra de uso, total (prints + documentos)
+       em MB de 1 GB, quebra por tipo, envios do dia e botão de
+       atualizar. Os arquivos NÃO ficam no GitHub — ficam na Workers
+       KV do Cloudflare (cota grátis de 1 GB), onde o Worker já grava
+       e serve; como a KV não expõe o uso em API, o próprio Worker
+       agora conta cada gravação (registro `_uso`) e expõe
+       GET /api/uso (com ?recalc=1 para varrer a base, 1x por hora).
+       Cópia do resultado no localStorage por 30 minutos.
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
