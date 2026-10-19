@@ -209,6 +209,9 @@ function nomeAscii(txt, reserva) {
    arquivo) e semeia a base — protegido a 1 varredura por hora, para a
    cota de leituras (100.000/dia) não ser gasta à toa. */
 const CHAVE_USO = '_uso';
+/* `_lista` é o cache da listagem de arquivos (rotaArquivos) — por ser
+   chave "_*", fica de fora tanto do recálculo de uso quanto da listagem. */
+const CHAVE_LISTA = '_lista';
 async function lerUso(env) {
   try {
     const v = await env.WIKI_IMAGENS.get(CHAVE_USO, 'json');
@@ -230,6 +233,8 @@ async function registrarEnvio(env, bytes, tipo) {
     uso[tipo].bytes += bytes;
     uso.enviosHoje = (uso.enviosHoje || 0) + 1;
     await salvarUso(env, uso);
+    /* e invalida a listagem de arquivos — ela deve mostrar o recém-enviado */
+    try { await env.WIKI_IMAGENS.delete(CHAVE_LISTA); } catch (e2) { }
   } catch (e) { }
 }
 /* GET /api/uso — quanto de espaço as imagens e os documentos ocupam */
@@ -254,7 +259,7 @@ async function rotaUso(request, env) {
       do {
         const pag = await env.WIKI_IMAGENS.list({ prefix: '', cursor: cursor });
         for (const par of (pag.keys || [])) {
-          if (par.name === CHAVE_USO) continue;
+          if (par.name.charAt(0) === '_') continue;   /* _uso, _lista…: não são arquivos */
           try {
             const buf = await env.WIKI_IMAGENS.get(par.name, 'arrayBuffer');
             const n = buf ? buf.byteLength : 0;
@@ -313,6 +318,85 @@ async function rotaBuild(request, env) {
       _marcaCache = { id: (m ? m[1] : ''), em: Date.now() };
     }
     return new Response(JSON.stringify({ build: _marcaCache.id, agora: new Date().toISOString() }), { headers: headers });
+  } catch (e) {
+    return new Response(JSON.stringify({ erro: String((e && e.message) || e) }), { status: 500, headers: headers });
+  }
+}
+
+/* GET /api/arquivos — TODOS os prints e documentos guardados na wiki, com
+   nome original, tamanho, quem enviou e quando (visto na wiki e no Painel).
+   Exige a MESMA sessão dos envios (token Bearer conferido). A listagem
+   nasce do list() da KV + metadados gravados no envio; o tamanho veio do
+   metadata a partir de agora e arquivo antigo sem metadata é medido na
+   leitura. O resultado fica 5 min em `_lista` (KV) — e é apagado a cada
+   envio novo (registrarEnvio), para nunca mostrar lista velha. */
+async function montarListaArquivos(env) {
+  const arquivos = [];
+  let cursor, total = 0;
+  do {
+    const pag = await env.WIKI_IMAGENS.list({ prefix: '', cursor: cursor });
+    for (const par of (pag.keys || [])) {
+      if (par.name.charAt(0) === '_') continue;           /* _uso, _lista… */
+      if (par.name.indexOf('wiki-') !== 0) continue;
+      const meta = par.metadata || {};
+      let bytes = (typeof meta.tamanho === 'number') ? meta.tamanho : -1;
+      if (bytes < 0) {                                    /* arquivo antigo: mede na hora */
+        try {
+          const buf = await env.WIKI_IMAGENS.get(par.name, 'arrayBuffer');
+          bytes = buf ? buf.byteLength : 0;
+        } catch (e) { bytes = 0; }
+      }
+      const ehDoc = par.name.indexOf('wiki-doc-') === 0;
+      arquivos.push({
+        chave: par.name,
+        tipo: ehDoc ? 'documento' : 'imagem',
+        nome: meta.nome || par.name,
+        ext: (par.name.split('.').pop() || '').toLowerCase(),
+        bytes: bytes,
+        por: meta.por || '',
+        em: meta.em || ''
+      });
+      total++;
+    }
+    cursor = pag.list_complete ? undefined : pag.cursor;
+  } while (cursor && total < 20000);
+  arquivos.sort(function (a, b) { return String(b.em).localeCompare(String(a.em)); });
+  return arquivos;
+}
+async function rotaArquivos(request, env) {
+  const origem = request.headers.get('Origin') || '';
+  const headers = {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Access-Control-Allow-Origin': origem || '*',
+    'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS'
+  };
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: headers });
+  if (!env || !env.WIKI_IMAGENS) {
+    return new Response(JSON.stringify({ erro: 'Worker sem o binding WIKI_IMAGENS.' }), { status: 500, headers: headers });
+  }
+  let usuario = null;
+  try { usuario = await usuarioDoToken(request); } catch (e) { usuario = null; }
+  if (!usuario) {
+    return new Response(JSON.stringify({ erro: 'Entre no sistema para ver os arquivos da wiki.' }), { status: 401, headers: headers });
+  }
+  try {
+    let lista = null;
+    try {
+      const salvo = await env.WIKI_IMAGENS.get(CHAVE_LISTA, 'json');
+      if (salvo && salvo.em && (Date.now() - salvo.em) < 300e3 && Array.isArray(salvo.arquivos)) lista = salvo.arquivos;
+    } catch (e) { }
+    if (!lista) {
+      lista = await montarListaArquivos(env);
+      try { await env.WIKI_IMAGENS.put(CHAVE_LISTA, JSON.stringify({ em: Date.now(), arquivos: lista })); } catch (e) { }
+    }
+    let imagens = 0, docs = 0, bytes = 0;
+    lista.forEach(function (a) { if (a.tipo === 'imagem') imagens++; else docs++; bytes += (a.bytes || 0); });
+    return new Response(JSON.stringify({
+      arquivos: lista,
+      total: { qtd: lista.length, bytes: bytes, imagens: imagens, documentos: docs },
+      geradoEm: new Date().toISOString()
+    }), { headers: headers });
   } catch (e) {
     return new Response(JSON.stringify({ erro: String((e && e.message) || e) }), { status: 500, headers: headers });
   }
@@ -381,7 +465,7 @@ async function enviarImagem(request, env) {
   const bytes = b64ParaBytes(dados);
   try {
     await env.WIKI_IMAGENS.put(nome, bytes, {
-      metadata: { por: usuario.email, em: new Date().toISOString() }
+      metadata: { por: usuario.email, em: new Date().toISOString(), tamanho: bytes.length }
     });
   } catch (e) {
     return respostaImagem({
@@ -480,7 +564,8 @@ async function enviarDocumento(request, env) {
         por: usuario.email,
         em: new Date().toISOString(),
         nome: nomeOriginal || nome,
-        tipo: TIPOS_DOC[extensao]
+        tipo: TIPOS_DOC[extensao],
+        tamanho: bytes.length
       }
     });
   } catch (e) {
@@ -522,6 +607,9 @@ export default {
       }
       if (url.pathname === '/api/build') {
         return await rotaBuild(request, env);
+      }
+      if (url.pathname === '/api/arquivos') {
+        return await rotaArquivos(request, env);
       }
       /* qualquer outro endereço volta para os arquivos estáticos do projeto */
       return await env.ASSETS.fetch(request);

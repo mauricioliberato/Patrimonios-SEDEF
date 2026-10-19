@@ -261,6 +261,20 @@
        mostra a versão em rodapé fino. Proteção de laço: no máximo um
        recarregamento a cada 30 s (sessionStorage nii-build-guard).
 
+   36. 📁 ARQUIVOS DA WIKI EM UMA LISTA: botão "Arquivos" na barra da
+       wiki abre um painel com TODOS os prints e documentos guardados
+       (mesmo os de página apagada): nome, tamanho, quem enviou,
+       quando e botão Abrir ↗ — com filtro Todos/Prints/Documentos e
+       contagem no rodapé. Vem do novo GET /api/arquivos (mesma
+       sessão Bearer dos envios); o Worker monta a lista pelo list()
+       da KV com os metadados, guarda 5 min em `_lista` e invalida a
+       cada envio. O tamanho passou a ser gravado nos metadados de
+       cada arquivo; antigo sem metadata é medido na leitura. O
+       cartão do Painel ganhou "📁 Ver arquivos", que cai direto no
+       painel. O recálculo de uso (/api/uso?recalc=1) passou a
+       ignorar chaves "_" para não contar os próprios controles como
+       arquivo.
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -268,7 +282,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261019-163858">
+<meta name="nii-build" content="20261019-165215">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -820,7 +834,7 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
             <div class="card-b">
               <div class="chart-track"><div class="chart-bar" id="usoNuvemBarra" style="width:0%"></div></div>
               <div id="usoNuvemLinhas" style="margin-top:10px"><div class="empty">Carregando…</div></div>
-              <div class="q-actions"><button class="btn btn-ghost btn-sm" id="usoNuvemAtualizar">🔄 Atualizar contagem</button></div>
+              <div class="q-actions"><button class="btn btn-ghost btn-sm" id="usoNuvemAtualizar">🔄 Atualizar contagem</button><button class="btn btn-ghost btn-sm" id="usoNuvemArquivos">📁 Ver arquivos</button></div>
             </div>
           </div>
         </div>
@@ -1609,6 +1623,7 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
               <input type="text" id="wikiBusca" placeholder="🔍 Buscar no título ou no conteúdo…">
               <select id="wikiFiltroCat" title="Filtrar por categoria"><option value="">Todas as categorias</option></select>
               <button class="btn btn-accent" type="button" id="btnWikiNova">+ Nova página</button>
+              <button class="btn btn-ghost" type="button" id="btnWikiArquivos" title="Todos os prints e documentos enviados à wiki">📁 Arquivos</button>
             </div>
           </div>
           <div class="card-b flush">
@@ -1704,6 +1719,36 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
               </div>
             </form>
           </div>
+        </div>
+
+        <!-- ============ ARQUIVOS (prints e documentos) ============ -->
+        <div class="card wiki-panel" id="cardWikiArquivos" style="display:none">
+          <div class="card-h">
+            <div style="min-width:0">
+              <h3>📁 Arquivos da wiki</h3>
+              <span class="subtle" id="wikiArqMeta">prints e documentos enviados nas páginas</span>
+            </div>
+            <div class="toolbar">
+              <select id="wikiArqFiltro" title="Filtrar por tipo">
+                <option value="">Todos</option>
+                <option value="imagem">🖼 Prints</option>
+                <option value="documento">📄 Documentos</option>
+              </select>
+              <button class="btn btn-ghost btn-sm" type="button" id="btnWikiArqAtualizar">🔄 Atualizar</button>
+              <button class="btn btn-ghost btn-sm" type="button" id="btnWikiArqVoltar">← Voltar</button>
+            </div>
+          </div>
+          <div class="card-b flush">
+            <div class="table-wrap">
+              <table>
+                <thead><tr>
+                  <th>Arquivo</th><th>Tamanho</th><th>Enviado por</th><th>Quando</th><th class="td-r">Ações</th>
+                </tr></thead>
+                <tbody id="wikiArqTbody"></tbody>
+              </table>
+            </div>
+          </div>
+          <div style="padding:10px 20px;border-top:1px solid var(--line)"><span class="subtle" id="wikiArqResumo"></span></div>
         </div>
       </section>
 
@@ -3721,6 +3766,7 @@ async function carregarUsoNuvem(forcar){
   pintarUsoNuvem();
 }
 $('#usoNuvemAtualizar').addEventListener('click',()=>{carregarUsoNuvem(true);});
+$('#usoNuvemArquivos').addEventListener('click',()=>{showView('wiki');setWikiPainel('arquivos');carregarWikiArquivos(true);});
 
 /* ============== TIPOS E MARCAS ============== */
 let listaAtual=null;
@@ -6093,7 +6139,7 @@ function wikiPodeEditar(w){
 }
 let wikiIdAberto=null;    /* página aberta na leitura/edição */
 let wikiRetorno='lista';  /* para onde "Cancelar" volta: lista ou leitura */
-const WIKI_PAINEIS={lista:'#cardWikiLista',leitura:'#cardWikiLeitura',editor:'#cardWikiEditor'};
+const WIKI_PAINEIS={lista:'#cardWikiLista',leitura:'#cardWikiLeitura',editor:'#cardWikiEditor',arquivos:'#cardWikiArquivos'};
 function setWikiPainel(p){
   Object.keys(WIKI_PAINEIS).forEach(k=>{
     document.querySelector(WIKI_PAINEIS[k]).style.display=(k===p?'block':'none');
@@ -6523,6 +6569,55 @@ $('#wikiBusca').addEventListener('input',debounce(renderWiki,150));
 $('#wikiFiltroCat').addEventListener('change',renderWiki);
 $('#btnWikiNova').addEventListener('click',()=>abrirWikiEditor(null,'lista'));
 $('#btnWikiVoltar').addEventListener('click',()=>{setWikiPainel('lista');renderWiki();});
+/* --- 📁 Arquivos da wiki: listagem de TODOS os prints e documentos ------
+   O Worker devolve tudo o que está guardado na KV (mesmo arquivo cuja
+   página foi apagada), com tamanho, quem enviou e quando — lê do
+   /api/arquivos com a mesma sessão dos envios; ele mesmo cacheia por
+   5 min e invalida sozinho quando alguém envia algo novo. */
+let wikiArquivos=null;
+async function carregarWikiArquivos(forcar){
+  try{
+    if(!forcar&&wikiArquivos){pintarWikiArquivos();return;}
+    if(!usuarioAtual||!auth.currentUser)throw new Error('entre no sistema para ver os arquivos.');
+    const r=await fetch('/api/arquivos',{cache:'no-store',headers:{'Authorization':'Bearer '+(await auth.currentUser.getIdToken())}});
+    let saida={};try{saida=await r.json();}catch(err){}
+    if(!r.ok)throw new Error(saida.erro||('falha ao buscar os arquivos (HTTP '+r.status+').'));
+    wikiArquivos=saida;
+  }catch(err){
+    wikiArquivos=null;
+    toast('Não deu para carregar os arquivos: '+esc(err.message),'bad');
+  }
+  pintarWikiArquivos();
+}
+function pintarWikiArquivos(){
+  const tb=$('#wikiArqTbody');if(!tb)return;
+  const filtro=$('#wikiArqFiltro')?$('#wikiArqFiltro').value:'';
+  const lista=(wikiArquivos&&Array.isArray(wikiArquivos.arquivos))?wikiArquivos.arquivos:[];
+  const visiveis=lista.filter(a=>!filtro||a.tipo===filtro);
+  tb.innerHTML=visiveis.length?visiveis.map(a=>{
+    const ehDoc=a.tipo==='documento';
+    const url=location.origin+(ehDoc?'/wiki-doc/':'/wiki-img/')+encodeURIComponent(a.chave);
+    const quando=a.em?new Date(a.em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';
+    return `<tr>
+      <td><b>${ehDoc?'📄':'🖼'}</b> ${esc(a.nome||a.chave)}${a.ext&&a.nome!==a.chave?` <span class="pill info">${esc(a.ext)}</span>`:''}${ehDoc?'':' <span class="subtle">(print)</span>'}</td>
+      <td class="mono subtle">${fmtBytes(a.bytes)}</td>
+      <td class="subtle">${esc(String(a.por||'—').replace(/@sedef\.pr\.gov\.br$/i,''))}</td>
+      <td class="subtle">${quando}</td>
+      <td class="td-r"><div class="actions">
+        <a class="btn btn-ghost btn-sm" href="${url}" target="_blank" rel="noopener">Abrir ↗</a>
+      </div></td>
+    </tr>`;
+  }).join(''):'<tr><td colspan="5" class="empty"><span class="big">📁</span>'+(wikiArquivos?'Nenhum arquivo enviado ainda — dentro de uma página, use 🖼 Imagem ou 📎 Documento.':'Sem informação de arquivos — toque em 🔄 Atualizar.')+'</td></tr>';
+  const t=(wikiArquivos&&wikiArquivos.total)||{qtd:0,bytes:0,imagens:0,documentos:0};
+  const res=$('#wikiArqResumo');
+  if(res)res.textContent=lista.length?(t.qtd+' arquivo(s) · '+fmtBytes(t.bytes)+' — '+(t.imagens||0)+' print(s) · '+(t.documentos||0)+' documento(s)'+(visiveis.length!==lista.length?' · exibindo '+visiveis.length:'')):'';
+  const meta=$('#wikiArqMeta');
+  if(meta)meta.textContent=wikiArquivos?'clique em Abrir para ver o arquivo em nova aba':'prints e documentos enviados nas páginas';
+}
+$('#btnWikiArquivos').addEventListener('click',()=>{setWikiPainel('arquivos');carregarWikiArquivos(false);});
+$('#btnWikiArqVoltar').addEventListener('click',()=>{setWikiPainel('lista');renderWiki();});
+$('#btnWikiArqAtualizar').addEventListener('click',()=>{carregarWikiArquivos(true);});
+$('#wikiArqFiltro').addEventListener('change',()=>pintarWikiArquivos());
 $('#btnWikiEditar').addEventListener('click',()=>{
   if(!wikiIdAberto)return;
   const w=db.wiki.find(x=>x.id===wikiIdAberto);
