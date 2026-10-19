@@ -2111,7 +2111,15 @@ async function sincronizarComNuvem(){
        o item no local — o que a leitura seguinte tratava como exclusão feita
        pelo próprio usuário, e a gravação seguinte apagava o item de TODO
        mundo (era o bug da wiki "que não sincronizava entre usuários"). */
-    const pendentes=SECOES.filter(n=>sujo[n]&&secaoRecebida[n]);
+    /* Tecnicos é de administrador NAS REGRAS DO FIRESTORE (junto com
+       sistema/admins). Um não-admin tentando essa gravação recebe
+       permission-denied TODA vez — e qualquer mexida local deixava a seção
+       "suja" e renascia a tentativa condenada, com toast na tela do
+       técnico (caso real: ele não pode mexer em cadastro, mas importar
+       planilha com nome de técnico novo via o resolver já bastava para
+       marcar a seção). Para não-admin a seção segue "suja" em silêncio:
+       quem leva a mudança para a nuvem é um administrador. */
+    const pendentes=SECOES.filter(n=>sujo[n]&&secaoRecebida[n]&&(n!=='tecnicos'||souAdmin()));
     for(const nome of pendentes){
       try{
         const ref=docRefSecao(nome);
