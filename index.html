@@ -232,6 +232,11 @@
        sozinha — o próximo push limpa também a nuvem. Ganchos em
        TODAS as exclusões de item: wiki, técnicos, setores,
        empréstimos, guias, impressoras, switches, racks e licenças.
+       E a EMERGÊNCIA de 18/10 ("fusão vazia com servidor cheio não
+       vale") passou a respeitar a lápide: o resgate só alcança o que
+       NÃO foi morto por exclusão — sem isso, apagar o ÚLTIMO registro
+       de uma seção era ressuscitado na hora (caso real: a wiki com
+       uma página só, em que toda exclusão "voltava no F5").
 
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
@@ -2086,7 +2091,19 @@ function fundirSecao(local,remoto,vistos,mortos){
      cópia que sobra vence — se quiser zerar uma seção inteira, esvazie e
      recarregue com a intenção explícita no formulário de cada item). */
   const final=res.concat(semId);
-  if(!final.length&&remoto.length)return remoto;
+  if(!final.length&&remoto.length){
+    /* EMERGÊNCIA 18/10: fusão VAZIA com servidor cheio não valia (um
+       navegador defasado apagava TUDO por acidente de memória). MAS a
+       lápide muda o quadro: agora o vazio pode ser de PROPÓSITO — o dono
+       apagou o último registro que sobrava da seção e a fusão,
+       corretamente, não tinha sobrado nada. Sem este ramo, o guardião
+       ressuscitava o próprio item morto e a exclusão do ÚLTIMO item
+       nunca pegava (volta no F5 — era o sintoma da wiki com uma página
+       só). O resgate só alcança o que NÃO tem lápide: item morto por
+       exclusão nunca volta por aqui. */
+    const vivo=remoto.filter(r=>r&&r.id&&!mortos.has(r.id));
+    return vivo.length?vivo:final;
+  }
   return final;
 }
 /* CORREÇÃO DE MIGRAÇÃO (item 26): navegadores que rodavam a versão antiga
