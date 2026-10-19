@@ -248,6 +248,19 @@
        GET /api/uso (com ?recalc=1 para varrer a base, 1x por hora).
        Cópia do resultado no localStorage por 30 minutos.
 
+   35. ATUALIZAÇÃO AUTOMÁTICA ANTES DE LOGAR: cada build carrega uma
+       marca própria (meta nii-build, logo na abertura do head do
+       documento). Ao abrir a página, o app pergunta ao Worker
+       (GET /api/build) qual marca o servidor está servindo AGORA e,
+       se for diferente da que está aberta, recarrega na hora — com a
+       tela de login ainda em branco. Aba aberta dias roda código
+       velho e não aplica regra
+       nova (caso real: conta inativada continuava entrando; a regra
+       só pegou depois do F5). Sem rede ou sem marca o login segue
+       normalmente — o teste nunca tranca o acesso. A tela de login
+       mostra a versão em rodapé fino. Proteção de laço: no máximo um
+       recarregamento a cada 30 s (sessionStorage nii-build-guard).
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -255,6 +268,7 @@
 
 <html lang="pt-BR">
 <head>
+<meta name="nii-build" content="20261019-163858">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -1849,6 +1863,7 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
       <button type="submit" class="btn btn-accent" id="btnLoginEntrar">Entrar</button>
       <div id="loginErro"></div>
     </form>
+    <div id="loginVer" style="margin-top:14px;font-size:11px;opacity:.5"></div>
   </div>
 </div>
 
@@ -2693,6 +2708,52 @@ try{
     setTimeout(()=>toast('Sessão encerrada por <b>inatividade</b> após '+Math.round(INATIVIDADE_MS/60000)+' minutos sem uso. Entre de novo para continuar.','warn'),700);
   }
 }catch(_){}
+
+/* ============ VERSÃO ABERTA × VERSÃO SERVIDA (antes de logar) ============
+   CASO REAL: Maycon foi inativada, mas o PC dela estava com a página aberta
+   de dias — código velho não tinha a regra nova, e ela entrou normalmente;
+   só depois de atualizar a página a regra pegou. Aba velha não pode decidir
+   sozinha: este teste compara a marca do arquivo ABERTO (meta nii-build,
+   escrita a cada build) com a marca que o servidor está servindo HOJE
+   (GET /api/build). Diferente → recarrega AGORA, com a tela de login ainda
+   em branco (nada digitado se perde). Sem rede, sem marca ou sem endpoint:
+   segue normalmente — este teste nunca tranca o acesso. */
+function versaoAberta(){
+  const m=document.querySelector('meta[name="nii-build"]');
+  return m?String(m.content||'').trim():'';
+}
+async function confereBuild(){
+  try{
+    const meu=versaoAberta();if(!meu)return 'sem-marca';
+    let guardou=0;
+    try{guardou=Number(sessionStorage.getItem('nii-build-guard')||0);}catch(_){}
+    if(guardou&&Date.now()-guardou<30000)return 'ja-atualizou'; /* não entra em laço */
+    let txt='';
+    try{
+      const r=await fetch('/api/build',{cache:'no-store'});
+      if(r.ok)txt=await r.text();
+    }catch(_){return 'sem-rede';}
+    const m=txt.match(/"build"\s*:\s*"([0-9A-Za-z._-]+)"/);
+    if(!m||!m[1])return 'sem-marca-servidor';
+    if(m[1]===meu)return 'atual';
+    try{sessionStorage.setItem('nii-build-guard',String(Date.now()));}catch(_){}
+    return 'atualizando';
+  }catch(_){return 'erro';}
+}
+try{
+  const lv=$('#loginVer');
+  if(lv&&versaoAberta())lv.textContent='versão '+versaoAberta();
+}catch(_){}
+confereBuild().then(a=>{
+  if(a!=='atualizando')return;
+  try{ /* aviso à prova de erro: o reload acontece de qualquer jeito */
+    const c=document.createElement('div');
+    c.style.cssText='position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#f5f7fa;color:#4b5563;font:600 14px system-ui;z-index:99999';
+    c.textContent='Atualizando o sistema para a versão mais recente…';
+    document.body.appendChild(c);
+  }catch(_){}
+  setTimeout(()=>location.reload(),500);
+});
 
 /* O Firebase Auth dispara este listener quando:
    - a página abre e já existe uma sessão salva (entra sozinho);

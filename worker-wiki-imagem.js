@@ -290,6 +290,34 @@ async function rotaUso(request, env) {
   return new Response(JSON.stringify(resposta), { headers: headers });
 }
 
+/* GET /api/build — qual é a marca do index.html servido HOJE.
+   O navegador pode estar com uma aba aberta de dias (código antigo — caso
+   real: conta inativada continuava entrando porque a regra nova não existia
+   na página velha). O app lê a própria marca (meta nii-build), compara com
+   esta e, se forem diferentes, recarrega ANTES de deixar logar. A marca é
+   lida do asset a cada 60 s (isolamento quente); sem ela o app simplesmente
+   não recarrega — nunca tranca o acesso. */
+let _marcaCache = { id: '', em: 0 };
+async function rotaBuild(request, env) {
+  const headers = {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS'
+  };
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: headers });
+  try {
+    if (!_marcaCache.id || (Date.now() - _marcaCache.em) > 60000) {
+      const resp = await env.ASSETS.fetch(new URL('/index.html', request.url).toString());
+      const html = await resp.text();
+      const m = html.match(/<meta name="nii-build" content="([0-9A-Za-z._-]+)">/);
+      _marcaCache = { id: (m ? m[1] : ''), em: Date.now() };
+    }
+    return new Response(JSON.stringify({ build: _marcaCache.id, agora: new Date().toISOString() }), { headers: headers });
+  } catch (e) {
+    return new Response(JSON.stringify({ erro: String((e && e.message) || e) }), { status: 500, headers: headers });
+  }
+}
+
 /* ---- rota única: /api/imagens (enviar) e /wiki-img/... (servir) ---------- */
 async function rotaImagemWiki(request, env) {
   const url = new URL(request.url);
@@ -491,6 +519,9 @@ export default {
       }
       if (url.pathname === '/api/uso') {
         return await rotaUso(request, env);
+      }
+      if (url.pathname === '/api/build') {
+        return await rotaBuild(request, env);
       }
       /* qualquer outro endereço volta para os arquivos estáticos do projeto */
       return await env.ASSETS.fetch(request);
