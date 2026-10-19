@@ -201,6 +201,19 @@
           dono pediu o mesmo para a impressora (o timer de 8 s saiu do
           código). O olho dos formulários já alternava.
 
+   31. SYNC: TÉCNICO NÃO TENTA MAIS GRAVAR "tecnicos" — as REGRAS do
+       Firestore só deixam administrador gravar sistema/tecnicos (e
+       sistema/admins). Um cliente não-admin com a seção "suja" (qualquer
+       mexida local, ex.: importar planilha com nome de técnico novo — o
+       resolverTecnicoPorNome cria o registro em memória) tentava a
+       gravação, levava permission-denied e o toast "Falha ao sincronizar
+       com a nuvem (tecnicos)" aparecia na tela do técnico. Agora a
+       barreira de pendentes do sync PULA a seção para não-admin (fica
+       suja em silêncio; quem empurra a mudança é um administrador).
+       Testado com espião em runTransaction: não-admin 0 transações em
+       tecnicos e 1 em equipamentos (resto intacto); admin continua
+       gravando.
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
