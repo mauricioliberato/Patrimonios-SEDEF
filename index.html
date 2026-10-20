@@ -303,6 +303,25 @@
        e recusa com 413 se passar de 1.000 arquivos ou 64 MB
        (manda baixar pela lista, um a um).
 
+   39. 🔒 PADRÃO BLOQUEADO PARA EMPRÉSTIMO: a partir desta versão
+       NENHUM equipamento entra em empréstimo por acaso — só o que
+       for liberado MANUALMENTE. O switch "Para empréstimo" do
+       cadastro nasce DESLIGADO (antes nascia ligado). Na primeira
+       carga, uma migração ÚNICA bloqueia todas as unidades ainda
+       liberadas e registra a marca em sistema/padraoEmp (para
+       nunca repetir — sem a marca, todo login novo re-bloquearia
+       o que o responsável acabou de liberar); se o db estiver
+       vazio (navegador novo sincronizando), tenta de novo daqui a
+       12 s, até 8 vezes, e NUNCA grava a marca sem ter visto os
+       equipamentos. Liberar depois: ✓ da linha do equipamento
+       (ação eq-toggle, já existente) ou ligar o switch no
+       cadastro. O que muda de fato: disponiveisParaEmp passa a
+       devolver só os liberados — o seletor de empréstimos e o
+       botão 📋 da linha param de mostrar o resto. Guias de
+       transferência NÃO são afetadas (movimentar bem é outra
+       coisa). Existe filtro "Não emprestável", contagem no
+       resumo e coluna "Emprestável (Sim/Não)" na exportação.
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -310,7 +329,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261019-173549">
+<meta name="nii-build" content="20261020-080426">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -1009,10 +1028,10 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
                 </div>
                 <div class="field c2">
                   <label>Para empréstimo</label>
-                  <label class="switch" title="Define se este equipamento pode ser emprestado">
-                    <input type="checkbox" id="eqEmprestavel" checked>
+                  <label class="switch" title="Padrão: bloqueado. Ligue somente nos equipamentos que serão emprestados — liberar depois é o botão ✓ da linha">
+                    <input type="checkbox" id="eqEmprestavel">
                     <span class="sw"></span>
-                    <span class="sw-txt" id="eqEmprestavelTxt">Sim</span>
+                    <span class="sw-txt" id="eqEmprestavelTxt">Não</span>
                   </label>
                 </div>
                 <div class="field c12">
@@ -2652,6 +2671,7 @@ function mostrarApp(u){
   iniciarSincronizacao();
   iniciarPresenca();
   iniciarBackupMeta();
+  aplicarPadraoBloqueio();
 }
 function revelarApp(){
   $('#loginOverlay').classList.add('hidden');
@@ -3958,7 +3978,7 @@ function resetFormEquip(){
   $('#eqPatrimonio').value='';$('#eqSerie').value='';$('#eqObs').value='';
   $('#eqModelo').value='';$('#eqSetor').value='';$('#eqTecnico').value='';
   $('#eqData').value=hojeISO();
-  $('#eqEmprestavel').checked=true;atualizaSwEmprestavel();
+  $('#eqEmprestavel').checked=false;atualizaSwEmprestavel();  /* padrão: BLOQUEADO para empréstimo */
   $('#eqFormTitle').textContent='2 · Cadastro de unidade (patrimônio)';
   $('#btnEqSubmit').textContent='✔ Salvar unidade';
   $('#btnEqCancel').style.display='none';
@@ -6061,6 +6081,38 @@ function iniciarBackupMeta(){
     backupPor=(snap.exists&&snap.data().por)||'';
     pintarBackup();
   },err=>{console.warn('Status de backup indisponível:',err);});
+}
+
+/* ---- Padrão do sistema: equipamento nasce BLOQUEADO para empréstimo ----
+   Decisão do responsável (20/10/2026): só entra em empréstimo o que for
+   liberado MANUALMENTE — a maioria do parque é fixa. Na primeira carga
+   desta versão TODAS as unidades ainda liberadas viram bloqueadas, UMA
+   única vez: a marca em sistema/padraoEmp impede repetir (sem ela, todo
+   login novo re-bloquearia o que o responsável acabou de liberar). Depois
+   disso, liberar é tocar no ✓ da linha do equipamento — ou ligar o
+   switch "Para empréstimo" no cadastro. Equipamento bloqueado some do
+   seletor de empréstimos (disponiveisParaEmp) e o botão 📋 da linha some
+   junto. Navegador novo (db ainda vazio): tenta de novo daqui a pouco,
+   enquanto os dados não chegarem — nunca grava a marca sem ter visto os
+   equipamentos. */
+const padraoEmpRef=()=>fsdb.collection('sistema').doc('padraoEmp');
+let tentativasPadraoEmp=0;
+function aplicarPadraoBloqueio(){
+  if(!usuarioAtual)return;                    /* sem sessão não lê nem grava nada */
+  padraoEmpRef().get().then(snap=>{
+    if(snap.exists)return;                    /* já foi aplicado antes — nunca mais */
+    if(!db.equipamentos.length){
+      if(tentativasPadraoEmp++<8)setTimeout(aplicarPadraoBloqueio,12000);
+      return;                                 /* dados ainda não chegaram */
+    }
+    const livres=db.equipamentos.filter(e=>e.emprestavel!==false);
+    livres.forEach(e=>{e.emprestavel=false;});
+    if(livres.length){
+      persistir();atualizarTudo();
+      toast('🔒 <b>'+livres.length+'</b> unidade(s) passaram a ficar <b>bloqueadas para empréstimo</b> (padrão novo do sistema). Libere os que forem emprestados com o botão <b>✓</b> da linha do equipamento.','warn');
+    }
+    return padraoEmpRef().set({bloquearTodos:Date.now(),qtd:livres.length,por:usuarioAtual.nome||usuarioAtual.usuario||''},{merge:true});
+  }).catch(err=>console.warn('Padrão de bloqueio não aplicado:',err));
 }
 async function registrarBackup(){
   backupUltimoMs=Date.now();
