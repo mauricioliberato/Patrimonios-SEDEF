@@ -303,24 +303,32 @@
        e recusa com 413 se passar de 1.000 arquivos ou 64 MB
        (manda baixar pela lista, um a um).
 
-   39. 🔒 PADRÃO BLOQUEADO PARA EMPRÉSTIMO: a partir desta versão
-       NENHUM equipamento entra em empréstimo por acaso — só o que
-       for liberado MANUALMENTE. O switch "Para empréstimo" do
-       cadastro nasce DESLIGADO (antes nascia ligado). Na primeira
-       carga, uma migração ÚNICA bloqueia todas as unidades ainda
-       liberadas e registra a marca em sistema/padraoEmp (para
-       nunca repetir — sem a marca, todo login novo re-bloquearia
-       o que o responsável acabou de liberar); se o db estiver
-       vazio (navegador novo sincronizando), tenta de novo daqui a
-       12 s, até 8 vezes, e NUNCA grava a marca sem ter visto os
-       equipamentos. Liberar depois: ✓ da linha do equipamento
-       (ação eq-toggle, já existente) ou ligar o switch no
-       cadastro. O que muda de fato: disponiveisParaEmp passa a
-       devolver só os liberados — o seletor de empréstimos e o
-       botão 📋 da linha param de mostrar o resto. Guias de
-       transferência NÃO são afetadas (movimentar bem é outra
-       coisa). Existe filtro "Não emprestável", contagem no
-       resumo e coluna "Emprestável (Sim/Não)" na exportação.
+   39. 🔒 PADRÃO BLOQUEADO PARA EMPRÉSTIMO (versão final, sem
+       gravar nada): NENHUM equipamento entra em empréstimo por
+       acaso — só o que for liberado MANUALMENTE. A primeira versão
+       tentava uma migração que gravava "emprestavel: false" em
+       todos os registros e NÃO funcionou: equipamentos tem mais de
+       12 mil itens num ÚNICO documento do Firestore, acima do
+       limite de 1 MiB, a gravação da seção é recusada em silêncio
+       e o marcador da migração (sistema/padraoEmp, doc pequeno,
+       gravado com sucesso) travava a repetição — nada bloqueava.
+       A versão final NÃO GRAVA DADO NENHUM: inverte a leitura do
+       campo — emprestitável só se emprestavel===true (explícito);
+       undefined ou false = bloqueado. Como nenhum registro tem
+       "true" explícito, todos nascem bloqueados na hora, sem
+       escrita, sem migração e sem depender da nuvem. Mudou a
+       leitura em disponiveisParaEmp, nos 4 filtros, na contagem do
+       resumo, na coluna da exportação e no importador (backup sem
+       o campo nasce bloqueado); o botão da linha (eq-toggle)
+       passou a inverter "liberado" (antes invertia "bloqueado" e
+       travava o novo padrão); o switch "Para empréstimo" do
+       cadastro continua nascendo DESLIGADO e a edição mostra o
+       valor salvo. Novo filtro "Emprestáveis (liberados)" na
+       lista: mostra só os liberados — serve para achar resquício
+       de valor antigo e bloquear com 🚫. Migração
+       aplicarPadraoBloqueio e o doc sistema/padraoEmp REMOVIDOS do
+       código. Guias de transferência NÃO são afetadas (movimentar
+       bem é outra coisa).
 
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
@@ -329,7 +337,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261020-080426">
+<meta name="nii-build" content="20261020-083423">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -918,6 +926,7 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
               <select id="eqFiltroStatus">
                 <option value="">Todos os status</option>
                 <option>Disponível</option><option>Reservado</option><option>Indisponível</option>
+                <option value="emp">Emprestáveis (liberados)</option>
                 <option value="naoEmp">Não emprestáveis</option>
               </select>
               <button type="button" class="btn btn-dark btn-sm" id="btnImprimirListaEq"
@@ -2671,7 +2680,6 @@ function mostrarApp(u){
   iniciarSincronizacao();
   iniciarPresenca();
   iniciarBackupMeta();
-  aplicarPadraoBloqueio();
 }
 function revelarApp(){
   $('#loginOverlay').classList.add('hidden');
@@ -3057,7 +3065,7 @@ function pillsStatus(e){
 function disponiveisParaEmp(editId){
   const loan=editId?db.emprestimos.find(x=>x.id===editId):null;
   return db.equipamentos.filter(e=>{
-    if(e.emprestavel===false)return loan?(loan.equipIds||[]).includes(e.id):false;
+    if(e.emprestavel!==true)return loan?(loan.equipIds||[]).includes(e.id):false; /* só liberado EXPLICITAMENTE passa */
     if(e.indisponivel)return false;
     return !db.emprestimos.some(x=>!x.devolucao&&x.id!==editId&&(x.equipIds||[]).includes(e.id));
   });
@@ -3995,7 +4003,7 @@ function editarEquip(id){
   $('#eqModelo').value=eq.modeloId||'';
   $('#eqSetor').value=eq.setorId||'';$('#eqTecnico').value=eq.tecnicoId||'';
   $('#eqData').value=eq.data;$('#eqObs').value=eq.obs||'';
-  $('#eqEmprestavel').checked=eq.emprestavel!==false;atualizaSwEmprestavel();
+  $('#eqEmprestavel').checked=eq.emprestavel===true;atualizaSwEmprestavel(); /* só "true" salvo conta como liberado */
   $('#eqFormTitle').textContent='Editando unidade '+eq.patrimonio;
   $('#btnEqSubmit').textContent='✔ Atualizar unidade';
   $('#btnEqCancel').style.display='inline-flex';
@@ -4020,7 +4028,7 @@ function excluirEquip(id){
 }
 function irParaEmprestimo(id){
   const eq=eqById(id);
-  if(!eq||statusEquip(eq).label!=='Disponível'||eq.emprestavel===false)return toast('Este equipamento não está disponível para empréstimo.','bad');
+  if(!eq||statusEquip(eq).label!=='Disponível'||eq.emprestavel!==true)return toast('Este equipamento não está disponível para empréstimo.','bad');
   showView('emprestimos');
   if(empEditId)resetEmpForm();
   addEqForm(id);
@@ -4057,7 +4065,7 @@ function renderEquipamentos(){
     const st=statusEquip(eq).label;
     if(ft&&eq.tipo!==ft)return false;
     if(!filtrarPorSetores(eq))return false;
-    if(fs){if(fs==='naoEmp'){if(eq.emprestavel!==false)return false;}else if(st!==fs)return false;}
+    if(fs){if(fs==='naoEmp'){if(eq.emprestavel===true)return false;}else if(fs==='emp'){if(eq.emprestavel!==true)return false;}else if(st!==fs)return false;}
     if(busca){
       const mod=eq.modeloId?modById(eq.modeloId):null;
       const alvo=(eq.patrimonio+' '+eq.serie+' '+eq.tipo+' '+eq.marca+' '+(mod?mod.descricao:'')+' '+(eq.obs||'')+' '+setNome(eq.setorId)+' '+tecNome(eq.tecnicoId)).toLowerCase();
@@ -4080,7 +4088,7 @@ function renderEquipamentos(){
   const visiveis=lista.slice(ini,ini+EQ_POR_PAGINA);
 
   $('#eqTbody').innerHTML=visiveis.length?visiveis.map(eq=>{
-    const st=statusEquip(eq);const bloqueado=eq.emprestavel===false;
+    const st=statusEquip(eq);const bloqueado=eq.emprestavel!==true;
     const mod=eq.modeloId?modById(eq.modeloId):null;
     return `
     <tr data-id="${eq.id}">
@@ -4100,14 +4108,14 @@ function renderEquipamentos(){
     </tr>`;}).join(''):`<tr><td colspan="8" class="empty"><span class="big">🗄️</span>Nenhum equipamento encontrado.</td></tr>`;
 
   const d=db.equipamentos.filter(e=>statusEquip(e).label==='Disponível').length;
-  const bloq=db.equipamentos.filter(e=>e.emprestavel===false).length;
+  const bloq=db.equipamentos.filter(e=>e.emprestavel!==true).length;
   const fatia=totalFiltrado?`${ini+1}–${Math.min(ini+EQ_POR_PAGINA,totalFiltrado)}`:'0';
   $('#eqResumo').textContent=`Mostrando ${fatia} de ${totalFiltrado} resultado(s) · ${db.equipamentos.length} unidade(s) · ${d} disponível(is) · ${bloq} bloqueada(s) p/ empréstimo · ${(db.modelos||[]).length} modelo(s) no catálogo`;
   renderPaginacaoEq(totalPaginas);
 
   const baseFiltroTipo=db.equipamentos.filter(eq=>{
     if(!filtrarPorSetores(eq))return false;
-    if(fs){if(fs==='naoEmp'){if(eq.emprestavel!==false)return false;}else if(statusEquip(eq).label!==fs)return false;}
+    if(fs){if(fs==='naoEmp'){if(eq.emprestavel===true)return false;}else if(fs==='emp'){if(eq.emprestavel!==true)return false;}else if(statusEquip(eq).label!==fs)return false;}
     return true;
   });
   const contagemTipo={};
@@ -4125,7 +4133,7 @@ function renderEquipamentos(){
 
   const baseFiltroSetor=db.equipamentos.filter(eq=>{
     if(ft&&eq.tipo!==ft)return false;
-    if(fs){if(fs==='naoEmp'){if(eq.emprestavel!==false)return false;}else if(statusEquip(eq).label!==fs)return false;}
+    if(fs){if(fs==='naoEmp'){if(eq.emprestavel===true)return false;}else if(fs==='emp'){if(eq.emprestavel!==true)return false;}else if(statusEquip(eq).label!==fs)return false;}
     return true;
   });
   const contagemSetor={};
@@ -4177,7 +4185,7 @@ function imprimirListaEquipamentos(){
     const st=statusEquip(eq).label;
     if(ft&&eq.tipo!==ft)return false;
     if(!filtrarPorSetores(eq))return false;
-    if(fs){if(fs==='naoEmp'){if(eq.emprestavel!==false)return false;}else if(st!==fs)return false;}
+    if(fs){if(fs==='naoEmp'){if(eq.emprestavel===true)return false;}else if(fs==='emp'){if(eq.emprestavel!==true)return false;}else if(st!==fs)return false;}
     if(busca){
       const mod=eq.modeloId?modById(eq.modeloId):null;
       const alvo=(eq.patrimonio+' '+eq.serie+' '+eq.tipo+' '+eq.marca+' '+(mod?mod.descricao:'')+' '+(eq.obs||'')+' '+setNome(eq.setorId)+' '+tecNome(eq.tecnicoId)).toLowerCase();
@@ -4197,7 +4205,7 @@ function imprimirListaEquipamentos(){
     const nomes=[...eqSetoresSelecionados].map(id=>esc(setNome(id))).join(', ');
     filtrosAplicados.push('Setor(es): <b>'+nomes+'</b>');
   }
-  if(fs)filtrosAplicados.push('Status: <b>'+esc(fs==='naoEmp'?'Não emprestáveis':fs)+'</b>');
+  if(fs)filtrosAplicados.push('Status: <b>'+esc(fs==='naoEmp'?'Não emprestáveis':fs==='emp'?'Emprestáveis (liberados)':fs)+'</b>');
   if(busca)filtrosAplicados.push('Busca: <b>'+esc(busca)+'</b>');
 
   const porTipo={};
@@ -4208,7 +4216,7 @@ function imprimirListaEquipamentos(){
   const linhas=lista.map(eq=>{
     const mod=eq.modeloId?modById(eq.modeloId):null;
     const st=statusEquip(eq).label;
-    const emprest=eq.emprestavel===false?'Não':'Sim';
+    const emprest=eq.emprestavel===true?'Sim':'Não';
     return `<tr>
       <td class="mono" style="font-weight:600">${esc(eq.patrimonio||'—')}</td>
       <td class="mono">${esc(eq.serie||'—')}</td>
@@ -4342,7 +4350,7 @@ $('#eqTbody').addEventListener('click',e=>{
   if(b.dataset.acao==='eq-emp')irParaEmprestimo(b.dataset.id);
   if(b.dataset.acao==='eq-toggle'){
     const eq=eqById(b.dataset.id);if(!eq)return;
-    eq.emprestavel=(eq.emprestavel===false);
+    eq.emprestavel=!(eq.emprestavel===true);  /* inverte LIBERADO: só "true" explícito passa */
     persistir();atualizarTudo();destacarLinha('#eqTbody',eq.id);
     toast(eq.emprestavel?'Equipamento <b class="mono">'+esc(eq.patrimonio)+'</b> <b>liberado</b>.':'Equipamento <b class="mono">'+esc(eq.patrimonio)+'</b> <b>bloqueado</b>.','warn');
   }
@@ -4698,7 +4706,7 @@ const PLANILHA_MODULOS={
     lista:()=>db.equipamentos,
     linhaExport:e=>({patrimonio:e.patrimonio,serie:e.serie,tipo:e.tipo,marca:e.marca,setorNome:nomeSetorExport(e.setorId),
       tecnicoNome:(db.tecnicos.find(t=>t.id===e.tecnicoId)||{}).nome||'',data:e.data,obs:e.obs,
-      indisponivelTxt:e.indisponivel?'Sim':'Não',emprestavelTxt:e.emprestavel===false?'Não':'Sim'}),
+      indisponivelTxt:e.indisponivel?'Sim':'Não',emprestavelTxt:e.emprestavel===true?'Sim':'Não'}),
     chave:o=>{
       const pat=soDigitos(o.patrimonio||'');if(pat)return 'pat:'+pat;
       const serie=String(o.serie||'').trim().toLowerCase();if(serie)return 'serie:'+serie;
@@ -4712,7 +4720,7 @@ const PLANILHA_MODULOS={
       o.tecnicoId=resolverTecnicoPorNome(o.tecnicoNome);delete o.tecnicoNome;
       o.data=o.data||hojeISO();
       o.indisponivel=paraSimNao(o.indisponivelTxt);delete o.indisponivelTxt;
-      o.emprestavel=o.emprestavelTxt?paraSimNao(o.emprestavelTxt):true;delete o.emprestavelTxt;
+      o.emprestavel=o.emprestavelTxt?paraSimNao(o.emprestavelTxt):false;delete o.emprestavelTxt;
       return o;
     },
     novo:o=>Object.assign({id:uid(),criadoEm:Date.now()},o)
@@ -6083,37 +6091,17 @@ function iniciarBackupMeta(){
   },err=>{console.warn('Status de backup indisponível:',err);});
 }
 
-/* ---- Padrão do sistema: equipamento nasce BLOQUEADO para empréstimo ----
-   Decisão do responsável (20/10/2026): só entra em empréstimo o que for
-   liberado MANUALMENTE — a maioria do parque é fixa. Na primeira carga
-   desta versão TODAS as unidades ainda liberadas viram bloqueadas, UMA
-   única vez: a marca em sistema/padraoEmp impede repetir (sem ela, todo
-   login novo re-bloquearia o que o responsável acabou de liberar). Depois
-   disso, liberar é tocar no ✓ da linha do equipamento — ou ligar o
-   switch "Para empréstimo" no cadastro. Equipamento bloqueado some do
-   seletor de empréstimos (disponiveisParaEmp) e o botão 📋 da linha some
-   junto. Navegador novo (db ainda vazio): tenta de novo daqui a pouco,
-   enquanto os dados não chegarem — nunca grava a marca sem ter visto os
-   equipamentos. */
-const padraoEmpRef=()=>fsdb.collection('sistema').doc('padraoEmp');
-let tentativasPadraoEmp=0;
-function aplicarPadraoBloqueio(){
-  if(!usuarioAtual)return;                    /* sem sessão não lê nem grava nada */
-  padraoEmpRef().get().then(snap=>{
-    if(snap.exists)return;                    /* já foi aplicado antes — nunca mais */
-    if(!db.equipamentos.length){
-      if(tentativasPadraoEmp++<8)setTimeout(aplicarPadraoBloqueio,12000);
-      return;                                 /* dados ainda não chegaram */
-    }
-    const livres=db.equipamentos.filter(e=>e.emprestavel!==false);
-    livres.forEach(e=>{e.emprestavel=false;});
-    if(livres.length){
-      persistir();atualizarTudo();
-      toast('🔒 <b>'+livres.length+'</b> unidade(s) passaram a ficar <b>bloqueadas para empréstimo</b> (padrão novo do sistema). Libere os que forem emprestados com o botão <b>✓</b> da linha do equipamento.','warn');
-    }
-    return padraoEmpRef().set({bloquearTodos:Date.now(),qtd:livres.length,por:usuarioAtual.nome||usuarioAtual.usuario||''},{merge:true});
-  }).catch(err=>console.warn('Padrão de bloqueio não aplicado:',err));
-}
+/* Padrão "só emprestável se liberado manualmente" (item 39). A versão
+   anterior deste bloco tentava gravar "emprestavel: false" em todos os
+   registros numa migração única — e falhava em silêncio: equipamentos
+   tem mais de 12 mil itens num ÚNICO documento do Firestore, acima do
+   limite de 1 MiB, e a gravação da seção é recusada; o marcador
+   system/padraoEmp, pequeno, chegava a ser gravado e travava a
+   repetição. O padrão passou a valer pela LEITURA do campo: só
+   "emprestavel === true" (liberado explicitamente) entra em
+   empréstimo — sem escrita nenhuma, funciona até quando a nuvem não
+   aceita mais a seção. Liberar: ✓ da linha (eq-toggle) ou o switch
+   "Para empréstimo" no cadastro — ambos gravam "true" explícito. */
 async function registrarBackup(){
   backupUltimoMs=Date.now();
   backupPor=usuarioAtual?(usuarioAtual.nome||usuarioAtual.usuario||''):'';
