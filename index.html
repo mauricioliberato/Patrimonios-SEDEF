@@ -366,19 +366,25 @@
        souAdmin() de novo). Setores já movidos pelas guias de
        teste permanecem — ajuste na mão se preciso.
 
-   42. 📌 PATRIMÔNIO DIGITADO NA GUIA: no campo "Equipamentos
-       transferidos" da guia entrou uma caixa "📌 Patrimônio →
-       Enter" ANTES do select: digita o patrimônio, dá Enter, e o
-       bem entra direto na guia — sem procurar na lista da ORIGEM
-       (que pode ter milhares de itens e demorava). O campo esvazia
-       e volta o foco depois de cada Enter, para escanear os bens
-       um atrás do outro. Mesmas travas do caminho do select: não
-       encontrado avisa; lotado em OUTRO setor avisa com o nome do
-       setor; já adicionado avisa e não duplica; ponto/barra no
-       patrimônio são ignorados (soDigitos). Sem origem escolhida,
-       adiciona qualquer bem — igual ao select (a trava da origem
-       vale quando ela está definida). O reset do formulário
-       esvazia a caixa. O select continua funcionando como antes.
+   42. 🔎 BUSCA DE EQUIPAMENTO NA GUIA (refiz no mesmo dia): o
+       select "Equipamentos transferidos" virou um COMBO — caixa +
+       flecha ▾ + lista que aparece embaixo, tudo num controle só.
+       Clicar no campo (ou na ▾) abre a lista da ORIGEM; digitar
+       PARTE do patrimônio (ou tipo, marca, nº de série) afunila a
+       lista na hora; clicar numa linha — ou setas de cima/baixo +
+       Enter — adiciona o bem à guia na INSTANTE, a lista continua
+       aberta sem o bem escolhido e a caixa esvazia para o próximo
+       (dá para clicar vários em sequência, sem tirar a mão do
+       mouse). A lista traz no máximo 200 linhas (a origem pode ter
+       milhares de bens) e avisa para digitar mais números. Travas
+       do caminho antigo preservadas: sem origem o pop pede para
+       escolher a ORIGEM; bem de OUTRO setor não entra e avisa com
+       o nome do setor; já adicionado não duplica (aviso). Clique
+       fora do combo fecha a lista; Esc fecha; o reset do
+       formulário esvazia e fecha a caixa. (A primeira versão da
+       rodada — caixa "📌 Patrimônio → Enter" separada do select —
+       foi trocada por este combo, que era o que o dono queria:
+       digitar ou escolher no mesmo controle.)
 
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
@@ -387,7 +393,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261020-135122">
+<meta name="nii-build" content="20261020-143026">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -617,6 +623,18 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
 .cart-item:last-child{border-bottom:none}
 .cart-item .rm{width:24px;height:24px;font-size:13px}
 .cart-empty{padding:16px 12px;color:var(--muted);font-size:12.5px;text-align:center}
+/* combo de equipamentos da guia: caixa com busca + flecha ▾ + pop com a lista */
+.combo{position:relative;display:flex;align-items:center;gap:2px;border:1px solid var(--line2);border-radius:6px;background:#fff;transition:border-color .15s,box-shadow .15s}
+.combo:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(255,140,26,.18)}
+.combo input[type=text]{border:0;outline:none;box-shadow:none;padding:9px 10px;background:transparent;min-width:0}
+.combo .seta{border:0;background:transparent;cursor:pointer;color:var(--muted);font-size:15px;padding:6px 9px;line-height:1;border-radius:5px;flex:0 0 auto}
+.combo .seta:hover{background:#f1f5f9;color:var(--ink)}
+.combo-pop{position:absolute;left:0;right:0;top:calc(100% + 4px);max-height:272px;overflow-y:auto;background:#fff;border:1px solid var(--line2);border-radius:6px;box-shadow:0 14px 34px rgba(15,23,42,.16);z-index:70}
+.combo-pop[hidden]{display:none}
+.combo-opt{display:flex;align-items:center;gap:8px;padding:8px 10px;cursor:pointer;border-bottom:1px dashed var(--line);font-size:13px}
+.combo-opt:last-child{border-bottom:0}
+.combo-opt.hl,.combo-opt:hover{background:#eef4ff}
+.combo-vazio{padding:11px 10px;color:var(--muted);font-size:12.5px;text-align:center}
 
 .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .toolbar input[type=text]{max-width:280px}
@@ -1272,12 +1290,12 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
                 </div>
                 <div class="field c5">
                   <label>Equipamentos transferidos <b>*</b></label>
-                  <div style="display:flex;gap:8px">
-                    <input type="text" id="guiaPatDig" class="mono" inputmode="numeric" style="flex:1;min-width:110px"
-                           placeholder="📌 Patrimônio → Enter"
-                           title="Mais rápido: digite o patrimônio e tecle Enter — o equipamento entra direto na guia">
-                    <select id="guiaEqSel" class="mono" style="flex:1"></select>
-                    <button type="button" class="btn btn-dark btn-sm" id="btnAddGuiaEq">+ Adicionar</button>
+                  <div class="combo" id="guiaEqCombo">
+                    <input type="text" id="guiaEqBusca" class="mono" autocomplete="off"
+                           placeholder="🔍 Digite parte do patrimônio…"
+                           title="Digite parte do patrimônio e escolha na lista abaixo — ou clique na ▾ para listar todos da ORIGEM">
+                    <button type="button" class="seta" id="guiaEqSeta" title="Mostrar os equipamentos da ORIGEM" tabindex="-1">▾</button>
+                    <div class="combo-pop" id="guiaEqPop" hidden></div>
                   </div>
                   <span class="hint" id="guiaEqEcho"><span class="dot"></span>Listados conforme a lotação na unidade de ORIGEM.</span>
                 </div>
@@ -5207,19 +5225,44 @@ function destinoGuiaSelecionado(){return (guiaDesSel&&setById(guiaDesSel))?guiaD
 
 $('#guiaBusca').addEventListener('input',debounce(renderGuias,150));
 
-function preencherSelGuiaEq(){
-  const sel=$('#guiaEqSel');if(!sel)return;
+/* ============ Combo de equipamentos da guia (código 42, refiz) ============
+   O select virou caixa + flecha + pop: clicar na ▾ (ou no campo) mostra a   lista da ORIGEM; digitar filtra por PARTE do patrimônio (ou tipo, marca
+   e nº de série); clicar numa linha — ou setas + Enter — adiciona direto à
+   guia, o pop segue aberto sem o bem escolhido e a caixa esvazia para o
+   próximo. Travas do caminho antigo preservadas: só bens da ORIGEM (quando   ela está definida) e sem repetir o que já está no carrinho. */
+const guiaComboMAX=200;  /* linhas máximas no pop: a origem pode ter milhares */
+var guiaComboHL=0;       /* linha destacada (var: inicializada antes de tudo) */
+function guiaPoolEq(){
   const ori=origemGuiaSelecionada();
-  const antes=sel.value;
-  let pool=[];
-  if(ori)pool=[...db.equipamentos].filter(e=>e.setorId===ori);
-  const opts=pool.sort((a,b)=>String(a.patrimonio).localeCompare(String(b.patrimonio),undefined,{numeric:true}))
-    .filter(e=>!cartGuia.includes(e.id))
-    .map(e=>`<option value="${e.id}">${esc(e.patrimonio)} — ${esc(e.tipo)} ${esc(e.marca)}${e.serie?' · S/N '+esc(e.serie):''}</option>`).join('');
-  sel.innerHTML=`<option value="">${ori?'Selecione para adicionar…':'⬆ Escolha a unidade de ORIGEM primeiro…'}</option>`+opts;
-  if(antes&&pool.some(e=>e.id===antes&&!cartGuia.includes(antes)))sel.value=antes;
+  if(!ori)return [];
+  return db.equipamentos.filter(e=>e.setorId===ori&&!cartGuia.includes(e.id))
+    .sort((a,b)=>String(a.patrimonio).localeCompare(String(b.patrimonio),undefined,{numeric:true}));
+}
+function guiaFiltradosEq(){
+  const txt=($('#guiaEqBusca').value||'').trim().toLowerCase();
+  const pool=guiaPoolEq();
+  if(!txt)return pool;
+  const dig=soDigitos(txt);
+  return pool.filter(e=>{
+    if(dig&&soDigitos(e.patrimonio).includes(dig))return true;
+    return (e.patrimonio+' '+e.tipo+' '+e.marca+' '+(e.serie||'')).toLowerCase().includes(txt);
+  });
+}
+function preencherSelGuiaEq(){
+  const pop=$('#guiaEqPop');if(!pop)return;
+  const ori=origemGuiaSelecionada();
   const echo=$('#guiaEqEcho');
-  if(echo)echo.innerHTML='<span class="dot"></span>'+(ori?('Listando equipamentos lotados em <b>'+esc(setNome(ori))+'</b> ('+pool.length+' no total).'):'Escolha primeiro a unidade de ORIGEM.');
+  if(echo)echo.innerHTML='<span class="dot"></span>'+(ori?('Lotados em <b>'+esc(setNome(ori))+'</b> — digite parte do patrimônio ou clique na ▾; clique num item para adicionar à guia.'):'Escolha primeiro a unidade de ORIGEM.');
+  if(!ori){pop.innerHTML='<div class="combo-vazio">⬆ Escolha a unidade de ORIGEM primeiro.</div>';return;}
+  const lista=guiaFiltradosEq();
+  const vis=lista.slice(0,guiaComboMAX);
+  if(guiaComboHL>=vis.length)guiaComboHL=0;
+  pop.innerHTML=vis.map((e,i)=>
+    `<div class="combo-opt${i===guiaComboHL?' hl':''}" data-id="${e.id}">
+      <span class="mono" style="font-weight:600">${esc(e.patrimonio)}</span>
+      <span class="subtle" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${icone(e.tipo)} ${esc(e.tipo)} ${esc(e.marca)}${e.serie?' · S/N '+esc(e.serie):''}</span>
+    </div>`).join('')||'<div class="combo-vazio">Nenhum equipamento da origem com esse filtro.</div>';
+  if(lista.length>guiaComboMAX)pop.insertAdjacentHTML('beforeend','<div class="combo-vazio">… e mais '+(lista.length-guiaComboMAX)+' — digite mais números para afunilar.</div>');
 }
 function renderGuiaCart(){
   $('#guiaCartCount').textContent=cartGuia.length;
@@ -5295,36 +5338,59 @@ $('#guiaOS').addEventListener('blur',()=>{$('#guiaOS').value=formatarOS($('#guia
   });
 });
 
-$('#btnAddGuiaEq').addEventListener('click',()=>{
-  const id=$('#guiaEqSel').value;
-  if(!id)return toast('Selecione um equipamento.','bad');
+function guiaPopAberto(){const p=$('#guiaEqPop');return !!p&&!p.hasAttribute('hidden');}
+function guiaAbrirPop(){const p=$('#guiaEqPop');if(!p)return;guiaComboHL=0;preencherSelGuiaEq();p.removeAttribute('hidden');}
+function guiaFecharPop(){const p=$('#guiaEqPop');if(p)p.setAttribute('hidden','');}
+function guiaAddEq(id){
+  const eq=eqById(id);if(!eq)return false;
   const ori=origemGuiaSelecionada();
-  const q=eqById(id);
-  if(ori&&q&&q.setorId!==ori)return toast('Este equipamento não está lotado na ORIGEM.','bad');
-  if(!cartGuia.includes(id))cartGuia.push(id);
-  atualizarCartaoGuia();
+  if(ori&&eq.setorId!==ori){toast('O patrimônio <b class="mono">'+esc(eq.patrimonio)+'</b> está lotado em <b>'+esc(setNome(eq.setorId))+'</b>, não na ORIGEM.','bad');return false;}
+  if(cartGuia.includes(id)){toast('O patrimônio <b class="mono">'+esc(eq.patrimonio)+'</b> já está nesta guia.','warn');return false;}
+  cartGuia.push(id);
+  atualizarCartaoGuia();   /* repinta carrinho e o pop (o bem escolhido some da lista) */
+  return true;
+}
+const guiaBuscaEl=$('#guiaEqBusca');
+guiaBuscaEl.addEventListener('focus',()=>guiaAbrirPop());
+guiaBuscaEl.addEventListener('input',debounce(()=>guiaAbrirPop(),120));
+guiaBuscaEl.addEventListener('keydown',e=>{
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+    e.preventDefault();
+    const vis=guiaFiltradosEq().slice(0,guiaComboMAX);
+    if(!vis.length)return;
+    guiaComboHL=(guiaComboHL+(e.key==='ArrowDown'?1:vis.length-1))%vis.length;
+    preencherSelGuiaEq();
+    const el=$('#guiaEqPop').querySelector('.combo-opt.hl');
+    if(el&&el.scrollIntoView)el.scrollIntoView({block:'nearest'});
+    return;
+  }
+  if(e.key==='Enter'){
+    e.preventDefault();
+    const vis=guiaFiltradosEq().slice(0,guiaComboMAX);
+    const alvo=vis[guiaComboHL]||vis[0];
+    if(!alvo)return toast('Nenhum equipamento da origem com esse filtro.','bad');
+    if(guiaAddEq(alvo.id)){guiaBuscaEl.value='';guiaComboHL=0;preencherSelGuiaEq();}
+    return;
+  }
+  if(e.key==='Escape')guiaFecharPop();
 });
-$('#guiaEqSel').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('#btnAddGuiaEq').click();}});
-/* Adicionar pelo patrimônio digitado (código 42): digitar e Enter — sem
-   precisar procurar na lista da ORIGEM, que pode ter milhares de bens.
-   Mesmas travas do caminho do select: só entra se estiver lotado na
-   origem (ou se a origem ainda não foi escolhida); duplicado não entra.
-   Depois de adicionar, o campo esvazia e volta o foco — dá para
-   escanear os bens um atrás do outro sem tirar a mão do Enter. */
-$('#guiaPatDig').addEventListener('keydown',e=>{
-  if(e.key!=='Enter')return;
-  e.preventDefault();
-  const campo=e.target;
-  const pat=soDigitos(campo.value);
-  if(!pat)return toast('Digite o patrimônio do equipamento.','bad');
-  const eq=db.equipamentos.find(x=>soDigitos(x.patrimonio)===pat);
-  if(!eq)return toast('Patrimônio <b class="mono">'+esc(pat)+'</b> não encontrado no cadastro.','bad');
-  const ori=origemGuiaSelecionada();
-  if(ori&&eq.setorId!==ori)return toast('O patrimônio <b class="mono">'+esc(pat)+'</b> está lotado em <b>'+esc(setNome(eq.setorId))+'</b>, não na ORIGEM.','bad');
-  if(cartGuia.includes(eq.id)){campo.select();return toast('O patrimônio <b class="mono">'+esc(pat)+'</b> já está nesta guia.','warn');}
-  cartGuia.push(eq.id);
-  atualizarCartaoGuia();
-  campo.value='';campo.focus();
+$('#guiaEqSeta').addEventListener('click',()=>{
+  if(guiaPopAberto())guiaFecharPop();
+  else{guiaBuscaEl.focus();guiaAbrirPop();}
+});
+$('#guiaEqPop').addEventListener('click',e=>{
+  const o=e.target.closest('.combo-opt');if(!o)return;
+  if(guiaAddEq(o.dataset.id)){guiaBuscaEl.value='';guiaComboHL=0;preencherSelGuiaEq();guiaBuscaEl.focus();}
+});
+document.addEventListener('click',e=>{   /* clique fora fecha o pop */
+  if(!guiaPopAberto())return;
+  /* composedPath: o caminho do evento vale mesmo com o alvo substituído
+     (a linha clicada é repintada antes deste handler rodar, e o closest
+     em alvo solto fecharia a lista errado — a seleção em cascata perde) */
+  const caminho=(typeof e.composedPath==='function')?e.composedPath():[];
+  if(caminho.includes(document.getElementById('guiaEqCombo')))return;
+  if(e.target&&e.target.closest&&e.target.closest('#guiaEqCombo'))return;
+  guiaFecharPop();
 });
 $('#guiaCart').addEventListener('click',e=>{
   const b=e.target.closest('[data-rm]');if(!b)return;
@@ -5362,8 +5428,8 @@ function resetGuiaForm(){
   $('#guiaOS').value='';
   $('#guiaTecnicoLogado').textContent=usuarioAtual?usuarioAtual.nome:'—';
   $('#guiaRespOri').value='';$('#guiaRespPat').value='';$('#guiaRespDest').value='';$('#guiaFoneOri').value='';
-  $('#guiaEqSel').value='';
-  {const pd=$('#guiaPatDig');if(pd)pd.value='';}  /* patrimônio digitado não sobra no reset */
+  guiaComboHL=0;guiaFecharPop();                 /* combo esvazia e fecha no reset */
+  if(guiaBuscaEl)guiaBuscaEl.value='';
   $('#guiaChkSetor').checked=true;
   sigGuia.limpar();sigGuiaPat.limpar();sigGuiaDest.limpar();
   ['#wrapSigGuia','#wrapSigGuiaPat','#wrapSigGuiaDest'].forEach(id=>$(id).classList.add('recolhido'));
