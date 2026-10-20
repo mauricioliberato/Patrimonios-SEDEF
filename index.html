@@ -424,6 +424,43 @@
        texto não fica duplicado no código. Baixa
        guia-backup-restauracao.txt com cabeçalho e data/hora.
 
+   45. 📋 INVENTÁRIO PATRIMONIAL (coleta anual): novo item de menu
+       "Inventário" (logo após Guias) com uma tela só para a coleta
+       anual — o administrador cria um inventário por ano e qualquer
+       logado confere os bens setor a setor. O painel mostra, por
+       setor, bens, conferidos, barra de progresso e se está
+       concluído (KPIs gerais no topo); bens sem setor ganham alerta
+       e ficam de fora. Na tela do setor: caixa de BUSCA (parte do
+       patrimônio, tipo, marca ou série) com Enter que confirma o
+       primeiro da lista, toque na LINHA confirma ou desfaz, e o
+       botão 📷 abre a câmera já em MODO CONTÍNUO (lê etiqueta após
+       etiqueta sem fechar a cada código — o scanner segura 1,5 s na
+       mesma etiqueta para não repetir; só a tela do inventário usa
+       esse modo, os demais alvos seguem fechando a câmera como
+       antes). Bem lotado em OUTRO setor abre aviso na hora com três
+       saídas: registrar e ATUALIZAR o setor do bem (muda o cadastro
+       como qualquer edição), só REGISTRAR a divergência (cadastro não
+       mexe) ou cancelar. "Concluir setor" encerra a visita (dá para
+       reabrir) e o que ficou sem marcação vira NÃO LOCALIZADO no
+       relatório. Relatório com tela, PLANILHA .xlsx (SheetJS —
+       Inventario/Setor/Patrimônio/Tipo/Marca/Série/Situação/
+       Conferido em/Observação) e IMPRESSÃO (folha SEDEF com brasão,
+       bloco por setor, totais e duas linhas de assinatura).
+       Armazenamento fora da seção equipamentos (que passa de 1 MiB
+       e recusa gravação em massa): as conferências ficam em UM
+       documento por inventário×setor (sistema/invC_<inv>_<setor>),
+       gravado direto no Firestore a cada toque e lido ao abrir o
+       inventário e no "🔄 Atualizar" (em cada bem, o maior horário
+       vence); o db guarda o espelho db.invConfs, que entra sozinho
+       no backup JSON, e a seção inventarios (cabeçalhos, status,
+       setores concluídos) sincroniza pelo caminho normal das
+       seções. Criar, encerrar e reabrir inventário: só
+       administrador (.apenas-admin + souAdmin() no clique);
+       conferir, concluir e reabrir setor: qualquer logado. O modal
+       de confirmação ganhou rótulo opcional para o botão OK (o
+       padrão "Excluir" das demais telas ficou intacto) e a badge do
+       menu conta inventários abertos.
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -431,7 +468,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261020-160213">
+<meta name="nii-build" content="20261020-181550">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -683,6 +720,27 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
 #guiaBackupTexto li{margin-bottom:5px}
 #guiaBackupTexto p{margin:0 0 10px}
 
+/* ============== INVENTÁRIO (tela de conferência) ============== */
+.inv-linha{display:flex;gap:10px;align-items:center;padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:#fff;margin-bottom:6px;cursor:pointer}
+.inv-linha:hover{border-color:#9db4c6}
+.inv-linha.ok{background:#eefbf1;border-color:#bfe8c8}
+.inv-linha.div{background:#fff6e9;border-color:#f4d9ac}
+.inv-pat{font-weight:700;min-width:64px}
+.inv-info{flex:1;font-size:13px;color:#445}
+.inv-marc{font-size:12px;font-weight:700;white-space:nowrap}
+.inv-marc.ok{color:#1a7f3c}
+.inv-marc.div{color:#b06d00}
+.inv-barra{display:inline-block;vertical-align:middle;width:110px;height:8px;border-radius:6px;background:#e8edf2;overflow:hidden;margin-right:6px}
+.inv-barra i{display:block;height:100%;background:#2f855a;border-radius:6px}
+.inv-kpis{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.inv-kpi{border:1px solid var(--line);border-radius:8px;padding:8px 14px;background:#fbfcfe;min-width:112px}
+.inv-kpi b{display:block;font-size:20px}
+.inv-kpi span{font-size:11px;color:#667;letter-spacing:.05em;text-transform:uppercase}
+#invTabelaSetores,#invRelSetores{width:100%;border-collapse:collapse;font-size:13px}
+#invTabelaSetores th,#invTabelaSetores td,#invRelSetores th,#invRelSetores td{border-bottom:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:middle}
+#invTabelaSetores th,#invRelSetores th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#667}
+#invLista{max-height:62vh;overflow:auto;padding-right:2px}
+
 .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .toolbar input[type=text]{max-width:280px}
 .toolbar select{width:auto}
@@ -880,6 +938,10 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
       <button class="nav-item" data-view="guias">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h13M17 7l-3-3M17 7l-3 3M20 17H7M7 17l3-3M7 17l3 3"/></svg>
         Guias de Transferência <span class="nav-badge" id="badge-gui">0</span>
+      </button>
+      <button class="nav-item" data-view="inventario">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5h11M9 12h11M9 19h11"/><path d="M4 5l1.2 1.2L7.5 3.8M4 12l1.2 1.2L7.5 10.8M4 19l1.2 1.2L7.5 17.8"/></svg>
+        Inventário <span class="nav-badge" id="badge-inv">0</span>
       </button>
       <div class="nav-group" id="navImpressorasGroup">
         <button class="nav-item nav-parent" type="button" aria-expanded="false" aria-controls="impressorasSubmenu">
@@ -1918,6 +1980,89 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
             <div class="row" style="margin-top:12px;gap:8px;flex-wrap:wrap;align-items:center">
               <button class="btn btn-ghost btn-sm" id="btnGuiaBkpTxt">⬇ Baixar este guia (TXT)</button>
               <span class="subtle">O mesmo texto, para guardar ou imprimir fora do sistema.</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="view-inventario">
+        <div class="card" id="invCardTopo">
+          <div class="card-h"><h3>📋 Inventário patrimonial</h3><span class="sub">coleta anual — passe pelos setores e confirme os bens um a um</span></div>
+          <div class="card-b">
+            <div class="row" style="gap:10px;flex-wrap:wrap;align-items:center">
+              <select id="invSel" style="max-width:380px"></select>
+              <button class="btn btn-ghost btn-sm apenas-admin" id="btnInvNovo">➕ Novo inventário</button>
+              <span class="subtle" id="invSelVazio" style="display:none">Nenhum inventário ainda — o administrador cria o primeiro.</span>
+            </div>
+            <div id="invFormCriar" style="display:none;margin-top:10px;gap:8px;align-items:center">
+              <label style="display:flex;gap:6px;align-items:center;font-size:13px">Ano
+                <input id="invAno" type="number" min="2020" max="2100" style="width:100px" value="2026">
+              </label>
+              <button class="btn btn-dark btn-sm" id="btnInvCriarOk">Criar</button>
+              <button class="btn btn-ghost btn-sm" id="btnInvCriarCancelar">Cancelar</button>
+            </div>
+            <div class="row" id="invAcoes" style="margin-top:10px;gap:8px;flex-wrap:wrap;display:none">
+              <button class="btn btn-dark btn-sm" id="btnInvRelatorio">📊 Ver relatório</button>
+              <button class="btn btn-ghost btn-sm" id="btnInvAtualizar">🔄 Atualizar da nuvem</button>
+              <button class="btn btn-ghost btn-sm apenas-admin" id="btnInvEncerrar">🔒 Encerrar inventário</button>
+              <button class="btn btn-ghost btn-sm apenas-admin" id="btnInvReabrirInv" style="display:none">🔓 Reabrir inventário</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" id="invPainel" style="display:none">
+          <div class="card-h"><h3 id="invPainelTitulo">—</h3><span class="sub" id="invPainelSub"></span></div>
+          <div class="card-b">
+            <div class="inv-kpis" id="invKpis"></div>
+            <div style="overflow-x:auto"><table id="invTabelaSetores"></table></div>
+            <p class="subtle" id="invSemSetores" style="display:none">Cadastre os setores primeiro (menu Cadastros auxiliares → Setores).</p>
+          </div>
+        </div>
+
+        <div class="card" id="invSetorCard" style="display:none">
+          <div class="card-h"><h3 id="invSetorTitulo">—</h3><span class="sub" id="invSetorSub"></span></div>
+          <div class="card-b">
+            <div class="row" style="gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+              <button class="btn btn-ghost btn-sm" id="btnInvVoltar">← Voltar ao inventário</button>
+              <button class="btn btn-dark btn-sm" id="btnInvConcluir">✔ Concluir setor</button>
+              <button class="btn btn-ghost btn-sm" id="btnInvReabrirSetor" style="display:none">↩ Reabrir setor</button>
+            </div>
+            <div class="row" style="gap:8px;flex-wrap:wrap;align-items:center">
+              <input id="invBusca" placeholder="Parte do patrimônio, tipo ou marca… (Enter confirma o primeiro)" style="flex:1;min-width:220px" autocomplete="off">
+              <button type="button" class="btn-cam" data-scan-target="invBusca" title="Ler código de barras com a câmera">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M3 8V5a2 2 0 012-2h3M21 8V5a2 2 0 00-2-2h-3M3 16v3a2 2 0 002 2h3M21 16v3a2 2 0 01-2 2h-3"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+              </button>
+            </div>
+            <div class="subtle" style="margin:8px 0;font-size:12px">Toque na linha (ou Enter) para confirmar — toque de novo para desfazer. A câmera confirma na hora, etiqueta após etiqueta. Bem de outro setor abre o aviso de divergência.</div>
+            <div id="invLista"></div>
+          </div>
+        </div>
+
+        <div class="card" id="invRelat" style="display:none">
+          <div class="card-h"><h3 id="invRelatTitulo">📊 Relatório</h3><span class="sub" id="invRelatSub"></span></div>
+          <div class="card-b">
+            <div class="row" style="gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+              <button class="btn btn-ghost btn-sm" id="btnInvRelVoltar">← Voltar</button>
+              <button class="btn btn-dark btn-sm" id="btnInvPlanilha">⬇ Planilha (xlsx)</button>
+              <button class="btn btn-dark btn-sm" id="btnInvImprimir">🖨 Imprimir</button>
+            </div>
+            <div class="inv-kpis" id="invRelKpis"></div>
+            <div style="overflow-x:auto"><table id="invRelSetores"></table></div>
+            <div id="invRelListas" style="margin-top:14px"></div>
+          </div>
+        </div>
+
+        <div class="modal-overlay" id="modalInvDiv">
+          <div class="modal" style="width:min(500px,100%)">
+            <div class="modal-h"><h3>⚠ Bem fora do setor</h3><button class="x-close" data-close>&times;</button></div>
+            <div class="modal-b"><p id="invDivMsg" style="font-size:14px;line-height:1.6;color:var(--ink-soft)"></p></div>
+            <div class="modal-f">
+              <button class="btn btn-ghost" data-close>Cancelar</button>
+              <button class="btn btn-ghost" id="btnInvDivSo">Só registrar divergência</button>
+              <button class="btn btn-dark" id="btnInvDivMover">Registrar e atualizar o setor</button>
             </div>
           </div>
         </div>
@@ -3333,6 +3478,7 @@ const TITULOS={
   equipamentos:['Equipamentos','Catálogo de modelos + unidades patrimoniais'],
   emprestimos:['Empréstimos','Reservas, retiradas e devoluções com assinatura'],
   guias:['Guias de Transferência','Transferência de bens patrimoniais entre unidades'],
+  inventario:['Inventário Patrimonial','Coleta anual — confira os bens setor a setor'],
   impressoras:['Impressoras','Parque de impressões'],
   switches:['Switchs NR e IARAS','Dados de acesso aos switches'],
   racks:['Racks de Redes','Mapeamento de racks, patch panel, portas de switch e setor'],
@@ -3361,6 +3507,7 @@ function showView(v){
   $('#topTitle').textContent=TITULOS[v][0];
   $('#topSub').textContent=TITULOS[v][1];
   if(v==='backup')pintarBackup();
+  if(v==='inventario')invAoAbrir();
   if(v==='dashboard')renderDashboard();
   if(v==='emprestimos')requestAnimationFrame(()=>sigRet.resize());
   if(v==='guias'){
@@ -3509,6 +3656,9 @@ let scanTorchOn = false;
 let scanFocusTimer = null;
 let scanRefocoInterval = null;
 let scanImageCapture = null;
+let scanContinuo = false;    /* leitura contínua (inventário): não fecha a câmera a cada código */
+let scanUltCodigo = '';      /* evita reaplicar a mesma etiqueta em sequência */
+let scanUltHora = 0;
 
 const FORMATOS_1D = ['code_128','code_39','code_93','codabar','ean_13','ean_8','upc_a','upc_e','itf'];
 const FORMATOS_QR = ['qr_code','data_matrix','pdf417','aztec'];
@@ -3522,6 +3672,7 @@ function normalizarCodigoLido(texto){
 async function abrirScanner(targetId){
   try{
     scanTarget = targetId;
+    scanContinuo = (targetId === 'invBusca');   /* só a tela de inventário lê em sequência */
     scanVotos = { ultimo: null, contagem: 0 };
     $('#modalScan').classList.add('show');
     $('#scanControles').style.display='none';
@@ -3656,14 +3807,14 @@ async function iniciarScannerNativo(){
         const codigosFiltrados = await detector.detect(tmp);
         if(codigosFiltrados && codigosFiltrados.length){
           const bruto = codigosFiltrados[0].rawValue;
-          if(confirmarLeitura(bruto)){ pararScanner(); aplicarLeitura(bruto); return; }
+          if(confirmarLeitura(bruto)){ aplicarLeitura(bruto); if(!scanContinuo){ pararScanner(); return; } }
         }
       }
       turno++;
       const codigos = await detector.detect(alvo);
       if(codigos && codigos.length){
         const bruto = codigos[0].rawValue;
-        if(confirmarLeitura(bruto)){ pararScanner(); aplicarLeitura(bruto); return; }
+        if(confirmarLeitura(bruto)){ aplicarLeitura(bruto); if(!scanContinuo){ pararScanner(); return; } }
       }
     }catch(_){}
     requestAnimationFrame(loop);
@@ -3715,6 +3866,7 @@ async function iniciarScannerHtml5(){
       },
       texto=>{
         if(!normalizarCodigoLido(texto)) return;
+        if(scanContinuo){ aplicarLeitura(texto); return; }   /* segue lendo as próximas etiquetas */
         pararScanner();
         aplicarLeitura(texto);
       },
@@ -3796,12 +3948,20 @@ function aplicarLeitura(bruto){
     toast('Código lido, mas sem números: <b class="mono">'+esc(String(bruto).slice(0,30))+'</b>','warn');
     return;
   }
+  if(scanContinuo){
+    /* mesma etiqueta diante da câmera dispara a cada quadro: só reprocessa
+       depois de 1,5 s, para o alvo dar conta de cada leitura. */
+    const agora = Date.now();
+    if(digitos === scanUltCodigo && agora - scanUltHora < 1500) return;
+    scanUltCodigo = digitos; scanUltHora = agora;
+  }
   const el = $('#'+scanTarget);
   if(el){
     el.value = digitos;
     el.classList.remove('leitura-ok'); void el.offsetWidth; el.classList.add('leitura-ok');
     beep();
     el.dispatchEvent(new Event('input',{bubbles:true}));
+    el.dispatchEvent(new CustomEvent('leitura',{bubbles:true,detail:{digitos}}));
     if(el.id==='eqBusca' && typeof renderEquipamentos==='function'){ eqPagina=1; renderEquipamentos(); }
   }
 }
@@ -3810,6 +3970,7 @@ function pararScanner(){
   if(scanRefocoInterval){ clearInterval(scanRefocoInterval); scanRefocoInterval = null; }
   if(scanFocusTimer){ clearInterval(scanFocusTimer); scanFocusTimer = null; }
   scanAtivo = false;
+  scanContinuo = false;
   scanTorchOn = false;
   scanCaps = null;
   scanImageCapture = null;
@@ -6333,9 +6494,10 @@ $('#licTbody').addEventListener('click',e=>{
 
 /* ============== MODAIS ============== */
 let confCb=null;
-function confirmar(titulo,msg,cb){
+function confirmar(titulo,msg,cb,okLabel){
   $('#confTitulo').textContent=titulo;
   $('#confMsg').innerHTML=msg;
+  $('#btnConfOk').textContent=okLabel||'Excluir';
   confCb=cb;
   $('#modalConf').classList.add('show');
 }
@@ -6514,7 +6676,7 @@ $('#fileImport').addEventListener('change',e=>{
       if(!Array.isArray(d.marcas))d.marcas=[...DEFAULT_MARCAS];
       /* Seções que nasceram depois de alguns backups: completa as que
          faltarem para o app não quebrar renderizando indefinido. */
-      ['impressoras','wiki','racks','licencas','switches','guias','modelos'].forEach(k=>{if(!Array.isArray(d[k]))d[k]=[];});
+      ['impressoras','wiki','racks','licencas','switches','guias','modelos','inventarios'].forEach(k=>{if(!Array.isArray(d[k]))d[k]=[];});
       d.emprestimos.forEach(x=>{if(!Array.isArray(x.equipIds)){x.equipIds=x.equipId?[x.equipId]:[];delete x.equipId;}});
       if(!d.eqSnap||typeof d.eqSnap!=='object')d.eqSnap={};
       (d.guias||[]).forEach(g=>{if(g&&!g.recebimento){g.recebimento={data:g.origemData||hojeISO(),hora:'',respNome:'',assinatura:null,atualizouSetor:false,ts:g.emitidaEm||Date.now()};}});
@@ -6569,6 +6731,489 @@ $('#btnGuiaBkpTxt').addEventListener('click',()=>{
   toast('Guia baixado (TXT).');
 });
 
+/* ============== INVENTÁRIO PATRIMONIAL (código 45) ============== */
+/* Coleta anual: um inventário por ano, conferência bens a bens dentro de
+   cada setor — com busca por parte do patrimônio, Enter, toque na linha ou
+   câmera lendo etiqueta em sequência. As conferências ficam em UM documento
+   por inventário×setor (sistema/invC_…) — nunca dentro da seção
+   equipamentos, que passa de 1 MiB num doc só e não aceita gravação em
+   massa. O db guarda um espelho (db.invConfs) que entra sozinho no backup
+   JSON; a nuvem é lida ao abrir o inventário e no "Atualizar" (em cada bem,
+   o maior horário vence). */
+let invSelId=null;         /* inventário aberto */
+let invSetorAtual=null;    /* setor sendo conferido */
+let invDivPendente=null;   /* {eqId} esperando resposta no modal de divergência */
+const invs=()=>db.inventarios||(db.inventarios=[]);   /* cabeçalhos (seção inventarios) */
+const invConfs=()=>db.invConfs||(db.invConfs={});     /* espelho: chave invId|setorId → {eqId:{t,s,de}} */
+const invDe=id=>invs().find(x=>x.id===id)||null;
+function invConfsSetor(invId,sid){
+  const chave=invId+'|'+sid;
+  const m=invConfs();
+  return m[chave]||(m[chave]={});
+}
+const invDocNome=(invId,sid)=>'invC_'+invId+'_'+sid;
+async function invNuvemSalvar(invId,sid){
+  try{
+    await fsdb.collection('sistema').doc(invDocNome(invId,sid))
+      .set({inv:invId,setor:sid,confs:invConfsSetor(invId,sid)},{merge:true});
+  }catch(err){console.warn('Inventário: o setor '+sid+' não foi para a nuvem:',err);}
+}
+async function invNuvemCarregar(invId){
+  /* lê em paralelo o documento de cada setor e funde com o local mantendo a
+     conferência de maior horário. Silenciosa: a tela já funciona com o
+     espelho local — a nuvem só completa o que falta. */
+  if(!invId)return;
+  try{
+    const respostas=await Promise.all(db.setores.map(s=>
+      fsdb.collection('sistema').doc(invDocNome(invId,s.id)).get()
+        .then(d=>({sid:s.id,d})).catch(err=>({sid:s.id,err}))));
+    let mudou=false;
+    for(const r of respostas){
+      if(r.err||!r.d||!r.d.exists)continue;
+      const remoto=(r.d.data()&&r.d.data().confs)||{};
+      const local=invConfsSetor(invId,r.sid);
+      for(const k of Object.keys(remoto)){
+        if(!local[k]||remoto[k].t>local[k].t){local[k]=remoto[k];mudou=true;}
+      }
+    }
+    if(mudou){
+      try{localStorage.setItem(LS,JSON.stringify(db));}catch(_){}
+      if(invSelId===invId){invRender();if(invSetorAtual)invRenderSetor();}
+    }
+  }catch(err){console.warn('Inventário: nuvem indisponível agora:',err);}
+}
+function invDepoisDeMudar(invId,sid){
+  persistir();                    /* espelho local (vai ao backup) + seções habituais */
+  invNuvemSalvar(invId,sid);      /* documento do setor direto para o Firestore */
+  invRender();
+  if(invSetorAtual===sid)invRenderSetor();
+}
+function invProgresso(inv){
+  const r={total:0,conf:0,concluidos:0,qtdSetores:db.setores.length};
+  for(const s of db.setores){
+    const cs=invConfsSetor(inv.id,s.id);
+    for(const e of db.equipamentos){
+      if(e.setorId!==s.id)continue;
+      r.total++;
+      const x=cs[e.id];
+      if(x&&(x.s==='ok'||x.s==='div'))r.conf++;
+    }
+    if(inv.setores&&inv.setores[s.id])r.concluidos++;
+  }
+  return r;
+}
+function invTela(quais){
+  /* 'painel' | 'setor' | 'relat' | null (só o cartão do topo) */
+  $('#invPainel').style.display=quais==='painel'?'':'none';
+  $('#invSetorCard').style.display=quais==='setor'?'':'none';
+  $('#invRelat').style.display=quais==='relat'?'':'none';
+}
+function invAoAbrir(){
+  invRender();
+  if(!db.setores.length)toast('Cadastre ao menos um <b>setor</b> antes de inventariar.','warn');
+}
+function invRender(){
+  if(invSelId&&!invDe(invSelId))invSelId=null;
+  const lista=invs().slice().sort((a,b)=>(b.ano||0)-(a.ano||0)||(b.criadoEm||0)-(a.criadoEm||0));
+  $('#invSel').innerHTML=['<option value="">— Escolha um inventário —</option>']
+    .concat(lista.map(x=>{
+      const p=invProgresso(x);
+      return '<option value="'+x.id+'"'+(x.id===invSelId?' selected':'')+'>'+
+        esc(x.nome)+' · '+(x.status==='encerrado'?'encerrado':'aberto')+' · '+p.conf+'/'+p.total+'</option>';
+    })).join('');
+  $('#invSelVazio').style.display=lista.length?'none':'';
+  const inv=invSelId?invDe(invSelId):null;
+  $('#invAcoes').style.display=inv?'flex':'none';
+  if(inv){
+    $('#btnInvEncerrar').style.display=inv.status==='aberto'?'':'none';
+    $('#btnInvReabrirInv').style.display=inv.status==='aberto'?'none':'';
+  }
+  if(inv&&$('#invPainel').style.display!=='none')invRenderPainel(inv);
+  $('#badge-inv').textContent=invs().filter(x=>x.status!=='encerrado').length;
+}
+function invRenderPainel(inv){
+  const p=invProgresso(inv);
+  const pct=p.total?Math.round(p.conf*100/p.total):0;
+  $('#invPainelTitulo').textContent=inv.nome;
+  $('#invPainelSub').textContent=(inv.status==='encerrado'?'Encerrado em '+(inv.encerradoEm?new Date(inv.encerradoEm).toLocaleString('pt-BR'):'—'):'Em andamento')+(inv.criadoPor?' · criado por '+inv.criadoPor:'');
+  const semSetor=db.equipamentos.filter(e=>!setById(e.setorId)).length;
+  $('#invKpis').innerHTML=
+    '<div class="inv-kpi"><b>'+p.total+'</b><span>ben(s) nos setores</span></div>'+
+    '<div class="inv-kpi"><b>'+p.conf+'</b><span>conferidos ('+pct+'%)</span></div>'+
+    '<div class="inv-kpi"><b>'+(p.total-p.conf)+'</b><span>a conferir</span></div>'+
+    '<div class="inv-kpi"><b>'+p.concluidos+'/'+p.qtdSetores+'</b><span>setores concluídos</span></div>'+
+    (semSetor?'<div class="inv-kpi" style="min-width:210px"><b>⚠ '+semSetor+'</b><span>sem setor — fora do inventário</span></div>':'');
+  const linhas=db.setores.map(s=>{
+    const cs=invConfsSetor(inv.id,s.id);
+    let total=0,conf=0;
+    for(const e of db.equipamentos){
+      if(e.setorId!==s.id)continue;
+      total++;
+      const x=cs[e.id];
+      if(x&&(x.s==='ok'||x.s==='div'))conf++;
+    }
+    const fechado=!!(inv.setores&&inv.setores[s.id]);
+    const pc=total?Math.round(conf*100/total):(fechado?100:0);
+    return '<tr>'+
+      '<td>'+esc(setNome(s.id))+'</td>'+
+      '<td class="mono">'+total+'</td>'+
+      '<td class="mono">'+conf+'</td>'+
+      '<td><span class="inv-barra"><i style="width:'+pc+'%"></i></span>'+pc+'%</td>'+
+      '<td>'+(fechado?'✅ concluído':'⏳ em andamento')+'</td>'+
+      '<td><button class="btn btn-ghost btn-sm" data-invsetor="'+s.id+'">'+(fechado?'Ver':'▶ Conferir')+'</button></td>'+
+    '</tr>';
+  }).join('');
+  $('#invTabelaSetores').innerHTML=linhas
+    ?'<thead><tr><th>Setor</th><th>Bens</th><th>Conferidos</th><th>Progresso</th><th>Situação</th><th></th></tr></thead><tbody>'+linhas+'</tbody>'
+    :'';
+  $('#invSemSetores').style.display=db.setores.length?'none':'';
+}
+$('#invTabelaSetores').addEventListener('click',e=>{
+  const b=e.target.closest('[data-invsetor]');
+  if(!b)return;
+  invAbrirSetor(b.dataset.invsetor);
+});
+async function invAbrirSetor(sid){
+  if(!invSelId)return;
+  invSetorAtual=sid;
+  $('#invBusca').value='';
+  invTela('setor');
+  invRenderSetor();
+  /* completa com o que a nuvem tem deste setor (outros aparelhos, hoje) */
+  const invId=invSelId;
+  try{
+    const d=await fsdb.collection('sistema').doc(invDocNome(invId,sid)).get();
+    if(d&&d.exists&&invSelId===invId){
+      const remoto=(d.data()&&d.data().confs)||{};
+      const local=invConfsSetor(invId,sid);
+      let mudou=false;
+      for(const k of Object.keys(remoto))if(!local[k]||remoto[k].t>local[k].t){local[k]=remoto[k];mudou=true;}
+      if(mudou){invRender();invRenderSetor();}
+    }
+  }catch(err){console.warn('Inventário: nuvem não respondeu ao abrir o setor:',err);}
+}
+function invFiltroSetor(){
+  const termo=($('#invBusca').value||'').trim().toLowerCase();
+  const dig=soDigitos(termo);
+  const todos=db.equipamentos.filter(e=>e.setorId===invSetorAtual);
+  if(!termo)return todos;
+  return todos.filter(e=>
+    String(e.patrimonio||'').toLowerCase().includes(termo)||
+    (dig&&String(e.patrimonio||'').replace(/\D/g,'').includes(dig))||
+    String(e.tipo||'').toLowerCase().includes(termo)||
+    String(e.marca||'').toLowerCase().includes(termo)||
+    String(e.serie||'').toLowerCase().includes(termo));
+}
+function invRenderSetor(){
+  if(!invSelId||!invSetorAtual)return;
+  const inv=invDe(invSelId);
+  if(!inv)return;
+  const cs=invConfsSetor(invSelId,invSetorAtual);
+  const todos=db.equipamentos.filter(e=>e.setorId===invSetorAtual);
+  const lista=invFiltroSetor();
+  const contados=todos.filter(e=>cs[e.id]&&(cs[e.id].s==='ok'||cs[e.id].s==='div')).length;
+  const fechado=!!(inv.setores&&inv.setores[invSetorAtual]);
+  $('#invSetorTitulo').textContent=setNome(invSetorAtual);
+  $('#invSetorSub').textContent=contados+' de '+todos.length+' conferidos'+(fechado?' · setor concluído — reabra para mexer':'');
+  $('#btnInvConcluir').style.display=fechado?'none':'';
+  $('#btnInvReabrirSetor').style.display=fechado?'':'none';
+  const CAP=800;
+  const html=lista.slice(0,CAP).map(e=>{
+    const x=cs[e.id];
+    const st=x&&x.s==='ok'?'ok':(x&&x.s==='div'?'div':'');
+    const hora=x&&x.s!=='off'&&x.t?new Date(x.t).toLocaleTimeString('pt-BR').slice(0,5):'';
+    const chip=e.indisponivel?' <span style="color:#a33">· ⛔ indisponível</span>':'';
+    const marc=st==='div'?'<span class="inv-marc div">⚠ '+hora+(x.de?' · lotado em '+esc(setNome(x.de)):'')+'</span>'
+      :st==='ok'?'<span class="inv-marc ok">✓ '+hora+'</span>':'<span class="inv-marc"></span>';
+    return '<div class="inv-linha '+(st||'')+'" data-id="'+e.id+'">'+
+      '<span class="mono inv-pat">'+esc(e.patrimonio)+'</span>'+
+      '<span class="inv-info">'+icone(e.tipo)+' '+esc(e.tipo||'')+' '+esc(e.marca||'')+(e.serie?' · <span class="mono">'+esc(e.serie)+'</span>':'')+chip+'</span>'+
+      marc+'</div>';
+  }).join('');
+  $('#invLista').innerHTML=lista.length
+    ? html+(lista.length>CAP?'<div class="subtle" style="padding:8px;font-size:12px">…mais '+(lista.length-CAP)+' bem(ns) — refine a busca para alcançar os outros.</div>':'')
+    :'<div class="subtle" style="padding:14px">Nenhum bem deste setor bate com a busca.</div>';
+}
+function invConferir(eqId,opts){
+  opts=opts||{};
+  if(!invSelId||!invSetorAtual)return;
+  const inv=invDe(invSelId);
+  if(!inv||inv.status!=='aberto'){toast('Inventário encerrado — reabra para conferir.','warn');return;}
+  const eq=eqById(eqId);
+  if(!eq){toast('Equipamento não encontrado.','bad');return;}
+  const cs=invConfsSetor(invSelId,invSetorAtual);
+  const x=cs[eqId];
+  if(opts.linha&&(x&&(x.s==='ok'||x.s==='div'))){
+    /* toque na linha já conferida → desfaz */
+    cs[eqId]={t:Date.now(),s:'off'};
+    invDepoisDeMudar(invSelId,invSetorAtual);
+    return;
+  }
+  if(x&&x.s==='ok'&&!opts.linha){toast('Já conferido às <b>'+new Date(x.t).toLocaleTimeString('pt-BR').slice(0,5)+'</b>.','ok');return;}
+  if(x&&x.s==='div'&&!opts.linha){toast('Já conferido como <b>divergente</b>.','warn');return;}
+  if(eq.setorId!==invSetorAtual){invAbrirDivergencia(eqId);return;}
+  cs[eqId]={t:Date.now(),s:'ok'};
+  invDepoisDeMudar(invSelId,invSetorAtual);
+}
+function invAbrirDivergencia(eqId){
+  const eq=eqById(eqId);
+  if(!eq)return;
+  invDivPendente={eqId};
+  $('#invDivMsg').innerHTML=
+    'O patrimônio <b class="mono">'+esc(eq.patrimonio)+'</b> ('+esc(eq.tipo||'')+' '+esc(eq.marca||'')+') está lotado no setor <b>'+esc(setNome(eq.setorId))+
+    '</b>, mas você está conferindo <b>'+esc(setNome(invSetorAtual))+'</b>.<br><br>O que fazer?';
+  $('#modalInvDiv').classList.add('show');
+}
+function invFecharDivergencia(){invDivPendente=null;$('#modalInvDiv').classList.remove('show');}
+$('#btnInvDivMover').addEventListener('click',()=>{
+  if(!invDivPendente)return;
+  const eq=eqById(invDivPendente.eqId);
+  invFecharDivergencia();
+  if(!eq||!invSelId||!invSetorAtual)return;
+  const de=eq.setorId;
+  eq.setorId=invSetorAtual;
+  invConfsSetor(invSelId,invSetorAtual)[eq.id]={t:Date.now(),s:'div',de:de};
+  persistir();                       /* mudança no cadastro do bem, como qualquer edição */
+  invDepoisDeMudar(invSelId,invSetorAtual);
+  toast('Registrado e movido para <b>'+esc(setNome(invSetorAtual))+'</b>.');
+});
+$('#btnInvDivSo').addEventListener('click',()=>{
+  if(!invDivPendente)return;
+  const eq=eqById(invDivPendente.eqId);
+  invFecharDivergencia();
+  if(!eq||!invSelId||!invSetorAtual)return;
+  invConfsSetor(invSelId,invSetorAtual)[eq.id]={t:Date.now(),s:'div',de:eq.setorId};
+  invDepoisDeMudar(invSelId,invSetorAtual);
+  toast('Divergência registrada — o cadastro do bem não foi alterado.');
+});
+$('#invLista').addEventListener('click',e=>{
+  const row=e.target.closest('.inv-linha');
+  if(!row)return;
+  invConferir(row.dataset.id,{linha:true});
+});
+$('#invBusca').addEventListener('keydown',e=>{
+  if(e.key!=='Enter')return;
+  e.preventDefault();
+  const primeira=$('#invLista .inv-linha');
+  if(!primeira){toast('Nenhum bem na lista para confirmar.','warn');return;}
+  invConferir(primeira.dataset.id,{});
+});
+$('#invBusca').addEventListener('input',()=>invRenderSetor());
+$('#invBusca').addEventListener('leitura',e=>{
+  /* veio da câmera: confirma o código lido na hora (fluxo de coleta) */
+  const dig=soDigitos(e.detail&&e.detail.digitos);
+  if(!dig)return;
+  if($('#modalInvDiv').classList.contains('show'))return;   /* divergência esperando resposta */
+  const alvo=db.equipamentos.find(x=>soDigitos(x.patrimonio)===dig);
+  if(!alvo){toast('Patrimônio <b class="mono">'+esc(dig)+'</b> não encontrado no cadastro.','bad');return;}
+  invConferir(alvo.id,{});
+  $('#invBusca').value='';
+  invRenderSetor();
+});
+$('#btnInvVoltar').addEventListener('click',()=>{invSetorAtual=null;invTela('painel');invRender();});
+$('#btnInvConcluir').addEventListener('click',()=>{
+  const inv=invDe(invSelId);
+  if(!inv||!invSetorAtual)return;
+  const cs=invConfsSetor(invSelId,invSetorAtual);
+  const regs=db.equipamentos.filter(e=>e.setorId===invSetorAtual);
+  const ok=regs.filter(e=>cs[e.id]&&(cs[e.id].s==='ok'||cs[e.id].s==='div')).length;
+  confirmar('Concluir '+setNome(invSetorAtual)+'?',
+    '<b>'+ok+'/'+regs.length+'</b> conferidos. Os que faltarem entram como <b>não localizados</b> no relatório. Dá para reabrir depois.',
+    ()=>{
+      inv.setores=inv.setores||{};
+      inv.setores[invSetorAtual]={fechadoEm:Date.now(),fechadoPor:(usuarioAtual&&usuarioAtual.nome)||''};
+      persistir();
+      invSetorAtual=null; invTela('painel'); invRender();
+      toast('Setor concluído.');
+    },'Concluir');
+});
+$('#btnInvReabrirSetor').addEventListener('click',()=>{
+  const inv=invDe(invSelId);
+  if(!inv||!invSetorAtual)return;
+  confirmar('Reabrir o setor?','<b>'+esc(setNome(invSetorAtual))+'</b> volta para "em andamento" — os que faltam deixam de contar como não localizados.',()=>{
+    if(inv.setores)delete inv.setores[invSetorAtual];
+    persistir();
+    invRenderSetor(); invRender();
+  },'Reabrir');
+});
+$('#invSel').addEventListener('change',()=>{
+  invSelId=$('#invSel').value||null;
+  invSetorAtual=null;
+  invTela(invSelId?'painel':null);
+  invRender();
+  if(invSelId)invNuvemCarregar(invSelId);
+});
+$('#btnInvNovo').addEventListener('click',()=>{
+  if(!souAdmin())return toast('Somente administrador pode criar inventário.','bad');
+  $('#invFormCriar').style.display='flex';
+  $('#invAno').value=new Date().getFullYear();
+  $('#invAno').focus();
+});
+$('#btnInvCriarCancelar').addEventListener('click',()=>{$('#invFormCriar').style.display='none';});
+$('#btnInvCriarOk').addEventListener('click',()=>{
+  if(!souAdmin())return toast('Somente administrador pode criar inventário.','bad');
+  const ano=parseInt($('#invAno').value,10);
+  if(!ano||ano<2020||ano>2100)return toast('Ano inválido.','bad');
+  if(invs().some(x=>x.ano===ano))return toast('Já existe um <b>Inventário '+ano+'</b>.','warn');
+  const novo={id:uid(),nome:'Inventário '+ano,ano:ano,criadoEm:Date.now(),criadoPor:(usuarioAtual&&usuarioAtual.nome)||'',status:'aberto',setores:{}};
+  invs().push(novo);
+  invSelId=novo.id;
+  persistir();
+  $('#invFormCriar').style.display='none';
+  invTela('painel'); invRender();
+  toast('Inventário de <b>'+ano+'</b> criado.');
+});
+$('#btnInvAtualizar').addEventListener('click',()=>{
+  if(!invSelId)return;
+  toast('Atualizando da nuvem…');
+  invNuvemCarregar(invSelId);
+});
+$('#btnInvEncerrar').addEventListener('click',()=>{
+  if(!souAdmin())return toast('Somente administrador.','bad');
+  const inv=invDe(invSelId);
+  if(!inv)return;
+  confirmar('Encerrar '+inv.nome+'?','Depois de encerrado ninguém confirma mais — o relatório vira somente leitura. Você pode reabrir depois.',()=>{
+    inv.status='encerrado'; inv.encerradoEm=Date.now();
+    persistir(); invRender();
+    toast('Inventário encerrado.');
+  },'Encerrar');
+});
+$('#btnInvReabrirInv').addEventListener('click',()=>{
+  if(!souAdmin())return toast('Somente administrador.','bad');
+  const inv=invDe(invSelId);
+  if(!inv)return;
+  confirmar('Reabrir '+inv.nome+'?','A conferência volta a ficar liberada.',()=>{
+    inv.status='aberto'; inv.encerradoEm=null;
+    persistir(); invRender();
+  },'Reabrir');
+});
+$('#btnInvRelatorio').addEventListener('click',()=>{invTela('relat');invRenderRelatorio();});
+$('#btnInvRelVoltar').addEventListener('click',()=>{invTela('painel');invRender();});
+function invMontarRelatorio(inv){
+  const porSetor=[],linhas=[];
+  const totais={total:0,conf:0,naoLoc:0,pend:0,divs:0,concluidos:0,qtdSetores:db.setores.length};
+  for(const s of db.setores){
+    const nome=setNome(s.id);
+    const cs=invConfsSetor(inv.id,s.id);
+    const fechado=!!(inv.setores&&inv.setores[s.id]);
+    if(fechado)totais.concluidos++;
+    const regs=db.equipamentos.filter(e=>e.setorId===s.id);
+    const usados=new Set(regs.map(e=>e.id));
+    const ps={nome:nome,fechado:fechado,total:regs.length,conf:0,nao:0,pend:0,div:0,linhas:[]};
+    for(const e of regs){
+      const x=cs[e.id];
+      let sit,obs='';
+      if(x&&x.s==='ok'){sit='Conferido';ps.conf++;}
+      else if(x&&x.s==='div'){sit='Divergente';ps.conf++;ps.div++;obs=x.de&&x.de!==s.id?'Lotado em '+setNome(x.de)+' — conferido aqui':'Conferido fora do setor de origem';}
+      else if(fechado){sit='Não localizado';ps.nao++;}
+      else {sit='Pendente';ps.pend++;}
+      const l={setor:nome,patrimonio:e.patrimonio,tipo:e.tipo||'',marca:e.marca||'',serie:e.serie||'',situacao:sit,quando:(x&&x.s!=='off')?(x.t||0):0,obs:obs};
+      ps.linhas.push(l); linhas.push(l);
+    }
+    /* conferências que já não batem com um bem lotado no setor: bem movido
+       de setor ou excluído do cadastro depois da coleta */
+    for(const k of Object.keys(cs)){
+      const x=cs[k];
+      if(!x||x.s==='off'||usados.has(k))continue;
+      const eq=eqById(k);
+      if(!eq){
+        ps.div++;
+        const l={setor:nome,patrimonio:'—',tipo:'',marca:'',serie:'',situacao:'Registro excluído',quando:x.t||0,obs:'Bem removido do cadastro depois da conferência'};
+        ps.linhas.push(l); linhas.push(l);
+        continue;
+      }
+      ps.conf++; ps.div++;
+      const l={setor:nome,patrimonio:eq.patrimonio,tipo:eq.tipo||'',marca:eq.marca||'',serie:eq.serie||'',situacao:'Divergente',quando:x.t||0,obs:'Conferido em '+nome+'; lotado em '+setNome(eq.setorId)};
+      ps.linhas.push(l); linhas.push(l);
+    }
+    totais.total+=ps.total; totais.conf+=ps.conf; totais.naoLoc+=ps.nao; totais.pend+=ps.pend; totais.divs+=ps.div;
+    porSetor.push(ps);
+  }
+  return {porSetor:porSetor,linhas:linhas,totais:totais};
+}
+function invRenderRelatorio(){
+  const inv=invDe(invSelId);
+  if(!inv)return;
+  const r=invMontarRelatorio(inv);
+  const t=r.totais;
+  const pct=t.total?Math.round(t.conf*100/t.total):0;
+  $('#invRelatTitulo').textContent='📊 '+inv.nome+' — relatório';
+  $('#invRelatSub').textContent=(inv.status==='encerrado'?'Encerrado':'Em andamento')+' · '+t.concluidos+'/'+t.qtdSetores+' setores concluídos · emitido em '+new Date().toLocaleString('pt-BR');
+  $('#invRelKpis').innerHTML=
+    '<div class="inv-kpi"><b>'+t.total+'</b><span>bens</span></div>'+
+    '<div class="inv-kpi"><b>'+t.conf+'</b><span>conferidos ('+pct+'%)</span></div>'+
+    '<div class="inv-kpi"><b>'+t.naoLoc+'</b><span>não localizados</span></div>'+
+    '<div class="inv-kpi"><b>'+t.divs+'</b><span>divergências</span></div>'+
+    '<div class="inv-kpi"><b>'+t.pend+'</b><span>pendentes (setores abertos)</span></div>';
+  $('#invRelSetores').innerHTML=
+    '<thead><tr><th>Setor</th><th>Bens</th><th>Conferidos</th><th>Não localizados</th><th>Divergências</th><th>Pendentes</th><th>Situação</th></tr></thead><tbody>'+
+    r.porSetor.map(ps=>'<tr><td>'+esc(ps.nome)+'</td><td class="mono">'+ps.total+'</td><td class="mono">'+ps.conf+'</td><td class="mono">'+ps.nao+'</td><td class="mono">'+ps.div+'</td><td class="mono">'+ps.pend+'</td><td>'+(ps.fechado?'✅ concluído':'⏳ em andamento')+'</td></tr>').join('')+
+    '</tbody>';
+  const listaDet=(titular,itens,linha)=>{
+    if(!itens.length)return '';
+    const cap=300;
+    return '<div style="border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:12px">'+
+      '<h4 style="margin:0 0 8px;font-size:14px">'+titular+' ('+itens.length+')</h4>'+
+      (itens.length>cap?'<p class="subtle" style="font-size:12px;margin:0 0 6px">Mostrando os primeiros '+cap+' — a planilha traz todos.</p>':'')+
+      itens.slice(0,cap).map(linha).join('')+'</div>';
+  };
+  const diverg=r.linhas.filter(l=>l.situacao==='Divergente'||l.situacao==='Registro excluído');
+  const faltantes=r.linhas.filter(l=>l.situacao==='Não localizado');
+  $('#invRelListas').innerHTML=
+    listaDet('⚠ Divergências',diverg,l=>'<div style="padding:4px 0;border-bottom:1px solid var(--line);font-size:13px"><b class="mono">'+esc(l.patrimonio)+'</b> — '+esc(l.setor)+' — <b>'+esc(l.situacao)+'</b>'+(l.obs?' · '+esc(l.obs):'')+'</div>')+
+    listaDet('🚫 Não localizados (setores concluídos)',faltantes,l=>'<div style="padding:4px 0;border-bottom:1px solid var(--line);font-size:13px"><b class="mono">'+esc(l.patrimonio)+'</b> — '+esc(l.tipo)+' '+esc(l.marca)+' · '+esc(l.setor)+'</div>');
+}
+$('#btnInvPlanilha').addEventListener('click',()=>{
+  const inv=invDe(invSelId);
+  if(!inv)return;
+  const r=invMontarRelatorio(inv);
+  const cab=['Inventário','Setor','Patrimônio','Tipo','Marca','Série','Situação','Conferido em','Observação'];
+  const aoa=[cab].concat(r.linhas.map(l=>[inv.nome,l.setor,l.patrimonio,l.tipo,l.marca,l.serie,l.situacao,l.quando?new Date(l.quando).toLocaleString('pt-BR'):'',l.obs]));
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols']=cab.map(()=>({wch:24}));
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,('Inventario '+inv.ano).slice(0,31));
+  XLSX.writeFile(wb,nomeArquivoPlanilha('Inventario_'+inv.ano,'Relatorio'));
+  toast(r.linhas.length+' linha(s) de <b>'+esc(inv.nome)+'</b> exportada(s).');
+});
+$('#btnInvImprimir').addEventListener('click',()=>{
+  const inv=invDe(invSelId);
+  if(!inv)return;
+  const r=invMontarRelatorio(inv);
+  const item=(l,v)=>'<div class="r-item"><div class="rl">'+l+'</div><div class="rv">'+v+'</div></div>';
+  const blocos=r.porSetor.map(ps=>
+    '<div class="r-block"><h4>'+esc(ps.nome)+' — '+ps.conf+'/'+ps.total+' conferidos'+(ps.fechado?' · concluído':'')+'</h4>'+
+    '<table class="r-table"><thead><tr><th>Patrimônio</th><th>Equipamento</th><th>Nº de série</th><th>Situação</th></tr></thead><tbody>'+
+    (ps.linhas.length?ps.linhas.map(l=>'<tr><td class="mono" style="font-weight:600">'+esc(l.patrimonio)+'</td><td>'+esc(l.tipo)+' '+esc(l.marca)+'</td><td class="mono">'+esc(l.serie||'—')+'</td><td>'+esc(l.situacao)+(l.obs?' — '+esc(l.obs):'')+'</td></tr>').join('')
+      :'<tr><td colspan="4" style="color:#666">Nenhum bem lotado neste setor</td></tr>')+
+    '</tbody></table>'+
+    '<div style="font-size:11px;color:#555;margin-top:6px">Conferidos '+ps.conf+' · Não localizados '+ps.nao+' · Pendentes '+ps.pend+' · Divergências '+ps.div+'</div></div>').join('');
+  const t=r.totais;
+  $('#printArea').innerHTML='<div class="recibo">'+
+    '<div class="rec-head">'+
+      '<div><h2>SEDEF - Núcleo de Informática e Informações</h2>'+
+      '<div style="font-size:13px;font-weight:600;margin-top:4px">RELATÓRIO DE INVENTÁRIO DE BENS PATRIMONIAIS</div></div>'+
+      '<div class="rec-right"><img src="'+BRASAO_B64+'" class="rec-brasao" alt="Brasão"><div class="rec-os">'+esc(inv.nome)+'</div>'+
+      '<div style="font-size:11px;color:#555">'+(inv.status==='encerrado'?'Encerrado':'Em andamento')+'</div></div>'+
+    '</div>'+
+    '<div class="r-grid">'+
+      item('Conferidos',t.conf+' de '+t.total)+
+      item('Não localizados',t.naoLoc)+
+      item('Divergências',t.divs)+
+      item('Setores concluídos',t.concluidos+' de '+t.qtdSetores)+
+      item('Emitido em',new Date().toLocaleString('pt-BR'))+
+      item('Responsável',esc((usuarioAtual&&usuarioAtual.nome)||'—'))+
+    '</div>'+
+    blocos+
+    '<div class="r-sigs">'+
+      '<div class="r-sig"><div style="height:64px"></div><div class="line"><b>___________________________</b><br>Responsável pelo inventário</div></div>'+
+      '<div class="r-sig"><div style="height:64px"></div><div class="line"><b>___________________________</b><br>Responsável pelo patrimônio</div></div>'+
+    '</div>'+
+    '<div class="r-foot">Documento gerado pelo '+NOME_SISTEMA+' em '+new Date().toLocaleString('pt-BR')+'</div>'+
+  '</div>';
+  setTimeout(()=>window.print(),60);
+});
+
 /* ============== RELÓGIO E TUDO ============== */
 function tick(){
   const d=new Date();
@@ -6580,6 +7225,7 @@ function atualizarBadges(){
   $('#badge-eq').textContent=db.equipamentos.length;
   $('#badge-emp').textContent=db.emprestimos.filter(e=>!e.devolucao).length;
   $('#badge-gui').textContent=(db.guias||[]).length;
+  $('#badge-inv').textContent=invs().filter(x=>x.status!=='encerrado').length;
   $('#badge-imp').textContent=(db.impressoras||[]).length;
   $('#badge-sw').textContent=(db.switches||[]).length;
   $('#badge-racks').textContent=(db.racks||[]).length;
@@ -6595,6 +7241,7 @@ function atualizarTudo(){
     renderLicencas,renderWiki,renderPlanilhasHub,atualizarCartaoEmp,atualizarBadges
   ].forEach(f=>{try{f();}catch(err){console.error('NII render:',err);}});
   if(currentView==='dashboard'){try{renderDashboard();}catch(err){console.error('NII render:',err);}}
+  if(currentView==='inventario'){try{invRender();if(invSetorAtual)invRenderSetor();}catch(err){console.error('NII inventário:',err);}}
   /* Página da wiki aberta na leitura: a nuvem pode ter trazido versão nova
      (ou a página pode ter sido apagada por outro usuário) — sem este
      refresh a tela seguia com o conteúdo antigo até sair e abrir de novo. */
