@@ -330,6 +330,23 @@
        código. Guias de transferência NÃO são afetadas (movimentar
        bem é outra coisa).
 
+   40. 🏢 SETOR NO COMBO DE EMPRÉSTIMO: quem abre a reserva é o
+       SETOR — o sistema agora mostra o dono de cada bem no combo
+       "Equipamentos" do empréstimo (antes: "pat — tipo marca";
+       agora: "pat — tipo marca · Setor") e, quando o campo "Setor"
+       do formulário está preenchido, o combo vira DOIS grupos:
+       "Do setor X (N)" com o bem do próprio setor solicitante em
+       cima e "Outros setores (M)" embaixo — só se pega de outro
+       setor na falta, e isso agora é visual. Trocar o setor no
+       formulário reagrupa o combo na hora (listener no change);
+       adicionar o primeiro equipamento continua preenchendo o
+       setor vazio do formulário e já reagrupa. O carrinho ("Neste
+       empréstimo") também passa a mostrar o setor de cada item
+       adicionado. As opções agora saem ordenadas por patrimônio
+       dentro de cada grupo (antes: ordem de cadastro). Mudança só
+       de leitura — nenhum dado novo gravado; setNome responde pelo
+       nome do setor.
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -337,7 +354,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261020-083423">
+<meta name="nii-build" content="20261020-123237">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -4870,8 +4887,24 @@ function garantirVisivelEmp(emp){
 function preencherSelEquip(){
   const sel=$('#empEqSel');if(!sel)return;
   const antes=sel.value;
-  const dispo=disponiveisParaEmp(empEditId).filter(e=>!carrinho.includes(e.id));
-  sel.innerHTML=`<option value="">Selecione para adicionar…</option>`+dispo.map(e=>`<option value="${e.id}">${esc(e.patrimonio)} — ${esc(e.tipo)} ${esc(e.marca)}</option>`).join('');
+  /* Pedido do responsável (código 40): quem abre a reserva é o SETOR — o
+     bem do próprio setor vem primeiro no combo (optgroup "Do setor …");
+     só na falta se pega de outro setor, que segue nooptgroup "Outros".
+     Cada opção também mostra o dono: "pat — tipo marca · Setor". */
+  const setorAlvo=$('#empSetor')?$('#empSetor').value:'';
+  const cmpPat=(a,b)=>String(a.patrimonio||'').localeCompare(String(b.patrimonio||''),undefined,{numeric:true});
+  const dispo=disponiveisParaEmp(empEditId).filter(e=>!carrinho.includes(e.id)).sort(cmpPat);
+  const rotulo=e=>`<option value="${e.id}">${esc(e.patrimonio)} — ${esc(e.tipo)} ${esc(e.marca)}${e.setorId?' · '+esc(setNome(e.setorId)):''}</option>`;
+  let html=`<option value="">Selecione para adicionar…</option>`;
+  if(setorAlvo){
+    const doSetor=dispo.filter(e=>e.setorId===setorAlvo);
+    const resto=dispo.filter(e=>e.setorId!==setorAlvo);
+    html+=`<optgroup label="Do setor ${esc(setNome(setorAlvo))} (${doSetor.length})">`+doSetor.map(rotulo).join('')+`</optgroup>`;
+    html+=`<optgroup label="Outros setores (${resto.length})">`+resto.map(rotulo).join('')+`</optgroup>`;
+  }else{
+    html+=dispo.map(rotulo).join('');
+  }
+  sel.innerHTML=html;
   if(dispo.some(e=>e.id===antes))sel.value=antes;
 }
 function renderCart(){
@@ -4880,9 +4913,11 @@ function renderCart(){
   if(!carrinho.length){box.innerHTML='<div class="cart-empty">Nenhum equipamento adicionado.<br>Use o campo ao lado para adicionar.</div>';return;}
   box.innerHTML=carrinho.map(id=>{
     const inf=infoEq(id);if(!inf)return '';
+    const eqDono=eqById(id);
+    const setor=eqDono&&eqDono.setorId?' · '+esc(setNome(eqDono.setorId)):'';
     return `<div class="cart-item">
       <span class="mono" style="font-weight:600">${esc(inf.patrimonio)}</span>
-      <span class="subtle" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${icone(inf.tipo)} ${esc(inf.tipo)} ${esc(inf.marca)}${inf.serie?' · S/N '+esc(inf.serie):''}${inf.excluido?' · <span style="color:var(--bad)">(excluído)</span>':''}</span>
+      <span class="subtle" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${icone(inf.tipo)} ${esc(inf.tipo)} ${esc(inf.marca)}${inf.serie?' · S/N '+esc(inf.serie):''}${setor}${inf.excluido?' · <span style="color:var(--bad)">(excluído)</span>':''}</span>
       <button type="button" class="ibtn bad rm" data-rm="${id}" title="Remover do empréstimo">✕</button>
     </div>`;}).join('');
 }
@@ -4899,6 +4934,9 @@ $('#btnAddEq').addEventListener('click',()=>{
   addEqForm(id);
 });
 $('#empEqSel').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('#btnAddEq').click();}});
+/* Trocou o setor do chamado → o combo reagrupa na hora: o bem do setor
+   solicitante volta para o topo (código 40). */
+$('#empSetor').addEventListener('change',preencherSelEquip);
 $('#empCart').addEventListener('click',e=>{
   const b=e.target.closest('[data-rm]');if(!b)return;
   carrinho=carrinho.filter(x=>x!==b.dataset.rm);
