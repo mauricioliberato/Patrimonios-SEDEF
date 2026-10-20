@@ -407,6 +407,23 @@
        .bkp-status (barra + tela) e a linha de detalhe;
        showView('backup') repinta ao abrir.
 
+   44. 📖 GUIA DE BACKUP E RESTAURAÇÃO: dentro da área de bkp entrou
+       um cartão-documento "📖 Guia de backup e restauração" com
+       quares seções recolhíveis (clique no título abre): 🅰️ Criar
+       o backup (passo a passo: logar → JSON → ZIP → guardar FORA
+       do PC → frequência e significado do indicador ✓/⚠); 🅱️
+       Restaurar (quando usar, escolher arquivo, confirmar, F5 nas
+       abas, aviso da FUSÃO, numeração de guias, ZIP sem importação
+       em massa); 🅲 O que NÃO entra no JSON (prints → ZIP, código →
+       pasta/GitHub, PDF → "Salvar em PDF" na impressão); 🅳 Dicas
+       (exportar antes de restaurar, guardar 2 últimos JSONs,
+       "nunca exportado" = fazer agora, combinar com a equipe).
+       Botão "⬇ Baixar este guia (TXT)" gera o arquivo a partir do
+       PRÓPRIO cartão (um varredor do DOM escreve listas com recuo e
+       os <details> viram seções "=== título ===") — fonte única, o
+       texto não fica duplicado no código. Baixa
+       guia-backup-restauracao.txt com cabeçalho e data/hora.
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -414,7 +431,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261020-153804">
+<meta name="nii-build" content="20261020-160213">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -656,6 +673,15 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
 .combo-opt:last-child{border-bottom:0}
 .combo-opt.hl,.combo-opt:hover{background:#eef4ff}
 .combo-vazio{padding:11px 10px;color:var(--muted);font-size:12.5px;text-align:center}
+/* guia de backup (documento dentro da área de bkp) */
+#guiaBackupTexto details{border:1px solid var(--line);border-radius:8px;background:#fbfcfe;padding:0 14px;margin-bottom:10px}
+#guiaBackupTexto summary{cursor:pointer;font-weight:700;color:var(--ink);padding:11px 0}
+#guiaBackupTexto summary::before{content:'▸ ';color:var(--accent)}
+#guiaBackupTexto details[open] summary{border-bottom:1px dashed var(--line);margin-bottom:10px}
+#guiaBackupTexto details[open] summary::before{content:'▾ '}
+#guiaBackupTexto ol,#guiaBackupTexto ul{margin:0 0 12px;padding-left:20px;line-height:1.75}
+#guiaBackupTexto li{margin-bottom:5px}
+#guiaBackupTexto p{margin:0 0 10px}
 
 .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .toolbar input[type=text]{max-width:280px}
@@ -1836,6 +1862,63 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
               <li>Guardar os <b>dois arquivos fora deste computador</b> (pendrive/nuvem pessoal).</li>
             </ol>
             <span class="hint" style="margin-top:10px;display:block"><span class="dot"></span>A barra lateral mostra <b>✓ Backup</b> (verde) até 7 dias da última exportação e <b>⚠</b> (laranja) depois — inclusive nesta tela, no cartão de situação.</span>
+          </div>
+        </div>
+
+        <!-- ============ GUIA DE BACKUP E RESTAURAÇÃO (código 44) ============
+             Documento de apoio: criar, guardar e restaurar, dentro da própria
+             área de bkp. O cartão é a ÚNICA fonte — o botão TXT varre este
+             HTML e escreve o texto, sem duplicar o conteúdo em dois lugares. -->
+        <div class="card" style="margin-top:14px" id="guiaBackupCard">
+          <div class="card-h">
+            <h3>📖 Guia de backup e restauração</h3>
+            <span class="sub">passo a passo para criar, guardar e restaurar — clique nos títulos para abrir</span>
+          </div>
+          <div class="card-b" id="guiaBackupTexto">
+            <details open>
+              <summary>🅰️ Criar o backup (passo a passo)</summary>
+              <ol>
+                <li><b>Entre no sistema</b> (precisa estar logado) e abra o menu <b>💾 Backup e Restauração</b>.</li>
+                <li><b>Dados (JSON):</b> clique em <b>⬇ Exportar backup (JSON)</b>. O navegador baixa o arquivo <span class="mono">nii-patrimonios-backup-AAAAMMDD.json</span> com <b>todas as seções</b>: equipamentos, técnicos, setores, empréstimos, guias (com as assinaturas), impressoras, switches, racks, licenças, listas, wiki e tipos/marcas.</li>
+                <li><b>Arquivos (ZIP):</b> clique em <b>⬇ Tudo (ZIP)</b>. Baixa o <span class="mono">backup-wiki-AAAAMMDD.zip</span> com <b>todos</b> os prints e documentos anexados (limite de 1.000 arquivos ou 64 MB — se avisar que é grande demais, baixe pelo painel 📁 Arquivos, em partes).</li>
+                <li><b>Guarde os dois arquivos FORA deste computador</b> — pendrive, HD externo ou nuvem pessoal. Pasta do PC não é backup.</li>
+                <li><b>Frequência:</b> semanal, e sempre depois de mudanças grandes (cadastro em massa, exclusões, restaurações). O indicador da barra lateral fica <b>✓ verde até 7 dias</b> da última exportação e <b>⚠ laranja depois</b>.</li>
+              </ol>
+            </details>
+            <details>
+              <summary>🅱️ Restaurar o backup</summary>
+              <p><b>Quando usar:</b> PC novo ou disco trocado, dado apagado por engano, nuvem zerada, troca da conta do Firebase.</p>
+              <ol>
+                <li>Abra <b>💾 Backup e Restauração</b>.</li>
+                <li>Clique em <b>⬆ Restaurar de um backup</b> e escolha o arquivo <b>JSON</b> (prefira o mais recente).</li>
+                <li>Leia o aviso na tela e <b>confirme</b>.</li>
+                <li>A tela assume os dados do arquivo e o sistema sincroniza com a nuvem — depois, dê <b>F5 nas abas abertas</b> para todo mundo receber.</li>
+              </ol>
+              <p><b>Atenção — fusão:</b> a nuvem recebe os itens por <b>fusão</b> (nada é apagado por completo). É ideal quando a nuvem está <b>vazia/zerada</b>; se ela estiver cheia de dados diferentes, os dois conjuntos podem coexistir.</p>
+              <p><b>Guias:</b> a numeração continua da <b>maior guia restaurada + 1</b>.</p>
+              <p><b>Arquivos (ZIP):</b> não têm importação em massa — para prints e documentos voltarem ao sistema, são reenviados pelo painel 📁 Arquivos.</p>
+            </details>
+            <details>
+              <summary>🅲 O que NÃO entra no JSON</summary>
+              <ul>
+                <li><b>Prints e documentos da Wiki</b> → use o <b>⬇ Tudo (ZIP)</b>.</li>
+                <li><b>Código do sistema</b> → pasta do projeto (<span class="mono">bkp-codigo-*.zip</span>) e GitHub.</li>
+                <li><b>PDFs impressos</b> → o sistema não guarda a folha pronta (ela é remontada na hora a partir do registro); ao imprimir, escolha <b>“Salvar em PDF”</b> se quiser a cópia visual.</li>
+              </ul>
+            </details>
+            <details>
+              <summary>🅓 Dicas de segurança</summary>
+              <ul>
+                <li>Antes de <b>restaurar</b>, exporte um backup do estado atual — assim você não perde o que estava na tela.</li>
+                <li>Guarde no mínimo os <b>2 últimos JSONs</b> (os nomes já trazem a data).</li>
+                <li>Se o indicador mostrar <b>“nunca exportado”</b>, faça o primeiro backup agora.</li>
+                <li>Restaurar troca os dados da <b>tela</b> e sincroniza para todo mundo — combine antes com a equipe, se mais gente estiver usando.</li>
+              </ul>
+            </details>
+            <div class="row" style="margin-top:12px;gap:8px;flex-wrap:wrap;align-items:center">
+              <button class="btn btn-ghost btn-sm" id="btnGuiaBkpTxt">⬇ Baixar este guia (TXT)</button>
+              <span class="subtle">O mesmo texto, para guardar ou imprimir fora do sistema.</span>
+            </div>
           </div>
         </div>
       </section>
@@ -6454,6 +6537,36 @@ $('#fileImport').addEventListener('change',e=>{
     }catch(_){toast('Arquivo de backup inválido.','bad');}
   };
   r.readAsText(f);e.target.value='';
+});
+
+/* --- 📖 Guia em TXT: o cartão do guia é a fonte única — este varredor
+   escreve um texto legível (listas numeradas com recuo, títulos dos
+   <details> como seções) e baixa como arquivo .txt para guardar ou
+   imprimir fora do sistema. */
+$('#btnGuiaBkpTxt').addEventListener('click',()=>{
+  const limpo=s=>s.replace(/\s+/g,' ').trim();
+  const linhas=[];
+  const andar=no=>{
+    for(const f of no.childNodes){
+      if(f.nodeType===3){const t=limpo(f.textContent);if(t)linhas.push(t);}
+      else if(f.tagName==='BR')linhas.push('');
+      else if(f.tagName==='OL')[...f.children].forEach((li,i)=>linhas.push('  '+(i+1)+'. '+limpo(li.textContent)));
+      else if(f.tagName==='UL')[...f.children].forEach(li=>linhas.push('  - '+limpo(li.textContent)));
+      else if(f.tagName==='SUMMARY')linhas.push('','=== '+limpo(f.textContent)+' ===','');
+      else andar(f);
+    }
+  };
+  andar(document.getElementById('guiaBackupTexto'));
+  const txt='GUIA DE BACKUP E RESTAURAÇÃO — SEDEF / Núcleo de Informática\r\n'+
+            'Gerado em '+new Date().toLocaleString('pt-BR')+'\r\n\r\n'+
+            linhas.join('\r\n')+'\r\n';
+  const blob=new Blob([txt],{type:'text/plain;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='guia-backup-restauracao.txt';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('Guia baixado (TXT).');
 });
 
 /* ============== RELÓGIO E TUDO ============== */
