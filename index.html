@@ -366,6 +366,20 @@
        souAdmin() de novo). Setores já movidos pelas guias de
        teste permanecem — ajuste na mão se preciso.
 
+   42. 📌 PATRIMÔNIO DIGITADO NA GUIA: no campo "Equipamentos
+       transferidos" da guia entrou uma caixa "📌 Patrimônio →
+       Enter" ANTES do select: digita o patrimônio, dá Enter, e o
+       bem entra direto na guia — sem procurar na lista da ORIGEM
+       (que pode ter milhares de itens e demorava). O campo esvazia
+       e volta o foco depois de cada Enter, para escanear os bens
+       um atrás do outro. Mesmas travas do caminho do select: não
+       encontrado avisa; lotado em OUTRO setor avisa com o nome do
+       setor; já adicionado avisa e não duplica; ponto/barra no
+       patrimônio são ignorados (soDigitos). Sem origem escolhida,
+       adiciona qualquer bem — igual ao select (a trava da origem
+       vale quando ela está definida). O reset do formulário
+       esvazia a caixa. O select continua funcionando como antes.
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -373,7 +387,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261020-132932">
+<meta name="nii-build" content="20261020-135122">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -1259,6 +1273,9 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
                 <div class="field c5">
                   <label>Equipamentos transferidos <b>*</b></label>
                   <div style="display:flex;gap:8px">
+                    <input type="text" id="guiaPatDig" class="mono" inputmode="numeric" style="flex:1;min-width:110px"
+                           placeholder="📌 Patrimônio → Enter"
+                           title="Mais rápido: digite o patrimônio e tecle Enter — o equipamento entra direto na guia">
                     <select id="guiaEqSel" class="mono" style="flex:1"></select>
                     <button type="button" class="btn btn-dark btn-sm" id="btnAddGuiaEq">+ Adicionar</button>
                   </div>
@@ -5288,6 +5305,27 @@ $('#btnAddGuiaEq').addEventListener('click',()=>{
   atualizarCartaoGuia();
 });
 $('#guiaEqSel').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('#btnAddGuiaEq').click();}});
+/* Adicionar pelo patrimônio digitado (código 42): digitar e Enter — sem
+   precisar procurar na lista da ORIGEM, que pode ter milhares de bens.
+   Mesmas travas do caminho do select: só entra se estiver lotado na
+   origem (ou se a origem ainda não foi escolhida); duplicado não entra.
+   Depois de adicionar, o campo esvazia e volta o foco — dá para
+   escanear os bens um atrás do outro sem tirar a mão do Enter. */
+$('#guiaPatDig').addEventListener('keydown',e=>{
+  if(e.key!=='Enter')return;
+  e.preventDefault();
+  const campo=e.target;
+  const pat=soDigitos(campo.value);
+  if(!pat)return toast('Digite o patrimônio do equipamento.','bad');
+  const eq=db.equipamentos.find(x=>soDigitos(x.patrimonio)===pat);
+  if(!eq)return toast('Patrimônio <b class="mono">'+esc(pat)+'</b> não encontrado no cadastro.','bad');
+  const ori=origemGuiaSelecionada();
+  if(ori&&eq.setorId!==ori)return toast('O patrimônio <b class="mono">'+esc(pat)+'</b> está lotado em <b>'+esc(setNome(eq.setorId))+'</b>, não na ORIGEM.','bad');
+  if(cartGuia.includes(eq.id)){campo.select();return toast('O patrimônio <b class="mono">'+esc(pat)+'</b> já está nesta guia.','warn');}
+  cartGuia.push(eq.id);
+  atualizarCartaoGuia();
+  campo.value='';campo.focus();
+});
 $('#guiaCart').addEventListener('click',e=>{
   const b=e.target.closest('[data-rm]');if(!b)return;
   cartGuia=cartGuia.filter(x=>x!==b.dataset.rm);
@@ -5325,6 +5363,7 @@ function resetGuiaForm(){
   $('#guiaTecnicoLogado').textContent=usuarioAtual?usuarioAtual.nome:'—';
   $('#guiaRespOri').value='';$('#guiaRespPat').value='';$('#guiaRespDest').value='';$('#guiaFoneOri').value='';
   $('#guiaEqSel').value='';
+  {const pd=$('#guiaPatDig');if(pd)pd.value='';}  /* patrimônio digitado não sobra no reset */
   $('#guiaChkSetor').checked=true;
   sigGuia.limpar();sigGuiaPat.limpar();sigGuiaDest.limpar();
   ['#wrapSigGuia','#wrapSigGuiaPat','#wrapSigGuiaDest'].forEach(id=>$(id).classList.add('recolhido'));
