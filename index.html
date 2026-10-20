@@ -386,6 +386,27 @@
        foi trocada por este combo, que era o que o dono queria:
        digitar ou escolher no mesmo controle.)
 
+   43. 💾 ÁREA DE BACKUP E RESTAURAÇÃO: novo item no menu (grupo
+       Ferramentas) "Backup e Restauração", com uma tela só para
+       bkp. Os botões "⬇ Exportar backup" e "⬆ Importar" saíram do
+       pé da barra lateral e foram para dentro da tela (MESMOS ids
+       — os listeners do export/restaurar continuam valendo sem
+       mexer no JS deles); o indicador "✓/⚠ Backup: data"
+       permanece no rodapé da barra (aviso de vencimento) e ganhou
+       um irmão na tela, que também pinta "Última exportação em ...
+       — por ...". A tela tem: cartão de SITUAÇÃO; 1 · Dados (JSON)
+       com os dois botões + resumo do que o JSON leva e o aviso da
+       FUSÃO na restauração; 2 · Arquivos (ZIP) — botão "⬇ Tudo
+       (ZIP)" novo; 3 · Código do sistema (fica na pasta do
+       projeto, não baixa por aqui); "Onde os dados ficam"
+       (Firestore sistema/, KV wiki-imagens, Auth, GitHub) e
+       "Rotina recomendada" (semanal: JSON + ZIP fora do PC). O
+       corpo do handler do ZIP foi extraído para baixarBackupZip()
+       e os DOIS botões (área nova e painel 📁 da Wiki) chamam a
+       mesma função. pintarBackup() agora pinta todos os
+       .bkp-status (barra + tela) e a linha de detalhe;
+       showView('backup') repinta ao abrir.
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -393,7 +414,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261020-143026">
+<meta name="nii-build" content="20261020-153804">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -892,6 +913,10 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
         Importar/Exportar
       </button>
+      <button class="nav-item" data-view="backup">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3"/></svg>
+        Backup e Restauração
+      </button>
       <button class="nav-item sair-mobile" id="btnSairMobile" type="button">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
         Sair
@@ -911,12 +936,8 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
         <small style="color:#cfe0ec;font-weight:600" id="usuarioLogadoNome">—</small>
         <button class="btn-side" id="btnSair" style="flex:0 0 auto;padding:6px 10px">Sair</button>
       </div>
-      <div class="row">
-        <button class="btn-side" id="btnExport">⬇ Exportar backup</button>
-        <button class="btn-side" id="btnImport">⬆ Importar</button>
-      </div>
-      <small id="backupStatus" style="display:block;font-weight:600">Backup: verificando…</small>
-      <small>Dados sincronizados em nuvem (Firebase).</small>
+      <small id="backupStatus" class="bkp-status" style="display:block;font-weight:600">Backup: verificando…</small>
+      <small>Dados sincronizados em nuvem (Firebase) — ações no menu 💾 Backup e Restauração.</small>
     </div>
   </aside>
 
@@ -1739,6 +1760,82 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
           </div>
           <div style="padding:10px 20px;border-top:1px solid var(--line)">
             <span class="subtle">Ao importar, um registro já existente (pela mesma chave) é <b>atualizado</b>; senão, é <b>criado</b>. Nada é apagado.</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ ÁREA DE BACKUP E RESTAURAÇÃO (código 43) ============
+           Tudo de bkp num lugar só: status, JSON (dados), ZIP (arquivos) e
+           referências. Os botões ⬇ Exportar/⬆ Importar vieram da barra
+           lateral mantendo os MESMOS ids — todos os listeners continuam
+           valendo sem mexer no JS do export/import. -->
+      <section class="view" id="view-backup">
+        <div class="card" style="margin-bottom:14px">
+          <div class="card-h">
+            <h3>💾 Situação do backup</h3>
+            <span class="sub">O plano gratuito do Firebase não faz backup automático — quem protege é a rotina</span>
+          </div>
+          <div class="card-b">
+            <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:baseline">
+              <span class="bkp-status" style="font-weight:700;font-size:14.5px">Backup: verificando…</span>
+              <span class="subtle" id="backupDetalhe">—</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:14px">
+          <div class="card">
+            <div class="card-h"><h3>1 · Dados (JSON)</h3><span class="sub">o backup de dados de verdade</span></div>
+            <div class="card-b">
+              <p class="subtle" style="margin:0 0 12px">Leva <b>todas as seções</b>: equipamentos, técnicos, setores, empréstimos, guias (com as assinaturas), impressoras, switches, racks, licenças, listas, wiki e tipos/marcas.</p>
+              <div class="row" style="gap:8px;flex-wrap:wrap">
+                <button class="btn btn-dark" id="btnExport">⬇ Exportar backup (JSON)</button>
+                <button class="btn" id="btnImport">⬆ Restaurar de um backup</button>
+              </div>
+              <span class="hint" style="margin-top:10px;display:block"><span class="dot"></span>Restaurar troca os dados da tela e sincroniza com a nuvem — <b>confirma antes</b>, e a nuvem recebe por <b>fusão</b> (nada é apagado por completo; ideal com a nuvem vazia). Guarde o arquivo baixado <b>fora deste computador</b>.</span>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-h"><h3>2 · Arquivos (ZIP)</h3><span class="sub">prints e documentos da Wiki</span></div>
+            <div class="card-b">
+              <p class="subtle" style="margin:0 0 12px">Baixa <b>todos</b> os prints e documentos anexados — os binários que o JSON nunca alcança. Limite de 1.000 arquivos ou 64 MB por ZIP.</p>
+              <div class="row" style="gap:8px;flex-wrap:wrap">
+                <button class="btn btn-dark" id="btnBkpZip">⬇ Tudo (ZIP)</button>
+              </div>
+              <span class="hint" style="margin-top:10px;display:block"><span class="dot"></span>O ZIP é a cópia de segurança <b>offline</b>: não há importação em massa — para os arquivos voltarem ao sistema, são reenviados pelo painel 📁 da Wiki.</span>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-h"><h3>3 · Código do sistema</h3><span class="sub">fora do navegador</span></div>
+            <div class="card-b">
+              <p class="subtle" style="margin:0">O código não é baixado por aqui: ele fica na pasta do projeto (<span class="mono">bkp-codigo-AAAAMMDD.zip</span> — fonte, index publicado, Worker, regras, checklist e gerador) e inteiro no GitHub <span class="mono">mauricioliberato/Patrimonios-SEDEF</span>.</p>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-h"><h3>🗄️ Onde os dados ficam</h3><span class="sub">referência</span></div>
+            <div class="card-b">
+              <ul class="subtle" style="margin:0;padding-left:18px;line-height:1.75">
+                <li><b>Dados/texto</b> → Firebase Firestore (projeto <span class="mono">patrimonio-395c5</span>), coleção <span class="mono">sistema/</span> — uma "página" por seção.</li>
+                <li><b>Prints e documentos</b> → Cloudflare Workers KV <span class="mono">wiki-imagens</span> (1 GB grátis; anexos até 8 MB).</li>
+                <li><b>Guias e comprovantes</b> → registros no Firestore com as assinaturas dentro deles; o <b>PDF não é salvo</b> — é montado na hora (imprima em PDF para guardar a cópia visual).</li>
+                <li><b>Usuários</b> → Firebase Auth · <b>Código</b> → GitHub + Cloudflare Workers.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px">
+          <div class="card-h"><h3>🗓️ Rotina recomendada</h3><span class="sub">semanal, ou depois de qualquer mudança grande</span></div>
+          <div class="card-b">
+            <ol class="subtle" style="margin:0;padding-left:20px;line-height:1.85">
+              <li><b>⬇ Exportar backup (JSON)</b> — item 1 acima.</li>
+              <li><b>⬇ Tudo (ZIP)</b> — item 2 acima.</li>
+              <li>Guardar os <b>dois arquivos fora deste computador</b> (pendrive/nuvem pessoal).</li>
+            </ol>
+            <span class="hint" style="margin-top:10px;display:block"><span class="dot"></span>A barra lateral mostra <b>✓ Backup</b> (verde) até 7 dias da última exportação e <b>⚠</b> (laranja) depois — inclusive nesta tela, no cartão de situação.</span>
           </div>
         </div>
       </section>
@@ -3160,7 +3257,8 @@ const TITULOS={
   licencas:['Licenças Office 2024','Controle de chaves do Office 2024'],
   wiki:['Wiki','Dicas, tutoriais e passo a passo de instalação e configuração'],
   setores:['Setores','Estrutura de setores — alimenta os demais módulos'],
-  planilhas:['Importar/Exportar','Baixe modelos, exporte dados ou importe planilhas']
+  planilhas:['Importar/Exportar','Baixe modelos, exporte dados ou importe planilhas'],
+  backup:['Backup e Restauração','Exporte e restaure os dados (JSON) e os arquivos (ZIP) do sistema']
 };
 let currentView='dashboard';
 
@@ -3179,6 +3277,7 @@ function showView(v){
   $$('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===v));
   $('#topTitle').textContent=TITULOS[v][0];
   $('#topSub').textContent=TITULOS[v][1];
+  if(v==='backup')pintarBackup();
   if(v==='dashboard')renderDashboard();
   if(v==='emprestimos')requestAnimationFrame(()=>sigRet.resize());
   if(v==='guias'){
@@ -6256,24 +6355,28 @@ function imprimirGuia(g){
 const backupMetaRef=()=>fsdb.collection('sistema').doc('backupMeta');
 let backupUltimoMs=null,backupPor='';
 function pintarBackup(){
-  const el=$('#backupStatus');if(!el)return;
-  const quem=backupPor?' — por '+esc(backupPor):'';
+  /* Pinta TODOS os indicadores .bkp-status — o da barra lateral e o da
+     área nova de backup — e a linha de detalhe (#backupDetalhe), que só
+     existe na área nova. Os textos são os mesmos de sempre (checklist 1). */
+  let txt,cor,titulo;
   if(backupUltimoMs===null){
-    el.textContent='⚠ Backup: nunca exportado';
-    el.style.color='#ffb4a2';
-    el.title='O plano gratuito não tem backup automático. Clique em "Exportar backup" e guarde o arquivo baixado.';
-    return;
-  }
-  const dias=Math.floor((Date.now()-backupUltimoMs)/86400000);
-  const quando=new Date(backupUltimoMs).toLocaleDateString('pt-BR');
-  if(dias<=7){
-    el.textContent='✓ Backup: '+quando;
-    el.style.color='#a7e8bd';
+    txt='⚠ Backup: nunca exportado';cor='#ffb4a2';
+    titulo='O plano gratuito não tem backup automático. Clique em "Exportar backup" e guarde o arquivo baixado.';
   }else{
-    el.textContent='⚠ Backup: '+quando+' ('+dias+' dias)';
-    el.style.color='#ffb4a2';
+    const dias=Math.floor((Date.now()-backupUltimoMs)/86400000);
+    const quando=new Date(backupUltimoMs).toLocaleDateString('pt-BR');
+    if(dias<=7){txt='✓ Backup: '+quando;cor='#a7e8bd';}
+    else{txt='⚠ Backup: '+quando+' ('+dias+' dias)';cor='#ffb4a2';}
+    titulo='Última exportação'+(backupPor?' — por '+esc(backupPor):'')+'. Guarde o arquivo baixado em um local seguro.';
   }
-  el.title='Última exportação'+quem+'. Guarde o arquivo baixado em um local seguro.';
+  $$('.bkp-status').forEach(el=>{el.textContent=txt;el.style.color=cor;el.title=titulo;});
+  const det=$('#backupDetalhe');
+  if(det){
+    det.textContent=backupUltimoMs
+      ? 'Última exportação em '+new Date(backupUltimoMs).toLocaleString('pt-BR')+(backupPor?' — por '+backupPor:'')+'.'
+      : 'Nunca exportado — faça o primeiro backup agora.';
+    det.title=titulo;
+  }
 }
 /* Tem variável própria, como o presencaUnsub: iniciarSincronizacao REESCREVE
    a lista unsubscribers (unsubscribers = SECOES.map(...)), e um push aqui
@@ -6888,7 +6991,9 @@ $('#btnWikiArqAtualizar').addEventListener('click',()=>{carregarWikiArquivos(tru
    O "⬇ Exportar backup" do menu leva as seções do Firestore (texto); os
    prints e PDFs vivem na Workers KV e ficam de fora dele. Esta rota
    monta um ZIP com tudo lá de dentro (mesma sessão dos envios). */
-$('#btnWikiArqZip').addEventListener('click',async()=>{
+/* Compartilhado: o botão 📁 da Wiki e o da área de Backup usam o MESMO
+   download (um só corpo de código — os dois disparam esta função). */
+async function baixarBackupZip(){
   try{
     if(!usuarioAtual||!auth.currentUser)throw new Error('entre no sistema para baixar os arquivos.');
     const r=await fetch('/api/backup-wiki',{cache:'no-store',headers:{'Authorization':'Bearer '+(await auth.currentUser.getIdToken())}});
@@ -6906,7 +7011,9 @@ $('#btnWikiArqZip').addEventListener('click',async()=>{
   }catch(err){
     toast('Não deu para baixar o ZIP: '+esc(err.message),'bad');
   }
-});
+}
+$('#btnWikiArqZip').addEventListener('click',baixarBackupZip);
+$('#btnBkpZip').addEventListener('click',baixarBackupZip);
 $('#wikiArqFiltro').addEventListener('change',()=>pintarWikiArquivos());
 /* --- 🗑 excluir arquivo (só administrador) --------------------------------
    O botão já some pela classe .apenas-admin, e a chamada aqui confere de
