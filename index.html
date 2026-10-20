@@ -347,6 +347,25 @@
        de leitura — nenhum dado novo gravado; setNome responde pelo
        nome do setor.
 
+   41. 📄 FOLHA DA GUIA + ZERAR NUMERAÇÃO: o cabeçalho impresso da
+       GUIA DE TRANSFERÊNCIA passou a ser "SEDEF - Núcleo de
+       Informática e Informações" (linha grande) e, abaixo, "GUIA
+       DE TRANSFERÊNCIA DE BENS PATRIMONIAIS" — a linha pequena
+       com ${ORG} foi retirada da guia (dizia a mesma coisa); o
+       brasão, o Nº e o rodapé ("gerado pelo NII Patrimonios")
+       seguem iguais. O comprovante de empréstimo (outra folha)
+       NÃO mudou. E entrou o botão admin "🔢 Zerar numeração" na
+       barra da lista "Guias emitidas": apaga as guias existentes
+       (pelo mesmo caminho da exclusão — marcarRemovido, senão a
+       fusão com a nuvem ressuscita) e zera o contador
+       guiaContador, com conferência DUPLA e ordem segura
+       (contador primeiro: se a nuvem recusar, nada é apagado).
+       Motivo: as guias 1–4 eram de teste e a numeração de
+       produção começa do Nº 1. Só administrador (classe
+       .apenas-admin some o botão para os outros; o clique confere
+       souAdmin() de novo). Setores já movidos pelas guias de
+       teste permanecem — ajuste na mão se preciso.
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -354,7 +373,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261020-123237">
+<meta name="nii-build" content="20261020-132932">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -1300,6 +1319,8 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
             <h3>Guias emitidas</h3>
             <div class="toolbar">
               <input type="text" id="guiaBusca" placeholder="🔍 Buscar nº, setor, patrimônio…">
+              <button class="btn btn-ghost btn-sm apenas-admin" type="button" id="btnZerarGuias"
+                      title="Apaga as guias emitidas e volta a numeração para o Nº 1 (só administrador)">🔢 Zerar numeração</button>
             </div>
           </div>
           <div class="card-b flush">
@@ -5469,6 +5490,40 @@ $('#guiaTbody').addEventListener('click',e=>{
     atualizarTudo();toast('Guia excluída.','warn');});
 });
 
+/* ============== ZERAR NUMERAÇÃO DAS GUIAS ============== */
+/* Pedido do responsável (código 41): as guias 1–4 eram de teste e a
+   numeração de produção deve começar do Nº 1. O próximo número é
+   Math.max(maior número entre as guias gravadas, guiaContador)+1 — só
+   zerar o contador NÃO basta: as guias antigas precisam sair pelo MESMO
+   caminho da exclusão normal (marcarRemovido), senão a fusão com a
+   nuvem ressuscita tudo e o número volta a subir. Só administrador
+   (botão some pela classe .apenas-admin e a chamada confere de novo),
+   com conferência dupla. Setores já movidos pelas guias de teste NÃO
+   voltam — ajuste na mão se preciso. */
+function gravarContadorGuia(n){
+  return fsdb.collection('sistema').doc('guiaContador')
+    .set({proximoNumero:n,atualizadoEm:Date.now(),por:usuarioAtual?(usuarioAtual.nome||''):''})
+    .then(()=>true)
+    .catch(err=>{console.error('Não deu para ajustar o contador de guias:',err);
+      toast('Não consegui ajustar a numeração — verifique a internet e tente de novo.','bad');return false;});
+}
+$('#btnZerarGuias').addEventListener('click',()=>{
+  if(!souAdmin())return;
+  const n=(db.guias||[]).length;
+  confirmar('Zerar numeração das guias',
+    (n?'Isso vai apagar <b>'+n+'</b> guia(s) já emitida(s) e ':'')+'zerar a numeração — a próxima guia sairá como <b>Nº 1</b>. '
+    +'As guias apagadas não voltam (só restaurando um backup). '
+    +(n?'Os setores para onde os bens foram movidos nas guias apagadas permanecem. ':'')+'Confirma?',
+    ()=>confirmar('Conferência dupla','Tem certeza? Apagar as guias e zerar a numeração <b>agora</b>.',async()=>{
+      if(!await gravarContadorGuia(0))return; /* nuvem recusou: não toca nas guias */
+      (db.guias||[]).forEach(g=>marcarRemovido('guias',g.id));
+      db.guias=[];
+      if(guiaEditId)resetGuiaForm();
+      persistir();atualizarTudo();
+      toast('Numeração zerada — a próxima guia sairá como <b>Nº 1</b>.','ok');
+    }));
+});
+
 /* ============== IMPRESSORAS ============== */
 let impEditId=null;
 $('#impBusca').addEventListener('input',debounce(renderImpressoras,150));
@@ -6050,8 +6105,7 @@ function imprimirGuia(g){
   const so=setById(g.origemSetorId),sd=setById(g.destinoSetorId);
   $('#printArea').innerHTML=`<div class="recibo">
     <div class="rec-head">
-      <div><h2>${NOME_SISTEMA}</h2>
-      <div style="font-size:12px;color:#555">${ORG}</div>
+      <div><h2>SEDEF - Núcleo de Informática e Informações</h2>
       <div style="font-size:13px;font-weight:600;margin-top:4px">GUIA DE TRANSFERÊNCIA DE BENS PATRIMONIAIS</div></div>
       <div class="rec-right"><img src="${BRASAO_B64}" class="rec-brasao" alt="Brasão"><div class="rec-os">Nº ${g.numero}</div>${g.os?`<div class="subtle" style="font-size:11px">O.S. ${esc(g.os)}</div>`:''}</div>
     </div>
