@@ -534,6 +534,26 @@
         toast "Lendo a foto…" e teto de 2400 px nas estratégias da
         foto (12 MP × 1,5× travava o aparelho no meio da leitura).
 
+    49. 🔐📸 SESSÃO: AUTO-RESTAURAÇÃO + RELATO AUTOMÁTICO (código 49):
+        o dono SEGUE deslogando depois da foto — mas a auditoria mostrou
+        que NÃO existe signOut no fluxo da foto (só sair() com botão ou
+        inatividade, e conta inativada). Logo é o aparelho RECARREGANDO
+        a página (a câmera externa evita a aba da memória) e o navegador
+        não devolvendo a sessão salva. Consertos: todo logout legítimo
+        deixa BILHETE em localStorage ('manual'/'inatividade'/
+        'inativada' — sair() virou sair(motivo), o evento do click é
+        coagido a 'manual'); sessão que some SEM bilhete em quem já
+        esteve logado → UMA recarga para restaurar (authRetry, apagado
+        quando a sessão volta); se falhar de novo → toast ⚠ com versão +
+        tipo de navegação + tempo de página (o relato chega explicado);
+        tela de login exibe versão + navegação em tempo real
+        (pintarVersaoLogin, 5 s); aba >5 min em segundo plano →
+        confereBuild (a volta da câmera em segundos NÃO recarrega);
+        scanner: rodapé avisa "nenhum código no quadro — aproxime"
+        depois de 6 s sem detecção (diferencia "a câmera não vê" de
+        "vê mas não confirma"). Função decidirSemSessao() exposta para
+        teste: primeira-vez / esperado / tentar-novamente / avisar.
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -541,7 +561,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261021-112146">
+<meta name="nii-build" content="20261021-121342">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -3013,7 +3033,7 @@ async function tentarLogin(usuario,senha){
   }
   /* Autenticado: agora a leitura é permitida pelas regras */
   if(!t)t=await lerTecnicoPorLogin(usuario);
-  if(t&&t.ativo===false){try{await auth.signOut();}catch(_){}throw erroLoginInativo();}
+  if(t&&t.ativo===false){try{localStorage.setItem('motivoSaida','inativada');}catch(_){}try{await auth.signOut();}catch(_){}throw erroLoginInativo();}
   if(t)await limparSenhaLegada(t); /* se sobrou senha em texto puro, apaga */
   return montarSessao(cred.user,t);
 }
@@ -3198,7 +3218,15 @@ function iniciarPresenca(){
   },err=>console.error('Erro no listener de presença:',err));
 }
 window.addEventListener('beforeunload',()=>{removerPresenca();});
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&usuarioAtual){marcarPresenca();resetarRelogioInatividade();}});
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='hidden'){ ocultoDesde=Date.now(); return; }
+  if(usuarioAtual){ marcarPresenca(); resetarRelogioInatividade(); }
+  /* Aba velha: confere a versão só depois de 5 minutos fora — a volta do
+     app da câmera (segundos) não pode recarregar a página no meio de uma
+     leitura, mas a aba esquecida de ontem pega a atualização sozinha. */
+  if(ocultoDesde && Date.now()-ocultoDesde>=300000){ ocultoDesde=0; confereBuild().then(aplicarConfere); }
+});
+let ocultoDesde=0;
 $('#formLogin').addEventListener('submit',async ev=>{
   ev.preventDefault();
   const usuario=$('#loginUser').value.trim(),senha=$('#loginPass').value;
@@ -3215,7 +3243,13 @@ $('#formLogin').addEventListener('submit',async ev=>{
     btn.disabled=false;btn.textContent='Entrar';
   }
 });
-async function sair(){
+async function sair(motivo){
+  /* Bilhete para o próximo carregamento saber que a saída foi de propósito
+     (o listener do click manda o EVENTO como argumento — só string vale):
+     sem ele, a recarga do location.reload() pareceria "sessão perdida sem
+     aviso" e dispararia o auto-restauramento sem necessidade. */
+  const m=(typeof motivo==='string'&&motivo)?motivo:'manual';
+  try{localStorage.setItem('motivoSaida',m);}catch(_){}
   if(presencaTimer)clearInterval(presencaTimer);
   try{await removerPresenca();}catch(_){}
   try{await auth.signOut();}catch(_){}
@@ -3273,7 +3307,7 @@ function vigiarInatividade(){
     /* só uma marca de interface para explicar a tela de login depois —
        NADA de credencial ou sessão guardada aqui */
     try{sessionStorage.setItem('saiuPorInatividade','1');}catch(_){}
-    sair();
+    sair('inatividade');
     return;
   }
   if(restante<=AVISO_INATIVIDADE_MS){
@@ -3324,11 +3358,39 @@ async function confereBuild(){
     return 'atualizando';
   }catch(_){return 'erro';}
 }
-try{
-  const lv=$('#loginVer');
-  if(lv&&versaoAberta())lv.textContent='versão '+versaoAberta();
-}catch(_){}
-confereBuild().then(a=>{
+/* ===== DIAGNÓSTICO DE SESSÃO (código 49) =====
+   Relato real: "tiro a foto, clico em OK e estou deslogado". Não existe
+   caminho de signOut na leitura da foto — o que acontece é o aparelho
+   recarregar a página (a câmera externa evita a aba de memória) e o
+   navegador não devolver a sessão salva. Daí: todo logout legítimo deixa
+   um BILHETE (sair() grava 'manual'/'inatividade'; conta inativada grava
+   'inativada') e, se a sessão some SEM bilhete, recarrega UMA vez para
+   restaurar; não voltando, avisa em tela com versão + tipo de navegação +
+   tempo de página, para o relato já chegar explicado. */
+const paginaCarregadaEm = Date.now();
+function diagNavegacao(){
+  let nav='?';
+  try{ const e=performance.getEntriesByType&&performance.getEntriesByType('navigation')[0]; nav=e?e.type:'?'; }catch(_){}
+  const segs=Math.max(0,Math.round((Date.now()-paginaCarregadaEm)/1000));
+  return 'nav '+nav+' · aberto há '+segs+'s';
+}
+function decidirSemSessao(){
+  try{ if(localStorage.getItem('motivoSaida'))return 'esperado'; }catch(_){}
+  try{
+    if(localStorage.getItem('foiLogado')!=='1')return 'primeira-vez';
+    if(localStorage.getItem('authRetry')!=='1')return 'tentar-novamente';
+  }catch(_){ return 'primeira-vez'; }
+  return 'avisar';
+}
+function pintarVersaoLogin(){
+  try{
+    const lv=$('#loginVer');
+    if(lv)lv.textContent='versão '+(versaoAberta()||'?')+' · '+diagNavegacao();
+  }catch(_){}
+}
+pintarVersaoLogin();
+setInterval(pintarVersaoLogin,5000);   /* o "aberto há Ns" acompanha quem espera na tela */
+function aplicarConfere(a){
   if(a!=='atualizando')return;
   try{ /* aviso à prova de erro: o reload acontece de qualquer jeito */
     const c=document.createElement('div');
@@ -3337,7 +3399,8 @@ confereBuild().then(a=>{
     document.body.appendChild(c);
   }catch(_){}
   setTimeout(()=>location.reload(),500);
-});
+}
+confereBuild().then(aplicarConfere);
 
 /* O Firebase Auth dispara este listener quando:
    - a página abre e já existe uma sessão salva (entra sozinho);
@@ -3346,6 +3409,18 @@ confereBuild().then(a=>{
 let _jaEntrou=false;
 auth.onAuthStateChanged(async fbUser=>{
   if(!fbUser){
+    /* Primeiro: o que fazer? Bilhete de saída = esperado (só limpa).
+       Sem bilhete e já esteve logado = a página foi recarregada e a
+       sessão não voltou: TENTA RESTAURAR com uma recarga; se falhar de
+       novo, avisa em tela com diagnóstico (só acontece uma vez —
+       authRetry é apagado quando a sessão volta). */
+    const caso=decidirSemSessao();
+    if(caso==='tentar-novamente'){
+      try{localStorage.setItem('authRetry','1');}catch(_){}
+      console.warn('[NII] sessão sumiu sem aviso ('+versaoAberta()+' · '+diagNavegacao()+') — recarregando para restaurar.');
+      location.reload();
+      return;
+    }
     /* Sem sessão: derruba TUDO que só funciona autenticado.
        Sem isso os listeners continuam de pé e passam a acusar
        "Missing or insufficient permissions" no console, e a flag _jaEntrou
@@ -3362,10 +3437,17 @@ auth.onAuthStateChanged(async fbUser=>{
     /* Sem sessão: garante que o overlay de login está visível */
     document.body.classList.remove('logado','admin');
     $('#loginOverlay').classList.remove('hidden');
+    if(caso==='avisar'){
+      toast('⚠ <b>Sessão encerrada sem aviso</b> ('+(versaoAberta()||'?')+' · '+diagNavegacao()+'). Entre de novo — e se aparecer esta linha de novo, me mande o texto dela.','bad');
+    }
     return;
   }
   if(_jaEntrou)return; /* evita dupla entrada */
   _jaEntrou=true;
+  /* Sessão (re)ativa: limpa os bilhetes da saída anterior e marca que este
+     aparelho já teve sessão — é a condição para o auto-restauramento acima
+     só agir em quem realmente estava logado. */
+  try{ localStorage.removeItem('motivoSaida'); localStorage.removeItem('authRetry'); localStorage.setItem('foiLogado','1'); }catch(_){}
   /* Monta a sessão a partir do usuário autenticado; tenta achar o cadastro
      do técnico para exibir o nome completo. */
   let t=null;
@@ -3380,6 +3462,7 @@ auth.onAuthStateChanged(async fbUser=>{
   if(t&&t.ativo===false){
     _jaEntrou=false;
     toast('Esta conta está <b>inativada</b>. Procure um administrador para reativar o acesso.','bad');
+    try{localStorage.setItem('motivoSaida','inativada');}catch(_){}
     try{await auth.signOut();}catch(_){}
     return;
   }
@@ -3921,10 +4004,12 @@ async function iniciarScannerNativo(){
     return tmp;
   };
 
-  let semConfirmar = 0;
+  let semConfirmar = 0, ultimaVezViu = Date.now(), quadroSemCodigoAvisado = false;
   const checar = async (quadro) => {
     const codigos = await detector.detect(quadro);
     if(codigos && codigos.length){
+      ultimaVezViu = Date.now();
+      quadroSemCodigoAvisado = false;
       /* confirmarLeitura devolve OS DÍGITOS a aplicar (o bruto desta
          leitura pode ser o parcial — vale o mais completo). */
       const pronto = confirmarLeitura(codigos[0].rawValue);
@@ -3938,6 +4023,13 @@ async function iniciarScannerNativo(){
         semConfirmar++;
         if(semConfirmar >= 30){ semConfirmar = 0; aplicar({ focusMode:'single-shot' }); }
       }
+    }else if(!quadroSemCodigoAvisado && scanVotos.contagem===0 && Date.now()-ultimaVezViu>6000){
+      /* Nada visto há 6 s: o rodapé fala em vez de ficar mudo. Quem lê
+         "nenhum código no quadro" sabe que a câmera está rodando e só
+         precisa aproximar; "lendo (1/2)…" significa que VÊ o código mas
+         ainda não confirmou — os dois relatos se diferenciam na hora. */
+      quadroSemCodigoAvisado=true;
+      $('#scanStatus').textContent='nenhum código no quadro — aproxime (ou 📸 Usar foto)';
     }
   };
 
