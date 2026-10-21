@@ -454,7 +454,16 @@
        vence); o db guarda o espelho db.invConfs, que entra sozinho
        no backup JSON, e a seção inventarios (cabeçalhos, status,
        setores concluídos) sincroniza pelo caminho normal das
-       seções. Criar, encerrar e reabrir inventário: só
+       seções — registrada na lista SECOES, o que foi ACHADO NO
+       TESTE EM 2 APARELHOS: sem constar lá, o cabeçalho gravava
+       só no celular que criou e o PC via a tela vazia (a
+       conferência já ia para a nuvem pelo caminho direto, mas sem
+       cabeçalho o outro aparelho não sabia que o inventário
+       existia). Com a entrada em SECOES, quem abrir primeiro com
+       dado local empurra na largada; e ao abrir a tela o app pede
+       a rodada de sincronização, cobrindo o caso de o outro
+       aparelho ter criado o documento vazio primeiro. Criar,
+       encerrar e reabrir inventário: só
        administrador (.apenas-admin + souAdmin() no clique);
        conferir, concluir e reabrir setor: qualquer logado. O modal
        de confirmação ganhou rótulo opcional para o botão OK (o
@@ -468,7 +477,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261020-181550">
+<meta name="nii-build" content="20261021-080054">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -2463,7 +2472,7 @@ let secaoRecebida={}; /* por seção: já lemos o servidor pelo menos uma vez */
 let ultimaToastSync=0; /* evita repetir o mesmo aviso de falha a cada snapshot */
 let syncRodando=false, syncPendente=false;
 
-const SECOES=['equipamentos','tecnicos','setores','emprestimos','guias','impressoras','switches','racks','licencas','listas','wiki','eqSnap'];
+const SECOES=['equipamentos','tecnicos','setores','emprestimos','guias','inventarios','impressoras','switches','racks','licencas','listas','wiki','eqSnap'];
 function docRefSecao(nome){return fsdb.collection('sistema').doc(nome);}
 /* 'listas' e 'eqSnap' não são listas de itens com id — são tratados por extenso */
 function ehListaObjeto(nome){return nome!=='listas'&&nome!=='eqSnap';}
@@ -6809,6 +6818,15 @@ function invTela(quais){
   $('#invRelat').style.display=quais==='relat'?'':'none';
 }
 function invAoAbrir(){
+  /* Seção nova (código 45): se OUTRO aparelho já tiver criado o documento
+     vazio na nuvem antes daqui (ex.: o PC ligou primeiro), o cabeçalho local
+     não seria empurrado sozinho até a próxima edição. Ao abrir a tela já se
+     pede a rodada de sincronização — a rodada compara local × servidor e só
+     escreve se precisar. */
+  if(usuarioAtual&&invs().length){
+    sujo['inventarios']=true;
+    sincronizarComNuvem();
+  }
   invRender();
   if(!db.setores.length)toast('Cadastre ao menos um <b>setor</b> antes de inventariar.','warn');
 }
