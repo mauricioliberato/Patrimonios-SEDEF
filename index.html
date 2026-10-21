@@ -612,6 +612,22 @@
         morto no aparelho (scanAssistFalhas ≥ 3). Aviso de 6 s agora
         manda aproximar ~30 cm ou subir o zoom.
 
+    53. 📷🔒 MODO SÓ FOTO NO ZOOM (código 53): o dono avançou —
+        "agora ele mostra números no rodapé com zoom de 2x, mas NÃO o
+        correto" e "a qualidade da imagem não é boa nessa configuração".
+        O vídeo de 1080p com zoom reamostrado fazia o ML Kit devolver
+        dígitos TROCADOS (leitura errada é pior que nenhuma). Modo só-
+        foto: com zoom ≥ 1,5× — ou duas trocas de família seguidas
+        (sinal de quadro fraco até a 1×) — o vídeo vira SÓ MIRA (nem o
+        quadro é capturado) e quem lê é o takePhoto full-res, a mesma
+        📸 que o dono já provou que lê certo; o auxílio acelera para
+        1,2 s; os votos do vídeo (nativo e html5) são IGNORADOS no
+        modo — no html5 sem marcar scanHtml5UltimaVez, senão o disparo
+        do auxílio parava; sai sozinho em ~12 s de calmaria; o rodapé
+        diz "leitura pela foto (vídeo só mira)" e o aviso de trocas
+        "leituras trocando — lendo pela foto agora (mais preciso)";
+        scanZoomAtual rastreado pelo slider e zerado em abrir/parar.
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -619,7 +635,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261021-163843">
+<meta name="nii-build" content="20261021-170242">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -3957,6 +3973,7 @@ let scanAssistOcupada = false, scanAssistProx = 0, scanAssistTentou = 0;       /
 let detectorAssist = null;                                                      /* leitor do auxílio no caminho html5 */
 let scanAssistFalhas = 0;                                                       /* takePhoto falhando seguido? (código 52) */
 let scanFocoTimer = null, scanFocoIdx = 0, scanVistoEm = 0;                     /* varredura de foco p/ aparelhos só-manual (código 52) */
+let scanZoomAtual = 1, scanInstavelAte = 0, scanTrocas = 0, scanSoFotoAvisado = false;  /* modo só-foto (código 53) */
 
 const FORMATOS_1D = ['code_128','code_39','code_93','codabar','ean_13','ean_8','upc_a','upc_e','itf'];
 const FORMATOS_QR = ['qr_code','data_matrix','pdf417','aztec'];
@@ -3976,6 +3993,10 @@ async function abrirScanner(targetId){
     scanAssistTentou = 0;
     scanAssistFalhas = 0;
     scanVistoEm = 0;
+    scanZoomAtual = 1;
+    scanInstavelAte = 0;
+    scanTrocas = 0;
+    scanSoFotoAvisado = false;
     $('#modalScan').classList.add('show');
     $('#scanControles').style.display='none';
     $('#scanGuia').style.display='none';
@@ -4193,6 +4214,31 @@ async function iniciarScannerNativo(){
   const loop = async () => {
     if(!scanAtivo) return;
     try{
+      /* MODO SÓ FOTO (código 53): com zoom ≥ 1,5× (ou leituras
+         trocando) o vídeo de 1080p reamostrado decodia NÚMEROS ERRADOS
+         (relato do dono no 2×: "mostra números… mas não o correto") e
+         aplicar número errado é pior que não aplicar. Nesse modo o
+         vídeo vira SÓ MIRA (nem o quadro é capturado): quem lê é o
+         takePhoto full-res, a mesma 📸 que o dono já provou que lê
+         certo — e o rodapé diz isso. */
+      if(modoSoFoto()){
+        if(!scanSoFotoAvisado){
+          scanSoFotoAvisado = true;
+          $('#scanStatus').textContent = 'leitura pela foto (o vídeo só mira)…';
+        }
+        await assistenciaPorFoto(detector, verCodigos);
+        if(!quadroSemCodigoAvisado && scanVotos.contagem===0 && Date.now()-ultimaVezViu>6000){
+          quadroSemCodigoAvisado = true;
+          $('#scanStatus').textContent = rodapeSemCodigo();
+        }
+        falhas = 0;
+        requestAnimationFrame(loop);
+        return;
+      }
+      if(scanSoFotoAvisado){
+        scanSoFotoAvisado = false;
+        quadroSemCodigoAvisado = false;   /* deixa o aviso de 6 s recomeçar no modo normal */
+      }
       const alvo = await capturarFrame();
       /* CINCO variações SEMPRE rodando: quadro cheio, contraste, recorte
          75%, recorte 75%+contraste e recorte 50%+contraste (o 50% dá o
@@ -4227,6 +4273,7 @@ async function iniciarScannerNativo(){
 function confirmarLeitura(bruto){
   const digitos = normalizarCodigoLido(bruto);
   if(!digitos) return false;
+  let avisoInstavel = '';   /* modo só-foto (código 53): explica a troca no rodapé */
   /* DUAS leituras da MESMA etiqueta valem — e "mesma" aceita leitura
      parcial que depois COMPLETA: o recorte pode entregar "1234" e o quadro
      cheio "123456" (prefixo em comum com ≥4 dígitos); sem esta regra as
@@ -4242,13 +4289,28 @@ function confirmarLeitura(bruto){
     scanVotos.ultimo = (digitos.length > ultimo.length) ? digitos : ultimo;
     scanVotos.contagem++;
   } else {
+    /* TROCA de família: no 48 só recomeçava. Agora, se isso acontece
+       seguido, a imagem está FRACA (zoom reamostrado, foco ruim) e
+       aplicar um número ERRADO é pior que não aplicar nada: por 12 s o
+       app passa a ler só pela foto full-res (modo só-foto) e o rodapé
+       explica — as duas trocas em janela curta são o sinal. */
+    if(ultimo && scanVotos.contagem >= 1){
+      scanTrocas++;
+      if(scanTrocas >= 2){
+        scanTrocas = 0;
+        scanInstavelAte = Date.now() + 12000;
+        scanSoFotoAvisado = true;   /* não deixa o laço sobrescrever o aviso */
+        avisoInstavel = 'leituras trocando — lendo pela foto agora (mais preciso)…';
+      }
+    }
     scanVotos.ultimo = digitos;
     scanVotos.contagem = 1;
   }
-  $('#scanStatus').textContent = 'lendo ('+scanVotos.contagem+'/2): '+scanVotos.ultimo+'…';
+  $('#scanStatus').textContent = avisoInstavel || ('lendo ('+scanVotos.contagem+'/2): '+scanVotos.ultimo+'…');
   if(scanVotos.contagem >= 2){
     const pronto = scanVotos.ultimo;
     scanVotos = { ultimo: null, contagem: 0 };
+    scanTrocas = 0;   /* leitura fechou: quadro bom, calmaria */
     $('#scanStatus').textContent = 'lido ✓ ' + pronto;
     return pronto;   /* devolve os DÍGITOS a aplicar (string = verdadeiro) */
   }
@@ -4332,7 +4394,9 @@ async function assistenciaPorFoto(detector, aoVer){
   if(!scanAtivo || scanAssistOcupada || !scanImageCapture) return;
   if(Date.now() < scanAssistProx) return;
   scanAssistOcupada = true;
-  scanAssistProx = Date.now() + 2000;   /* folga entre disparos: cada foto demora */
+  /* Folga entre disparos: no modo só-foto a foto É a única fonte de
+     leitura — 1,2 s mantém o ritmo; fora dele, 2 s (cada foto demora). */
+  scanAssistProx = Date.now() + (modoSoFoto() ? 1200 : 2000);
   scanAssistTentou++;
   try{
     const det = detector || await obterDetectorAssist();
@@ -4378,10 +4442,30 @@ function passoDeFoco(){
   }catch(_){}
 }
 
+/* ===== MODO SÓ FOTO (código 53) ========================================
+   Relato do dono no zoom 2×: "mostra números no rodapé… mas não o
+   correto" e "a qualidade da imagem não é boa nessa configuração" — o
+   vídeo de 1080p com zoom reamostrado fazia o ML Kit devolver dígitos
+   TROCADOS em quadro fraco (leitura errada é pior que nenhuma). Nesse
+   modo o vídeo vira SÓ MIRA: quem lê é o takePhoto full-res — a mesma
+   📸 Usar foto que o dono já provou que lê certo. Entra com zoom ≥
+   1,5× (qualidade ruim conhecida) ou quando as leituras TROCAM de
+   família duas vezes seguidas (sinal de quadro fraco a 1× também);
+   sai sozinho em ~12 s de calmaria. */
+function modoSoFoto(){
+  return scanZoomAtual >= 1.5 || Date.now() < scanInstavelAte;
+}
+
 /* Rodapé quando nada aparece: além de orientar, DIZ o estado do auxílio
    — "automática ativa" = fotografou e não leu; "automática sem resposta"
    = o takePhoto do aparelho está morto (aí só a 📸 manual resolve). */
 function rodapeSemCodigo(){
+  if(modoSoFoto()){
+    return 'nenhum código na foto — aproxime (uns 30 cm) (ou 📸 Usar foto)' +
+      (scanAssistFalhas >= 3 ? ' · 📸 automática sem resposta' :
+       scanAssistTentou  > 0 ? ' · 📸 automática ativa' : '') +
+      ' · leitura pela foto (vídeo só mira)';
+  }
   return 'nenhum código no quadro — aproxime (uns 30 cm) ou suba o zoom (ou 📸 Usar foto)' +
     (scanAssistFalhas >= 3 ? ' · 📸 automática sem resposta' :
      scanAssistTentou  > 0 ? ' · 📸 automática ativa' : '');
@@ -4432,6 +4516,11 @@ async function iniciarScannerHtml5(){
         experimentalFeatures: { useBarCodeDetectorIfSupported: true }
       },
       texto=>{
+        /* MODO SÓ FOTO (código 53): o vídeo reamostrado decodia errado —
+           ignora os votos daqui E não marca scanHtml5UltimaVez (senão o
+           disparo do auxílio da foto pararia); quem confirma é o
+           takePhoto full-res. */
+        if(modoSoFoto()) return;
         scanHtml5UltimaVez = Date.now();
         scanVistoEm = Date.now();   /* varredura de foco congela ao ver código */
         scanHtml5SemAviso = false;
@@ -4581,6 +4670,7 @@ function ativarControles(track){
     inpZoom.oninput = async () => {
       const fator = Number(inpZoom.value)/100;
       const z = min*fator;
+      scanZoomAtual = fator;   /* ≥ 1,5× = vídeo reamostrado lê errado → modo só-foto (código 53) */
       lblZoom.textContent = fator.toFixed(1)+'×';
       try{ await track.applyConstraints({ advanced: [{ zoom: z }] }); }catch(_){}
     };
@@ -4631,6 +4721,11 @@ function pararScanner(){
   scanAssistProx = 0;
   scanAssistTentou = 0;
   scanAssistFalhas = 0;
+  /* Modo só-foto: próxima sessão começa em modo normal (zoom novo = stream novo). */
+  scanZoomAtual = 1;
+  scanInstavelAte = 0;
+  scanTrocas = 0;
+  scanSoFotoAvisado = false;
   if(scanStream){
     try{ scanStream.getTracks().forEach(t=>t.stop()); }catch(_){}
     scanStream = null; scanTrack = null;
