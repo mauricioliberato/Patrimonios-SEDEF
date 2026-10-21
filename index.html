@@ -554,6 +554,27 @@
         "vê mas não confirma"). Função decidirSemSessao() exposta para
         teste: primeira-vez / esperado / tentar-novamente / avisar.
 
+    50. 🔐📷 FALSO DESLOGAR (ENTRY TRAVADO) + RODAPÉ DO FALLBACK
+        (código 50): as respostas do dono fecharam o diagnóstico —
+        depois do OK ele vê o FORM DE LOGIN, mas um F5 "volta para a
+        página principal" (sessão viva!) e o rodapé "fica mudo" mesmo
+        no 49. Duas causas: (1) o entry do onAuthStateChanged AWAITAVA
+        o get() do cadastro de técnicos ANTES de mostrar o app — rede
+        lenta no retorno da câmera = form parado com a sessão saudável
+        (e o laço dos 13 get() da sincronização segurava o revelar: o
+        teto de 12 s vinha DEPOIS do laço); (2) no caminho
+        html5-qrcode (ML Kit indisponível no aparelho) o
+        #scanControles nunca era exibido — o status não existia
+        visualmente = mudo. Consertos: entry com Promise.race de 6 s
+        (t=null + checagem em segundo plano que ainda derruba conta
+        inativada e atualiza nome/admin), revelar() + teto de 12 s
+        ANTES do laço dos gets, CÃO DE GUARDA no <head> (sem sinal
+        __niiPronto em 12 s → UMA recarga com prova em sessionStorage
+        → depois explica no #loginErro — cobre CDN/script morto),
+        html5: #scanControles visível + ativarControles(track do vídeo
+        quando exposto) + aviso "nenhum código no quadro" (timer
+        limpo no pararScanner).
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -561,7 +582,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261021-121342">
+<meta name="nii-build" content="20261021-130113">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -2465,6 +2486,29 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
   </div>
 </div>
 
+<!-- CÃO DE GUARDA DA SESSÃO: se a página morrer antes de armar o login
+     (CDN do Firebase fora, script travado, rede ruim no retorno da
+     câmera), o form de login fica mudo para sempre e parece um
+     deslogar que não é — relato real do dono ("tira a foto, clica em OK
+     e estou deslogado", mas o F5 voltava direto para a página principal:
+     a sessão estava viva, o CÓDIGO é que não tinha subido). Sem sinal
+     de vida em 12 s, recarrega UMA vez (prova em sessionStorage); não
+     resolver, explica embaixo em vez de deixar mudo. -->
+<script>
+setTimeout(function(){
+  if(window.__niiPronto)return;
+  try{
+    if(sessionStorage.getItem('nii-vivo-guard')){
+      var e=document.getElementById('loginErro');
+      if(e)e.textContent='O sistema não conseguiu carregar. Atualize a página (F5) e confira a internet.';
+      return;
+    }
+    sessionStorage.setItem('nii-vivo-guard','1');
+  }catch(_){}
+  location.reload();
+},12000);
+</script>
+
 <!-- Bibliotecas externas. O atributo "integrity" trava o conteúdo exato de cada
      arquivo: se a CDN for comprometida ou o arquivo for trocado, o navegador se
      recusa a executar em vez de rodar código estranho com acesso aos dados.
@@ -2933,6 +2977,19 @@ async function iniciarSincronizacao(){
   restaurarVistos();   /* memória das exclusões de sessões anteriores */
   restaurarRemovidos(); /* lápides das exclusões de sessões anteriores */
   sincronizando=true;
+  /* TETO DE 12 s PARA ENTRAR — declarado ANTES do laço dos 13 get():
+     se a nuvem não responder (volta da câmera com rede ruim), o app
+     revela com a cópia local mesmo assim; os listeners completam os
+     dados depois. Antes o teto vinha DEPOIS do laço — um get travado
+     segurava tudo e a tela nunca abria. */
+  let appRevelado=false;
+  function revelar(){
+    if(appRevelado)return;
+    appRevelado=true;
+    garantirModelos();garantirGuias();
+    revelarApp();
+  }
+  setTimeout(()=>{if(!appRevelado){revelar();toast('A sincronização inicial demorou mais que o normal — verifique sua internet.','warn');}},12000);
   /* Sem internet? Não adianta esperar nem acusar erro: abre já com a cópia
      local, que é fundida com a nuvem quando a conexão voltar. */
   const offline=(typeof navigator!=='undefined')&&navigator.onLine===false;
@@ -2954,18 +3011,12 @@ async function iniciarSincronizacao(){
   }
   unsubscribers.forEach(u=>u());
   const secoesRecebidas=new Set();
-  let appRevelado=false;
-  function revelar(){
-    if(appRevelado)return;
-    appRevelado=true;
-    garantirModelos();garantirGuias();
-    revelarApp();
-  }
+  /* revelar(), appRevelado e o teto de 12 s: declarados ACIMA, antes do
+     laço — é por isso que um get travado não segura mais a entrada. */
   if(offline){
     revelar();
     toast('Sem conexão no momento — exibindo a cópia local. Sincroniza sozinho quando a internet voltar.','warn');
   }
-  setTimeout(()=>{if(!appRevelado){revelar();toast('A sincronização inicial demorou mais que o normal — verifique sua internet.','warn');}},12000);
   unsubscribers=SECOES.map(nome=>docRefSecao(nome).onSnapshot(snap=>{
     if(!snap.exists)return;
     aplicarSecao(nome,snap.data());
@@ -3451,11 +3502,44 @@ auth.onAuthStateChanged(async fbUser=>{
   /* Monta a sessão a partir do usuário autenticado; tenta achar o cadastro
      do técnico para exibir o nome completo. */
   let t=null;
+  const leituraTecnicos=docRefSecao('tecnicos').get();
   try{
-    const snap=await docRefSecao('tecnicos').get();
-    const lista=(snap.exists&&Array.isArray(snap.data().items))?snap.data().items:[];
-    const emailAlvo=String(fbUser.email||'').toLowerCase();
-    t=lista.find(x=>emailDoLogin(x.usuario)===emailAlvo)||null;
+    /* REDE LENTA NO RETORNO DA CÂMERA: sem este prazo o await travava
+       AQUI — o form de login ficava na tela com a sessão saudável (relato
+       do dono: "desloga, mas o F5 volta pra principal"). Passou de 6 s,
+       entra com o que se tem e termina a checagem em segundo plano. */
+    const rapido=await Promise.race([
+      leituraTecnicos,
+      new Promise(res=>setTimeout(()=>res(null),6000))
+    ]);
+    if(rapido===null){
+      console.warn('[NII] cadastro de técnicos demorou >6 s — seguindo sem ele nesta carga (checagem segue em segundo plano).');
+      (async()=>{
+        try{
+          const snap=await leituraTecnicos;
+          const lista=(snap.exists&&Array.isArray(snap.data().items))?snap.data().items:[];
+          const emailAlvo=String(fbUser.email||'').toLowerCase();
+          const tb=lista.find(x=>emailDoLogin(x.usuario)===emailAlvo)||null;
+          if(tb&&tb.ativo===false){   /* inativada durante a espera: ainda derruba */
+            try{localStorage.setItem('motivoSaida','inativada');}catch(_){}
+            toast('Esta conta está <b>inativada</b>. Procure um administrador para reativar o acesso.','bad');
+            try{await auth.signOut();}catch(_){}
+            return;
+          }
+          if(auth.currentUser===fbUser){   /* a sessão ainda é desta entrada */
+            usuarioAtual=montarSessao(fbUser,tb);
+            document.body.classList.toggle('admin',souAdmin());
+            revelarApp();   /* atualiza nome/admin do cabeçalho (inofensivo se já revelado) */
+            console.log('[NII] cadastro do técnico chegou atrasado — sessão atualizada.');
+          }
+        }catch(err){console.warn('Checagem atrasada do técnico falhou:',err);}
+      })();
+    }else{
+      const snap=rapido;
+      const lista=(snap.exists&&Array.isArray(snap.data().items))?snap.data().items:[];
+      const emailAlvo=String(fbUser.email||'').toLowerCase();
+      t=lista.find(x=>emailDoLogin(x.usuario)===emailAlvo)||null;
+    }
   }catch(err){console.warn('Falha ao ler cadastro do técnico:',err);}
   /* Conta inativada: derruba a sessão na hora — cobre também o F5 com
      sessão antiga já persistida pelo Auth. */
@@ -3504,6 +3588,10 @@ auth.onAuthStateChanged(async fbUser=>{
     })(0);
   }
 });
+
+/* Página viva: sessão armada (o listener acima está registrado). É o sinal
+   que o cão de guarda lá no <head> procura antes de recarregar. */
+window.__niiPronto=1;
 
 /* ============== BANCO LOCAL ============== */
 const LS='sget-db-v1';
@@ -3827,6 +3915,7 @@ let scanContinuo = false;    /* leitura contínua (inventário): não fecha a c�
 let scanUltCodigo = '';      /* evita reaplicar a mesma etiqueta em sequência */
 let scanUltHora = 0;
 let scanFotoAte = 0;         /* até quando a captura de foto conta como uso (grça p/ inatividade) */
+let scanHtml5UltimaVez = 0, scanHtml5SemAviso = false, scanIdleTimer = null;   /* rodapé do caminho html5 */
 
 const FORMATOS_1D = ['code_128','code_39','code_93','codabar','ean_13','ean_8','upc_a','upc_e','itf'];
 const FORMATOS_QR = ['qr_code','data_matrix','pdf417','aztec'];
@@ -4127,6 +4216,8 @@ async function iniciarScannerHtml5(){
         experimentalFeatures: { useBarCodeDetectorIfSupported: true }
       },
       texto=>{
+        scanHtml5UltimaVez = Date.now();
+        scanHtml5SemAviso = false;
         const pronto = confirmarLeitura(texto);   /* duas da mesma etiqueta (família), como no nativo */
         if(!pronto) return;
         aplicarLeitura(pronto);
@@ -4138,6 +4229,34 @@ async function iniciarScannerHtml5(){
       },
       ()=>{}
     );
+    /* RODAPÉ NO FALLBACK: o #scanControles (status "lendo (1/2)…",
+       "nenhum código…", botões) nunca era exibido no caminho html5 —
+       por isso ele parecia MUDO (relato do dono: "fica mudo, nada
+       muda"). Mostra; se o vídeo do html5 expuser o track, reativa
+       foco como no nativo; senão, lanterna/zoom ficam inertes. */
+    $('#scanControles').style.display='flex';
+    const vid=$('#scanReader video');
+    const trk=vid&&vid.srcObject&&vid.srcObject.getVideoTracks?vid.srcObject.getVideoTracks()[0]:null;
+    if(trk){ ativarControles(trk); }
+    else{
+      const bt=$('#btnScanTorch'),bf=$('#btnScanFoco'),iz=$('#scanZoom');
+      if(bt){bt.disabled=true;bt.style.opacity='.4';}
+      if(bf){bf.disabled=true;bf.style.opacity='.4';}
+      if(iz){iz.disabled=true;}
+      $('#scanZoomVal').textContent='—';
+    }
+    /* Mesmo aviso do caminho nativo: sem nada visto há 6 s, o rodapé
+       orienta em vez de ficar calado. */
+    scanHtml5UltimaVez = Date.now();
+    scanHtml5SemAviso = false;
+    if(scanIdleTimer) clearInterval(scanIdleTimer);
+    scanIdleTimer = setInterval(()=>{
+      if(!scanAtivo) return;
+      if(scanVotos.contagem===0 && !scanHtml5SemAviso && Date.now()-scanHtml5UltimaVez>6000){
+        scanHtml5SemAviso=true;
+        $('#scanStatus').textContent='nenhum código no quadro — aproxime (ou 📸 Usar foto)';
+      }
+    },1000);
   }catch(e){
     console.error('html5-qrcode falhou:', e);
     toast('Não foi possível acessar a câmera. Verifique as permissões do navegador.','bad');
@@ -4233,6 +4352,7 @@ function aplicarLeitura(bruto){
 }
 
 function pararScanner(){
+  if(scanIdleTimer){ clearInterval(scanIdleTimer); scanIdleTimer = null; }
   if(scanRefocoInterval){ clearInterval(scanRefocoInterval); scanRefocoInterval = null; }
   if(scanFocusTimer){ clearInterval(scanFocusTimer); scanFocusTimer = null; }
   scanAtivo = false;
