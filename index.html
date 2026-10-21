@@ -492,6 +492,24 @@
         leitura em resolução cheia e várias estratégias de escala
         e contraste.
 
+    47. 🔢 LEITURA EXIGE DUAS CONFIRMAÇÕES (números vieram
+        incompletos/trocados): o dono leu no celular com a câmera e o
+        campo veio errado, enquanto a 📸 Usar foto trazia certo (e a
+        etiqueta tem número + texto). Três causas achadas e removidas:
+        (a) código com 8+ dígitos valia já na PRIMEIRA leitura — um
+        quadro embaçado preenchia direto; (b) o recorte central de
+        60% rodava desde o começo e podia PARTIR uma etiqueta grande,
+        gerando leitura parcial. Agora TODOS os tamanhos exigem 2
+        leituras iguais, mostrando os dígitos na tela ("lendo (1/2):
+        1234…" e "lido ✓ 1234"), e o recorte só entra no MODO GARIMPO
+        (45 turnos ≈ 3–5 s sem ver nada) com 85% do quadro (corta só
+        as bordas); quando há leituras acontecendo, só quadro cheio e
+        contraste. (c) Conserto no fallback html5-qrcode: chamava
+        pararScanner() ANTES de aplicarLeitura() — o parar zera o
+        scanTarget e o campo NUNCA enchia nesse caminho; agora aplica
+        e fecha na sequência, também com as duas confirmações. A foto
+        segue sem votos: resolução cheia, estática, leitura certa.
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -499,7 +517,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261021-101331">
+<meta name="nii-build" content="20261021-103803">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -3849,12 +3867,14 @@ async function iniciarScannerNativo(){
     tctx.drawImage(canvas, 0, 0);
     return tmp;
   };
-  /* Recorte central: quando o código é pequeno no quadro (aparelho um pouco
-     longe da etiqueta), cortar a área central dá ao leitor muito mais
-     pixels do código — a mesma vantagem da caixa do html5, girando entre as
-     quatro variações para não ficar preso numa só. */
+  /* Recorte central — só no MODO GARIMPO (depois de ~45 turnos sem ver
+     nenhum código), com 85% do quadro (corta só as bordas). Antes rodava
+     desde o começo com 60% e podia PARTIR uma etiqueta grande: o leitor
+     devolvia uma leitura parcial — número incompleto ou trocado — e, com
+     a regra antiga de aceitar códigos longos na primeira, enchia o campo
+     errado. */
   const copiarCentro = (tratar) => {
-    const frac = 0.6;
+    const frac = 0.85;
     const w = Math.max(1, Math.round(canvas.width  * frac));
     const h = Math.max(1, Math.round(canvas.height * frac));
     const tmp = document.createElement('canvas');
@@ -3865,14 +3885,18 @@ async function iniciarScannerNativo(){
     return tmp;
   };
 
+  let turnosSemLeitura = 0;
   const checar = async (quadro) => {
     const codigos = await detector.detect(quadro);
     if(codigos && codigos.length){
+      turnosSemLeitura = 0;
       const bruto = codigos[0].rawValue;
       if(confirmarLeitura(bruto)){
         aplicarLeitura(bruto);
         if(!scanContinuo) pararScanner();
       }
+    }else{
+      turnosSemLeitura++;
     }
   };
 
@@ -3881,7 +3905,12 @@ async function iniciarScannerNativo(){
     if(!scanAtivo) return;
     try{
       const alvo = await capturarFrame();
-      const variante = turno % 4;
+      /* O recorte central só entra no MODO GARIMPO: depois de ~45 turnos
+         (3–5 s) sem ver nenhum código, o código pequeno é que costuma
+         ser o problema. Enquanto houver leituras acontecendo, só quadro
+         cheio e contraste — é o recorte que partia etiqueta grande. */
+      const garimpo = turnosSemLeitura > 45;
+      const variante = garimpo ? (turno % 4) : (turno % 2);
       await checar(
         variante === 0 ? alvo :
         variante === 1 ? copiarTratado() :
@@ -3909,18 +3938,24 @@ async function iniciarScannerNativo(){
 function confirmarLeitura(bruto){
   const digitos = normalizarCodigoLido(bruto);
   if(!digitos) return false;
-  if(digitos.length >= 8){
-    $('#scanStatus').textContent = 'lendo ✓';
-    return true;
-  }
+  /* SEMPRE duas leituras iguais — inclusive para códigos longos. Antes,
+     8+ dígitos valia já na PRIMEIRA leitura: um quadro embaçado ou um
+     recorte cortado preenchia o campo incompleto/trocado (relato do dono
+     no celular — a 📸 Usar foto, cheia e estática, trazia certo). Duas
+     leituras iguais de quadros diferentes filtram o leitor errado. */
   if(scanVotos.ultimo === digitos){
     scanVotos.contagem++;
   } else {
     scanVotos.ultimo = digitos;
     scanVotos.contagem = 1;
   }
-  $('#scanStatus').textContent = 'lendo ('+scanVotos.contagem+'/2)…';
-  return scanVotos.contagem >= 2;
+  $('#scanStatus').textContent = 'lendo ('+scanVotos.contagem+'/2): '+digitos+'…';
+  if(scanVotos.contagem >= 2){
+    scanVotos = { ultimo: null, contagem: 0 };
+    $('#scanStatus').textContent = 'lido ✓ ' + digitos;
+    return true;
+  }
+  return false;
 }
 
 async function iniciarScannerHtml5(){
@@ -3953,10 +3988,13 @@ async function iniciarScannerHtml5(){
         experimentalFeatures: { useBarCodeDetectorIfSupported: true }
       },
       texto=>{
-        if(!normalizarCodigoLido(texto)) return;
-        if(scanContinuo){ aplicarLeitura(texto); return; }   /* segue lendo as próximas etiquetas */
-        pararScanner();
+        if(!confirmarLeitura(texto)) return;   /* duas leituras iguais, como no caminho nativo */
         aplicarLeitura(texto);
+        /* Ordem importa: ANTES era pararScanner() → aplicarLeitura(), mas
+           o parar zera o scanTarget e o campo ficava SEM preencher no
+           fallback. Aplica e só então fecha (igual ao caminho nativo); no
+           modo contínuo segue lendo as próximas etiquetas. */
+        if(!scanContinuo) pararScanner();
       },
       ()=>{}
     );
