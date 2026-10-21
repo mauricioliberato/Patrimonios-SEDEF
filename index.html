@@ -593,6 +593,25 @@
         rodapé entrega isso); takePhoto com teto de 5 s para driver
         travado não travar o laço.
 
+    52. 🎯📷 FOCO VARRENDO (S23+) + RODAPÉ QUE DIZ A VERDADE
+        (código 52): a foto do dono com a etiqueta "ESTADO DO PARANÁ"
+        dentro da mira + o rodapé "Foco: manual" fecharam o caso: o
+        S23+ expõe ao Chrome APENAS focusMode 'manual' — o continuous/
+        single-shot é rejeitado, o foco ficava PRESO no ponto em que a
+        lente abriu, o botão 🎯 Focar reaplicava 'manual' e era NO-OP,
+        e o takePhoto do auxílio herdava o mesmo foco travado (a foto
+        da câmera do Android focava sozinha — por isso só a 📸 manual
+        lia). Consertos: VARREDURA de foco (ping-pong de 8 passos de
+        focusDistance a cada 550 ms enquanto nada é visto; congela ao
+        ver código e por 2,5 s no 🎯 Focar, que agora foca a ~50 cm),
+        scanCaps/scanTrack expostos no caminho html5 (lanterna/zoom
+        deixam de ficar inertes quando o vídeo expõe o track), 5ª
+        variação do ao vivo (recorte central 50% tratado) + recortes
+        75%/50% no auxílio, e rodapé honesto: "automática ativa" =
+        fotografou e não leu × "automática sem resposta" = takePhoto
+        morto no aparelho (scanAssistFalhas ≥ 3). Aviso de 6 s agora
+        manda aproximar ~30 cm ou subir o zoom.
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -600,7 +619,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261021-152756">
+<meta name="nii-build" content="20261021-163843">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -3936,6 +3955,8 @@ let scanFotoAte = 0;         /* até quando a captura de foto conta como uso (gr
 let scanHtml5UltimaVez = 0, scanHtml5SemAviso = false, scanIdleTimer = null;   /* rodapé do caminho html5 */
 let scanAssistOcupada = false, scanAssistProx = 0, scanAssistTentou = 0;       /* auxílio da foto ao vivo (código 51) */
 let detectorAssist = null;                                                      /* leitor do auxílio no caminho html5 */
+let scanAssistFalhas = 0;                                                       /* takePhoto falhando seguido? (código 52) */
+let scanFocoTimer = null, scanFocoIdx = 0, scanVistoEm = 0;                     /* varredura de foco p/ aparelhos só-manual (código 52) */
 
 const FORMATOS_1D = ['code_128','code_39','code_93','codabar','ean_13','ean_8','upc_a','upc_e','itf'];
 const FORMATOS_QR = ['qr_code','data_matrix','pdf417','aztec'];
@@ -3953,6 +3974,8 @@ async function abrirScanner(targetId){
     scanVotos = { ultimo: null, contagem: 0 };
     scanAssistProx = 0;   /* auxílio da foto ao vivo: primeira tentativa liberada na hora */
     scanAssistTentou = 0;
+    scanAssistFalhas = 0;
+    scanVistoEm = 0;
     $('#modalScan').classList.add('show');
     $('#scanControles').style.display='none';
     $('#scanGuia').style.display='none';
@@ -4063,10 +4086,15 @@ async function iniciarScannerNativo(){
   };
 
   $('#scanGuia').style.display='block';
+  /* Aparelhos SÓ com foco 'manual' (ex.: S23+ no Chrome): o app varre a
+     distância de foco sozinho — sem isso o foco fica preso e o ML Kit
+     falha mesmo com a etiqueta no quadro. */
+  const soFocoManual = !focoAutomaticoDisponivel() && !!(scanCaps && scanCaps.focusDistance);
+  if(soFocoManual) iniciarVarreduraFoco();
   {
     const focoInfo = (scanCaps && Array.isArray(scanCaps.focusMode) && scanCaps.focusMode.length) ? scanCaps.focusMode.join(', ') : 'não informado';
     const modo = scanImageCapture ? 'ImageCapture' : 'video';
-    $('#scanHint').innerHTML = `Decoder: <b>ML Kit</b> · Captura: <b>${canvas.width}×${canvas.height}</b> (${modo}) · Foco: <b>${esc(focoInfo)}</b> · só os números são aproveitados.`;
+    $('#scanHint').innerHTML = `Decoder: <b>ML Kit</b> · Captura: <b>${canvas.width}×${canvas.height}</b> (${modo}) · Foco: <b>${esc(focoInfo)}</b>${soFocoManual?' <b>(varredura ligada)</b>':''} · só os números são aproveitados.`;
   }
   $('#scanControles').style.display='flex';
   ativarControles(track);
@@ -4103,8 +4131,8 @@ async function iniciarScannerNativo(){
      ciclo (só no "modo garimpo") e a leitura nunca confirmava — era o
      "não consegue ler nada". O residual de parcial é coberto pela regra
      de FAMÍLIA em confirmarLeitura (prefixo em comum = mesma etiqueta). */
-  const copiarCentro = (tratar) => {
-    const frac = 0.75;
+  const copiarCentro = (tratar, frac) => {
+    frac = frac || 0.75;
     const w = Math.max(1, Math.round(canvas.width  * frac));
     const h = Math.max(1, Math.round(canvas.height * frac));
     const tmp = document.createElement('canvas');
@@ -4121,6 +4149,7 @@ async function iniciarScannerNativo(){
      votos da família, e a mais completa vence. */
   const verCodigos = (codigos) => {
     ultimaVezViu = Date.now();
+    scanVistoEm = Date.now();   /* varredura de foco congela: o ponto atual está vendo código */
     quadroSemCodigoAvisado = false;
     /* confirmarLeitura devolve OS DÍGITOS a aplicar (o bruto desta
        leitura pode ser o parcial — vale o mais completo). */
@@ -4148,7 +4177,7 @@ async function iniciarScannerNativo(){
          precisa aproximar; "lendo (1/2)…" significa que VÊ o código mas
          ainda não confirmou — os dois relatos se diferenciam na hora. */
       quadroSemCodigoAvisado=true;
-      $('#scanStatus').textContent='nenhum código no quadro — aproxime (ou 📸 Usar foto)'+(scanAssistTentou>0?' · 📸 automática ativa':'');
+      $('#scanStatus').textContent = rodapeSemCodigo();
     }
     /* AUXÍLIO DA FOTO AO VIVO (código 51): 3 s sem nada — ou leitura
        pendente que o vídeo não confirma — o app dispara sozinho o
@@ -4165,15 +4194,17 @@ async function iniciarScannerNativo(){
     if(!scanAtivo) return;
     try{
       const alvo = await capturarFrame();
-      /* QUATRO variações SEMPRE rodando: quadro cheio, contraste, recorte
-         e recorte+contraste (no 47 o recorte só entrava no "modo garimpo"
-         e a leitura nunca chegava a confirmar). */
-      const variante = turno % 4;
+      /* CINCO variações SEMPRE rodando: quadro cheio, contraste, recorte
+         75%, recorte 75%+contraste e recorte 50%+contraste (o 50% dá o
+         dobro de pixels no código pequeno centralizado — a etiqueta do
+         Estado do Paraná a ~1 m tinha módulos de ~3 px e passava). */
+      const variante = turno % 5;
       await checar(
         variante === 0 ? alvo :
         variante === 1 ? copiarTratado() :
         variante === 2 ? copiarCentro(false) :
-                         copiarCentro(true)
+        variante === 3 ? copiarCentro(true) :
+                         copiarCentro(true, 0.5)
       );
       falhas = 0;
       turno++;
@@ -4242,6 +4273,7 @@ async function detectarNaFotoViva(detector){
       new Promise((_,rej)=>setTimeout(()=>rej(new Error('takePhoto sem resposta')), 5000))
     ]);
     const bmp = await createImageBitmap(foto);
+    scanAssistFalhas = 0;   /* a foto saiu: o takePhoto VIVE neste aparelho */
     /* Mesmo teto de 2400 px e as MESMAS quatro estratégias da 📸 Usar
        foto — só muda a origem (aqui, o disparo automático de quem mira). */
     const LIMITE = 2400;
@@ -4271,9 +4303,26 @@ async function detectarNaFotoViva(detector){
       }catch(_){}
       c.width = c.height = 0;   /* devolve a memória antes da próxima estratégia */
     }
+    /* Recortes centrais tratados (75% e 50%): a etiqueta pequena no
+       meio do quadro ganha pixels relativos — o código 52 aprendeu com
+       a foto do dono (Estado do Paraná a ~1 m passava em branco). */
+    for(const frac of [0.75, 0.5]){
+      const w = Math.max(1, Math.round(base.width  * frac));
+      const h = Math.max(1, Math.round(base.height * frac));
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      const x = c.getContext('2d');
+      x.filter = 'grayscale(1) contrast(1.9) brightness(1.05)';
+      x.drawImage(base, (base.width - w) / 2, (base.height - h) / 2, w, h, 0, 0, w, h);
+      try{
+        const codigos = await detector.detect(c);
+        if(codigos && codigos.length) return codigos;
+      }catch(_){}
+      c.width = c.height = 0;
+    }
     base.width = base.height = 0;
     return [];
-  }catch(_){ return null; }
+  }catch(_){ scanAssistFalhas++; return null; }
 }
 
 /* Dispara com intervalo mínimo e trava anti-sobreposição: o caminho
@@ -4302,6 +4351,55 @@ async function obterDetectorAssist(){
     detectorAssist = new BarcodeDetector({ formats: wanted });
     return detectorAssist;
   }catch(_){ return null; }
+}
+
+/* ===== VARREDURA DE FOCO (código 52) ====================================
+   O S23+ (e outros) expõe ao Chrome APENAS focusMode 'manual': o
+   continuous/single-shot é rejeitado, o foco fica PRESO no ponto em que
+   a lente abriu e até o botão 🎯 Focar virava no-op (aplicava 'manual'
+   de novo). O preview parecia legível para o olho, mas o ML Kit falha
+   com módulos de ~3 px quando o foco está fora de ponto — e o takePhoto
+   do auxílio herdava o mesmo foco travado, enquanto a foto da câmera do
+   Android (📸 Usar foto) focava sozinha. Agora, nesses aparelhos, o
+   app VARE o foco (de perto a longe) enquanto nada é visto; achou
+   código, congela no ponto bom. */
+function passoDeFoco(){
+  try{
+    if(!scanAtivo || !scanTrack || !scanCaps || !scanCaps.focusDistance) return;
+    if(Date.now() - scanVistoEm < 700) return;   /* vendo código: o foco está bom — congela */
+    const min = scanCaps.focusDistance.min ?? 0;
+    const max = scanCaps.focusDistance.max ?? 10;
+    if(!(max > min)) return;
+    const N = 8;
+    const volta = scanFocoIdx++ % (2 * N);
+    const i = volta < N ? volta : (2 * N - 1 - volta);   /* perto ↔ longe */
+    const d = min + (max - min) * (i / (N - 1));
+    scanTrack.applyConstraints({ advanced: [{ focusDistance: d }] }).catch(()=>{});
+  }catch(_){}
+}
+
+/* Rodapé quando nada aparece: além de orientar, DIZ o estado do auxílio
+   — "automática ativa" = fotografou e não leu; "automática sem resposta"
+   = o takePhoto do aparelho está morto (aí só a 📸 manual resolve). */
+function rodapeSemCodigo(){
+  return 'nenhum código no quadro — aproxime (uns 30 cm) ou suba o zoom (ou 📸 Usar foto)' +
+    (scanAssistFalhas >= 3 ? ' · 📸 automática sem resposta' :
+     scanAssistTentou  > 0 ? ' · 📸 automática ativa' : '');
+}
+
+/* Só para aparelhos SEM foco automático (continuous/single-shot). */
+function iniciarVarreduraFoco(){
+  if(scanFocoTimer) clearInterval(scanFocoTimer);
+  scanFocoIdx = 0;
+  scanFocoTimer = setInterval(()=>{
+    if(!scanAtivo){ return; }
+    passoDeFoco();
+  }, 550);
+}
+
+function focoAutomaticoDisponivel(){
+  const m = (scanCaps && Array.isArray(scanCaps.focusMode)) ? scanCaps.focusMode : [];
+  return m.includes('continuous') || m.includes('single-shot');
 }
 
 async function iniciarScannerHtml5(){
@@ -4335,6 +4433,7 @@ async function iniciarScannerHtml5(){
       },
       texto=>{
         scanHtml5UltimaVez = Date.now();
+        scanVistoEm = Date.now();   /* varredura de foco congela ao ver código */
         scanHtml5SemAviso = false;
         const pronto = confirmarLeitura(texto);   /* duas da mesma etiqueta (família), como no nativo */
         if(!pronto) return;
@@ -4356,7 +4455,15 @@ async function iniciarScannerHtml5(){
     const vid=$('#scanReader video');
     const trk=vid&&vid.srcObject&&vid.srcObject.getVideoTracks?vid.srcObject.getVideoTracks()[0]:null;
     if(trk){
+      /* Guarda o track: lanterna/zoom/foco passam a funcionar também no
+         fallback (antes scanCaps ficava nulo e os botões ficavam inertes)
+         e a varredura de foco ganha o mesmo poder do caminho nativo. */
+      scanTrack = trk;
+      scanCaps = trk.getCapabilities ? trk.getCapabilities() : {};
       ativarControles(trk);
+      if(!focoAutomaticoDisponivel() && scanCaps && scanCaps.focusDistance){
+        iniciarVarreduraFoco();
+      }
       /* AUXÍLIO DA FOTO AO VIVO também no fallback: o takePhoto usa o
          MESMO track que o html5-qrcode está lendo — mesma fonte da 📸
          Usar foto, que é o que sempre funcionou neste aparelho. */
@@ -4382,7 +4489,7 @@ async function iniciarScannerHtml5(){
       const semVer = Date.now() - scanHtml5UltimaVez;
       if(scanVotos.contagem===0 && !scanHtml5SemAviso && semVer>6000){
         scanHtml5SemAviso=true;
-        $('#scanStatus').textContent='nenhum código no quadro — aproxime (ou 📸 Usar foto)'+(scanAssistTentou>0?' · 📸 automática ativa':'');
+        $('#scanStatus').textContent = rodapeSemCodigo();
       }
       /* AUXÍLIO DA FOTO AO VIVO (código 51): 3 s sem nada — ou leitura
          pendente que o html5 não confirma — fotografar sozinho e tentar
@@ -4392,6 +4499,7 @@ async function iniciarScannerHtml5(){
       if((semVer > 3000 || scanVotos.contagem >= 1) && typeof BarcodeDetector !== 'undefined' && scanImageCapture){
         assistenciaPorFoto(null, (codigos)=>{
           scanHtml5UltimaVez = Date.now();
+          scanVistoEm = Date.now();   /* varredura de foco congela */
           scanHtml5SemAviso = false;
           const pronto = confirmarLeitura(codigos[0].rawValue);
           if(!pronto) return;
@@ -4418,7 +4526,19 @@ function ativarControles(track){
     const aplicar = async (c) => { try{ await track.applyConstraints({ advanced:[c] }); return true; }catch(_){ return false; } };
     if(await aplicar({ focusMode:'continuous' })) return;
     if(await aplicar({ focusMode:'single-shot' })) return;
-    if(await aplicar({ focusMode:'manual' })) return;
+    /* Aparelhos só-manual (S23+ e cia.): antes o botão reaplicava
+       'manual' e não fazia NADA. Agora foca na DISTÂNCIA DE LEITURA
+       (~50 cm = 2 dpt) e segura a varredura por 2,5 s para o ponto
+       escolhido valer. */
+    if(await aplicar({ focusMode:'manual' })){
+      if(scanCaps && scanCaps.focusDistance){
+        const min = scanCaps.focusDistance.min ?? 0;
+        const max = scanCaps.focusDistance.max ?? 10;
+        await aplicar({ focusDistance: Math.min(max, Math.max(min, 2.0)) });
+        scanVistoEm = Date.now() + 2500;   /* congela a varredura: foco pedido pelo usuário */
+      }
+      return;
+    }
     if(scanCaps && scanCaps.focusDistance){
       const min = scanCaps.focusDistance.min ?? 0;
       const max = scanCaps.focusDistance.max ?? 10;
@@ -4499,15 +4619,18 @@ function pararScanner(){
   if(scanIdleTimer){ clearInterval(scanIdleTimer); scanIdleTimer = null; }
   if(scanRefocoInterval){ clearInterval(scanRefocoInterval); scanRefocoInterval = null; }
   if(scanFocusTimer){ clearInterval(scanFocusTimer); scanFocusTimer = null; }
+  if(scanFocoTimer){ clearInterval(scanFocoTimer); scanFocoTimer = null; }
   scanAtivo = false;
   scanContinuo = false;
   scanTorchOn = false;
   scanCaps = null;
   scanImageCapture = null;
+  scanTrack = null;   /* no caminho html5 o stream é da biblioteca: o track guardado morre aqui mesmo */
   /* Auxílio da foto ao vivo: próxima sessão começa do zero (a trava
      scanAssistOcupada quem zera é o finally do disparo em voo). */
   scanAssistProx = 0;
   scanAssistTentou = 0;
+  scanAssistFalhas = 0;
   if(scanStream){
     try{ scanStream.getTracks().forEach(t=>t.stop()); }catch(_){}
     scanStream = null; scanTrack = null;
