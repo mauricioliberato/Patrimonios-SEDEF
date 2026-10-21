@@ -575,6 +575,24 @@
         quando exposto) + aviso "nenhum código no quadro" (timer
         limpo no pararScanner).
 
+    51. 📷 AUXÍLIO DA FOTO AO VIVO (código 51): o dono confirmou —
+        versão certa, rodapé "nenhum código no quadro" (câmera rodando,
+        nada enxergado) e 📸 Usar foto LÊ CERTO. A auditoria fechou o
+        porquê: a lista de formatos do ao vivo é IDÊNTICA à da foto —
+        a diferença é RESOLUÇÃO e FOCO (vídeo 1920×1080 com foco
+        instável × still full-res com foco no disparo). Agora, sem
+        nada visto há 3 s (ou com leitura pendente que o vídeo não
+        confirma), o app dispara sozinho um takePhoto() e roda o
+        MESMO pipeline da 📸 Usar foto (teto 2400 px + 4 estratégias)
+        enquanto você mira: achou, alimenta os votos da família e
+        aplica. Vale para os DOIS caminhos — nativo: o laço de vídeo
+        espera a foto (uma por vez, sem fila); html5: ImageCapture
+        criado do track da própria biblioteca, disparo solto com trava
+        anti-sobreposição. O rodapé assina "· 📸 automática ativa"
+        quando o auxílio já tentou (se continuar sem ler, o próprio
+        rodapé entrega isso); takePhoto com teto de 5 s para driver
+        travado não travar o laço.
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -582,7 +600,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261021-130113">
+<meta name="nii-build" content="20261021-152756">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -3916,6 +3934,8 @@ let scanUltCodigo = '';      /* evita reaplicar a mesma etiqueta em sequência *
 let scanUltHora = 0;
 let scanFotoAte = 0;         /* até quando a captura de foto conta como uso (grça p/ inatividade) */
 let scanHtml5UltimaVez = 0, scanHtml5SemAviso = false, scanIdleTimer = null;   /* rodapé do caminho html5 */
+let scanAssistOcupada = false, scanAssistProx = 0, scanAssistTentou = 0;       /* auxílio da foto ao vivo (código 51) */
+let detectorAssist = null;                                                      /* leitor do auxílio no caminho html5 */
 
 const FORMATOS_1D = ['code_128','code_39','code_93','codabar','ean_13','ean_8','upc_a','upc_e','itf'];
 const FORMATOS_QR = ['qr_code','data_matrix','pdf417','aztec'];
@@ -3931,6 +3951,8 @@ async function abrirScanner(targetId){
     scanTarget = targetId;
     scanContinuo = (targetId === 'invBusca');   /* só a tela de inventário lê em sequência */
     scanVotos = { ultimo: null, contagem: 0 };
+    scanAssistProx = 0;   /* auxílio da foto ao vivo: primeira tentativa liberada na hora */
+    scanAssistTentou = 0;
     $('#modalScan').classList.add('show');
     $('#scanControles').style.display='none';
     $('#scanGuia').style.display='none';
@@ -4094,31 +4116,47 @@ async function iniciarScannerNativo(){
   };
 
   let semConfirmar = 0, ultimaVezViu = Date.now(), quadroSemCodigoAvisado = false;
+  /* O MESMO tratamento vem do quadro de vídeo E do takePhoto do auxílio:
+     um só lugar confirma e aplica — as duas fontes disputam os MESMOS
+     votos da família, e a mais completa vence. */
+  const verCodigos = (codigos) => {
+    ultimaVezViu = Date.now();
+    quadroSemCodigoAvisado = false;
+    /* confirmarLeitura devolve OS DÍGITOS a aplicar (o bruto desta
+       leitura pode ser o parcial — vale o mais completo). */
+    const pronto = confirmarLeitura(codigos[0].rawValue);
+    if(pronto){
+      semConfirmar = 0;
+      aplicarLeitura(pronto);
+      if(!scanContinuo) pararScanner();
+    }else{
+      /* vendo candidato mas ainda não confirmou: empurra o foco de vez
+         em quando — quadro embaçado é o que mais trava a confirmação */
+      semConfirmar++;
+      if(semConfirmar >= 30){ semConfirmar = 0; aplicar({ focusMode:'single-shot' }); }
+    }
+  };
   const checar = async (quadro) => {
     const codigos = await detector.detect(quadro);
     if(codigos && codigos.length){
-      ultimaVezViu = Date.now();
-      quadroSemCodigoAvisado = false;
-      /* confirmarLeitura devolve OS DÍGITOS a aplicar (o bruto desta
-         leitura pode ser o parcial — vale o mais completo). */
-      const pronto = confirmarLeitura(codigos[0].rawValue);
-      if(pronto){
-        semConfirmar = 0;
-        aplicarLeitura(pronto);
-        if(!scanContinuo) pararScanner();
-      }else{
-        /* vendo candidato mas ainda não confirmou: empurra o foco de vez
-           em quando — quadro embaçado é o que mais trava a confirmação */
-        semConfirmar++;
-        if(semConfirmar >= 30){ semConfirmar = 0; aplicar({ focusMode:'single-shot' }); }
-      }
-    }else if(!quadroSemCodigoAvisado && scanVotos.contagem===0 && Date.now()-ultimaVezViu>6000){
+      verCodigos(codigos);
+      return;
+    }
+    if(!quadroSemCodigoAvisado && scanVotos.contagem===0 && Date.now()-ultimaVezViu>6000){
       /* Nada visto há 6 s: o rodapé fala em vez de ficar mudo. Quem lê
          "nenhum código no quadro" sabe que a câmera está rodando e só
          precisa aproximar; "lendo (1/2)…" significa que VÊ o código mas
          ainda não confirmou — os dois relatos se diferenciam na hora. */
       quadroSemCodigoAvisado=true;
-      $('#scanStatus').textContent='nenhum código no quadro — aproxime (ou 📸 Usar foto)';
+      $('#scanStatus').textContent='nenhum código no quadro — aproxime (ou 📸 Usar foto)'+(scanAssistTentou>0?' · 📸 automática ativa':'');
+    }
+    /* AUXÍLIO DA FOTO AO VIVO (código 51): 3 s sem nada — ou leitura
+       pendente que o vídeo não confirma — o app dispara sozinho o
+       takePhoto (resolução cheia + foco no disparo, o MESMO pipeline da
+       📸 Usar foto que já lia) e tenta ler enquanto você mira. O laço de
+       vídeo aguarda aqui (uma foto por vez, sem fila). */
+    if(Date.now()-ultimaVezViu > 3000 || scanVotos.contagem >= 1){
+      await assistenciaPorFoto(detector, verCodigos);
     }
   };
 
@@ -4186,6 +4224,86 @@ function confirmarLeitura(bruto){
   return false;
 }
 
+/* ===== AUXÍLIO DA FOTO AO VIVO (código 51) ==============================
+   O ao vivo só decodificava QUADROS DE VÍDEO (1920×1080, foco instável)
+   e a etiqueta passava em branco — "nenhum código no quadro" mesmo com a
+   câmera em cima dela — enquanto 📸 Usar foto (resolução cheia + foco no
+   disparo) lia perfeito. A lista de formatos era e é a MESMA; o que
+   faltava era resolução. Enquanto nada aparece no ao vivo, o app agora
+   dispara sozinho um takePhoto() — o MESMO pipeline da foto que funciona
+   — e tenta ler; achou, alimenta os votos da família e aplica. */
+async function detectarNaFotoViva(detector){
+  if(!detector || !scanImageCapture || !scanAtivo) return null;
+  try{
+    const tira = scanImageCapture.takePhoto();
+    tira.catch(()=>{});   /* um takePhoto que chega tarde não pode virar erro na aba */
+    const foto = await Promise.race([
+      tira,
+      new Promise((_,rej)=>setTimeout(()=>rej(new Error('takePhoto sem resposta')), 5000))
+    ]);
+    const bmp = await createImageBitmap(foto);
+    /* Mesmo teto de 2400 px e as MESMAS quatro estratégias da 📸 Usar
+       foto — só muda a origem (aqui, o disparo automático de quem mira). */
+    const LIMITE = 2400;
+    const maxLado = Math.max(bmp.width, bmp.height) || 1;
+    const fatorMax = Math.min(1, LIMITE / maxLado);
+    const base = document.createElement('canvas');
+    base.width  = Math.max(1, Math.round(bmp.width  * fatorMax));
+    base.height = Math.max(1, Math.round(bmp.height * fatorMax));
+    base.getContext('2d').drawImage(bmp, 0, 0, base.width, base.height);
+    if(bmp.close) bmp.close();
+    const estrategias = [
+      { escala: 1.0, filtro: null },
+      { escala: 0.7, filtro: 'grayscale(1) contrast(1.5)' },
+      { escala: 0.5, filtro: 'grayscale(1) contrast(1.8) brightness(1.05)' },
+      { escala: 1.5, filtro: 'grayscale(1) contrast(1.5)' }
+    ];
+    for(const est of estrategias){
+      const c = document.createElement('canvas');
+      c.width  = Math.max(1, Math.round(base.width  * est.escala));
+      c.height = Math.max(1, Math.round(base.height * est.escala));
+      const x = c.getContext('2d');
+      if(est.filtro) x.filter = est.filtro;
+      x.drawImage(base, 0, 0, c.width, c.height);
+      try{
+        const codigos = await detector.detect(c);
+        if(codigos && codigos.length) return codigos;
+      }catch(_){}
+      c.width = c.height = 0;   /* devolve a memória antes da próxima estratégia */
+    }
+    base.width = base.height = 0;
+    return [];
+  }catch(_){ return null; }
+}
+
+/* Dispara com intervalo mínimo e trava anti-sobreposição: o caminho
+   nativo ESPERA (pausando o laço de vídeo — uma foto por vez, sem fila);
+   o caminho html5 chama solto (a biblioteca continua lendo sozinha). */
+async function assistenciaPorFoto(detector, aoVer){
+  if(!scanAtivo || scanAssistOcupada || !scanImageCapture) return;
+  if(Date.now() < scanAssistProx) return;
+  scanAssistOcupada = true;
+  scanAssistProx = Date.now() + 2000;   /* folga entre disparos: cada foto demora */
+  scanAssistTentou++;
+  try{
+    const det = detector || await obterDetectorAssist();
+    if(!det) return;
+    const codigos = await detectarNaFotoViva(det);
+    if(codigos && codigos.length && scanAtivo) aoVer(codigos);
+  }finally{ scanAssistOcupada = false; }
+}
+
+async function obterDetectorAssist(){
+  if(detectorAssist) return detectorAssist;
+  try{
+    const sup = await BarcodeDetector.getSupportedFormats();
+    const wanted = FORMATOS.filter(f => sup.includes(f));
+    if(!wanted.length) return null;
+    detectorAssist = new BarcodeDetector({ formats: wanted });
+    return detectorAssist;
+  }catch(_){ return null; }
+}
+
 async function iniciarScannerHtml5(){
   try{
     const F = Html5QrcodeSupportedFormats;
@@ -4237,7 +4355,16 @@ async function iniciarScannerHtml5(){
     $('#scanControles').style.display='flex';
     const vid=$('#scanReader video');
     const trk=vid&&vid.srcObject&&vid.srcObject.getVideoTracks?vid.srcObject.getVideoTracks()[0]:null;
-    if(trk){ ativarControles(trk); }
+    if(trk){
+      ativarControles(trk);
+      /* AUXÍLIO DA FOTO AO VIVO também no fallback: o takePhoto usa o
+         MESMO track que o html5-qrcode está lendo — mesma fonte da 📸
+         Usar foto, que é o que sempre funcionou neste aparelho. */
+      scanImageCapture = null;
+      if(typeof ImageCapture !== 'undefined'){
+        try{ scanImageCapture = new ImageCapture(trk); }catch(_){ scanImageCapture = null; }
+      }
+    }
     else{
       const bt=$('#btnScanTorch'),bf=$('#btnScanFoco'),iz=$('#scanZoom');
       if(bt){bt.disabled=true;bt.style.opacity='.4';}
@@ -4252,9 +4379,26 @@ async function iniciarScannerHtml5(){
     if(scanIdleTimer) clearInterval(scanIdleTimer);
     scanIdleTimer = setInterval(()=>{
       if(!scanAtivo) return;
-      if(scanVotos.contagem===0 && !scanHtml5SemAviso && Date.now()-scanHtml5UltimaVez>6000){
+      const semVer = Date.now() - scanHtml5UltimaVez;
+      if(scanVotos.contagem===0 && !scanHtml5SemAviso && semVer>6000){
         scanHtml5SemAviso=true;
-        $('#scanStatus').textContent='nenhum código no quadro — aproxime (ou 📸 Usar foto)';
+        $('#scanStatus').textContent='nenhum código no quadro — aproxime (ou 📸 Usar foto)'+(scanAssistTentou>0?' · 📸 automática ativa':'');
+      }
+      /* AUXÍLIO DA FOTO AO VIVO (código 51): 3 s sem nada — ou leitura
+         pendente que o html5 não confirma — fotografar sozinho e tentar
+         pelo pipeline da 📸 (só se o aparelho tiver BarcodeDetector;
+         senão, só a 📸 manual dá conta). Chamada solta: a trava interna
+         evita sobreposição e a biblioteca segue lendo no caminho dela. */
+      if((semVer > 3000 || scanVotos.contagem >= 1) && typeof BarcodeDetector !== 'undefined' && scanImageCapture){
+        assistenciaPorFoto(null, (codigos)=>{
+          scanHtml5UltimaVez = Date.now();
+          scanHtml5SemAviso = false;
+          const pronto = confirmarLeitura(codigos[0].rawValue);
+          if(!pronto) return;
+          aplicarLeitura(pronto);
+          /* Igual ao callback da biblioteca: aplica e só então fecha. */
+          if(!scanContinuo) pararScanner();
+        });
       }
     },1000);
   }catch(e){
@@ -4360,6 +4504,10 @@ function pararScanner(){
   scanTorchOn = false;
   scanCaps = null;
   scanImageCapture = null;
+  /* Auxílio da foto ao vivo: próxima sessão começa do zero (a trava
+     scanAssistOcupada quem zera é o finally do disparo em voo). */
+  scanAssistProx = 0;
+  scanAssistTentou = 0;
   if(scanStream){
     try{ scanStream.getTracks().forEach(t=>t.stop()); }catch(_){}
     scanStream = null; scanTrack = null;
