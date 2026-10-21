@@ -470,6 +470,28 @@
        padrão "Excluir" das demais telas ficou intacto) e a badge do
        menu conta inventários abertos.
 
+    46. 📷 LEITURA DA CÂMERA NO CELULAR (não lia de primeira): o
+        caminho ao vivo (BarcodeDetector/ML Kit) passou a trabalhar
+        melhor em quatro pontos: FOCO na abertura (single-shot na
+        cena antes de começar a caçar, porque o intervalo de refoco
+        só insiste quando "continuous" é recusado); quadro no
+        TAMANHO REAL capturado, nunca ampliado (aparelhos que dizem
+        1920×1080 mas entregam o bitmap menor esticavam o quadro e o
+        leitor não enxergava — por isso a FOTO, em resolução cheia,
+        sempre lia e a câmera ao vivo não); QUATRO VARIAÇÕES
+        girando a cada quadro (cheio, com contraste, recorte
+        central 60%, recorte central com contraste) — o recorte dá
+        muito mais pixels do código quando a etiqueta é pequena no
+        quadro; e AVISO quando o leitor falha muitas vezes
+        seguidas (em vez de silêncio, aparece "câmera com
+        dificuldade — tente 📸 Usar foto"). No fallback
+        html5-qrcode a caixa de leitura foi ampliada (92% da
+        largura e até 85% da altura — antes era uma faixa curta e
+        um QR grande, etiqueta perto da câmera, ficava FORA da área
+        lida). A 📸 Usar foto continua como saída garantida, com
+        leitura em resolução cheia e várias estratégias de escala
+        e contraste.
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -477,7 +499,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261021-080054">
+<meta name="nii-build" content="20261021-101331">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -3766,6 +3788,11 @@ async function iniciarScannerNativo(){
     setTimeout(r, 2500);
   });
   await video.play();
+  /* Primeiro foco na cena antes de começar a caçar o código: o intervalo de
+     refoco abaixo só insiste quando "continuous" não é aceito — sem este
+     empurrão, alguns aparelhos abrem desfocados e a primeira tentativa
+     morre no quadro embaçado. */
+  await aplicar({ focusMode:'single-shot' });
   await new Promise(r=>setTimeout(r, 900));
 
   try{
@@ -3777,6 +3804,15 @@ async function iniciarScannerNativo(){
   canvas.width  = settings.width  || video.videoWidth  || 1280;
   canvas.height = settings.height || video.videoHeight || 720;
   const ctx = canvas.getContext('2d');
+  /* Enquadra o canvas no TAMANHO REAL do quadro capturado — e nunca
+     amplia: alguns aparelhos dizem 1920×1080 nas settings mas entregam o
+     grabFrame/bitmap menor; esticar o quadro embaçava os pixels e o leitor
+     não enxergava o código (a foto, em resolução cheia, sempre lia). */
+  const enquadrar = (w, h) => {
+    if(w > 0 && h > 0 && (canvas.width !== w || canvas.height !== h)){
+      canvas.width = w; canvas.height = h;
+    }
+  };
 
   $('#scanGuia').style.display='block';
   {
@@ -3794,38 +3830,77 @@ async function iniciarScannerNativo(){
     if(scanImageCapture){
       try{
         const bitmap = await scanImageCapture.grabFrame();
-        ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+        enquadrar(bitmap.width, bitmap.height);
+        ctx.drawImage(bitmap, 0, 0);
         if(bitmap.close) bitmap.close();
         return canvas;
       }catch(_){}
     }
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    enquadrar(video.videoWidth, video.videoHeight);
+    ctx.drawImage(video, 0, 0);
     return canvas;
   };
 
+  const copiarTratado = () => {
+    const tmp = document.createElement('canvas');
+    tmp.width = canvas.width; tmp.height = canvas.height;
+    const tctx = tmp.getContext('2d');
+    tctx.filter = 'grayscale(1) contrast(1.9) brightness(1.05)';
+    tctx.drawImage(canvas, 0, 0);
+    return tmp;
+  };
+  /* Recorte central: quando o código é pequeno no quadro (aparelho um pouco
+     longe da etiqueta), cortar a área central dá ao leitor muito mais
+     pixels do código — a mesma vantagem da caixa do html5, girando entre as
+     quatro variações para não ficar preso numa só. */
+  const copiarCentro = (tratar) => {
+    const frac = 0.6;
+    const w = Math.max(1, Math.round(canvas.width  * frac));
+    const h = Math.max(1, Math.round(canvas.height * frac));
+    const tmp = document.createElement('canvas');
+    tmp.width = w; tmp.height = h;
+    const tctx = tmp.getContext('2d');
+    if(tratar) tctx.filter = 'grayscale(1) contrast(1.9) brightness(1.05)';
+    tctx.drawImage(canvas, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h, 0, 0, w, h);
+    return tmp;
+  };
+
+  const checar = async (quadro) => {
+    const codigos = await detector.detect(quadro);
+    if(codigos && codigos.length){
+      const bruto = codigos[0].rawValue;
+      if(confirmarLeitura(bruto)){
+        aplicarLeitura(bruto);
+        if(!scanContinuo) pararScanner();
+      }
+    }
+  };
+
+  let falhas = 0;
   const loop = async () => {
     if(!scanAtivo) return;
     try{
       const alvo = await capturarFrame();
-      if(turno % 2 === 1){
-        const tmp = document.createElement('canvas');
-        tmp.width = canvas.width; tmp.height = canvas.height;
-        const tctx = tmp.getContext('2d');
-        tctx.filter = 'grayscale(1) contrast(1.9) brightness(1.05)';
-        tctx.drawImage(canvas, 0, 0);
-        const codigosFiltrados = await detector.detect(tmp);
-        if(codigosFiltrados && codigosFiltrados.length){
-          const bruto = codigosFiltrados[0].rawValue;
-          if(confirmarLeitura(bruto)){ aplicarLeitura(bruto); if(!scanContinuo){ pararScanner(); return; } }
-        }
-      }
+      const variante = turno % 4;
+      await checar(
+        variante === 0 ? alvo :
+        variante === 1 ? copiarTratado() :
+        variante === 2 ? copiarCentro(false) :
+                         copiarCentro(true)
+      );
+      falhas = 0;
       turno++;
-      const codigos = await detector.detect(alvo);
-      if(codigos && codigos.length){
-        const bruto = codigos[0].rawValue;
-        if(confirmarLeitura(bruto)){ aplicarLeitura(bruto); if(!scanContinuo){ pararScanner(); return; } }
+    }catch(err){
+      falhas++;
+      if(falhas === 1){
+        console.warn('BarcodeDetector falhou no quadro ao vivo (seguindo tentando):', err);
+      }else if(falhas === 25){
+        /* uns 4 s de erro seguido: em vez de silêncio, avisa que a câmera
+           está viva mas com dificuldade — e aponta a saída que sempre
+           funcionou (📸 Usar foto). */
+        $('#scanStatus').textContent = 'câmera com dificuldade — tente 📸 Usar foto';
       }
-    }catch(_){}
+    }
     requestAnimationFrame(loop);
   };
   loop();
@@ -3860,8 +3935,12 @@ async function iniciarScannerHtml5(){
       {
         fps: 20,
         qrbox: (w, h) => {
+          /* Caixa maior e mais alta: a anterior era uma faixa curta
+             (h×0.65 e no máximo 55% da largura) e um QR grande — etiqueta
+             aproximada da câmera — ficava FORA da área lida; só a foto
+             conseguia. Agora o código tem folga para caber. */
           const larg = Math.floor(w * 0.92);
-          const alt  = Math.floor(Math.min(h * 0.65, larg * 0.55));
+          const alt  = Math.floor(Math.min(h * 0.85, larg * 0.9));
           return { width: larg, height: alt };
         },
         aspectRatio: 1.777,
