@@ -510,6 +510,30 @@
         e fecha na sequência, também com as duas confirmações. A foto
         segue sem votos: resolução cheia, estática, leitura certa.
 
+    48. 📷🔌 CÂMERA: LEITURA QUE CONFIRMA + FIM DO DESLOGO DURANTE O
+        USO DA CÂMERA (código 48): o dono apontou, NÃO LEU NADA, foi
+        de 📸 Usar foto e, ao clicar em OK, estava DESLOGADO. Era uma
+        corrente de três elos: (1) no código 47 o recorte saiu do
+        ciclo e as leituras parciais (recorte cortando) e completas
+        (quadro cheio) se trocavam — as DUAS confirmações nunca
+        aconteciam ("não consegue ler nada"); (2) mirar sem tocar na
+        tela por 20 minutos dispara a saída automática por
+        inatividade; (3) o AVISO de 1 minuto ficava ATRÁS do modal da
+        câmera (mesmo z-index 200 e depois no HTML) — invisível, sem
+        chance de "Continuar sessão" — e o sair() rodava enquanto ele
+        estava no app da câmera, aparecendo só depois do OK. Consertos:
+        confirmação por FAMÍLIA (duas leituras com prefixo em comum e
+        ≥4 dígitos = mesma etiqueta; vale o número MAIS COMPLETO; a
+        função devolve os dígitos confirmados e os chamadores aplicam
+        ELES, não o bruto), recorte de 75% sempre no ciclo (zoom sem
+        partir a etiqueta), empurrão de foco single-shot a cada 30
+        tentativas sem confirmar, aviso de inatividade com z-index
+        1300 (acima de qualquer modal), câmera ABERTA + FOTO EM CURSO
+        + VOLTA DE APP EXTERNO (visibilitychange) contam como uso —
+        com grace de 3 min na foto, cancelar não fura a inatividade —,
+        toast "Lendo a foto…" e teto de 2400 px nas estratégias da
+        foto (12 MP × 1,5× travava o aparelho no meio da leitura).
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -517,7 +541,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261021-103803">
+<meta name="nii-build" content="20261021-112146">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -801,6 +825,11 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
 
 .modal-overlay{position:fixed;inset:0;background:rgba(10,22,32,.58);backdrop-filter:blur(2px);display:none;align-items:flex-start;justify-content:center;z-index:200;padding:6vh 16px;overflow-y:auto}
 .modal-overlay.show{display:flex}
+/* O aviso de inatividade precisa ficar ACIMA de qualquer modal (o scanner
+   tinha o mesmo z-index e vinha depois no HTML — pintava por cima, o aviso
+   de 1 minuto era invisível e a saída automática acontecia sem ninguém
+   poder pressionar "Continuar sessão"). */
+#modalInatividade{z-index:1300}
 .modal{background:#fff;border-radius:12px;width:min(600px,100%);box-shadow:0 24px 60px rgba(0,0,0,.35);animation:modalIn .22s ease both;border-top:4px solid var(--accent)}
 @keyframes modalIn{from{opacity:0;transform:translateY(14px) scale(.98)}to{opacity:1;transform:none}}
 .modal-h{padding:18px 22px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:10px}
@@ -3169,7 +3198,7 @@ function iniciarPresenca(){
   },err=>console.error('Erro no listener de presença:',err));
 }
 window.addEventListener('beforeunload',()=>{removerPresenca();});
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&usuarioAtual)marcarPresenca();});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&usuarioAtual){marcarPresenca();resetarRelogioInatividade();}});
 $('#formLogin').addEventListener('submit',async ev=>{
   ev.preventDefault();
   const usuario=$('#loginUser').value.trim(),senha=$('#loginPass').value;
@@ -3227,6 +3256,12 @@ function resetarRelogioInatividade(){
 const btnContinuar=$('#btnContinuarSessao');
 if(btnContinuar)btnContinuar.addEventListener('click',()=>{resetarRelogioInatividade();toast('Sessão mantida.');});
 function vigiarInatividade(){
+  /* CÂMERA CONTA COMO USO: com o scanner aberto (mirar o celular sem
+     tocar na tela por 20 min era o bastante para a saída automática
+     disparar — e o aviso ficava atrás do modal da câmera) ou durante a
+     captura de foto (tempo no app da câmera). Voltar de app externo
+     também conta (visibilitychange, lá em cima). */
+  if(scanAtivo || Date.now() < scanFotoAte) resetarRelogioInatividade();
   const temSessao=!!(usuarioAtual&&typeof auth!=='undefined'&&auth.currentUser);
   if(!temSessao){sessaoVigiada=false;esconderAvisoInatividade();return;}
   /* sessão nova (ou primeira checagem) começa com o relógio zerado */
@@ -3708,6 +3743,7 @@ let scanImageCapture = null;
 let scanContinuo = false;    /* leitura contínua (inventário): não fecha a câmera a cada código */
 let scanUltCodigo = '';      /* evita reaplicar a mesma etiqueta em sequência */
 let scanUltHora = 0;
+let scanFotoAte = 0;         /* até quando a captura de foto conta como uso (grça p/ inatividade) */
 
 const FORMATOS_1D = ['code_128','code_39','code_93','codabar','ean_13','ean_8','upc_a','upc_e','itf'];
 const FORMATOS_QR = ['qr_code','data_matrix','pdf417','aztec'];
@@ -3867,14 +3903,14 @@ async function iniciarScannerNativo(){
     tctx.drawImage(canvas, 0, 0);
     return tmp;
   };
-  /* Recorte central — só no MODO GARIMPO (depois de ~45 turnos sem ver
-     nenhum código), com 85% do quadro (corta só as bordas). Antes rodava
-     desde o começo com 60% e podia PARTIR uma etiqueta grande: o leitor
-     devolvia uma leitura parcial — número incompleto ou trocado — e, com
-     a regra antiga de aceitar códigos longos na primeira, enchia o campo
-     errado. */
+  /* Recorte central a 75% do quadro — SEMPRE no ciclo. Dá zoom no código
+     (etiqueta pequena no cheio não lia) sem partir a etiqueta: 60% no
+     código 46 partia e gerava número incompleto; no 47 o recorte saiu do
+     ciclo (só no "modo garimpo") e a leitura nunca confirmava — era o
+     "não consegue ler nada". O residual de parcial é coberto pela regra
+     de FAMÍLIA em confirmarLeitura (prefixo em comum = mesma etiqueta). */
   const copiarCentro = (tratar) => {
-    const frac = 0.85;
+    const frac = 0.75;
     const w = Math.max(1, Math.round(canvas.width  * frac));
     const h = Math.max(1, Math.round(canvas.height * frac));
     const tmp = document.createElement('canvas');
@@ -3885,18 +3921,23 @@ async function iniciarScannerNativo(){
     return tmp;
   };
 
-  let turnosSemLeitura = 0;
+  let semConfirmar = 0;
   const checar = async (quadro) => {
     const codigos = await detector.detect(quadro);
     if(codigos && codigos.length){
-      turnosSemLeitura = 0;
-      const bruto = codigos[0].rawValue;
-      if(confirmarLeitura(bruto)){
-        aplicarLeitura(bruto);
+      /* confirmarLeitura devolve OS DÍGITOS a aplicar (o bruto desta
+         leitura pode ser o parcial — vale o mais completo). */
+      const pronto = confirmarLeitura(codigos[0].rawValue);
+      if(pronto){
+        semConfirmar = 0;
+        aplicarLeitura(pronto);
         if(!scanContinuo) pararScanner();
+      }else{
+        /* vendo candidato mas ainda não confirmou: empurra o foco de vez
+           em quando — quadro embaçado é o que mais trava a confirmação */
+        semConfirmar++;
+        if(semConfirmar >= 30){ semConfirmar = 0; aplicar({ focusMode:'single-shot' }); }
       }
-    }else{
-      turnosSemLeitura++;
     }
   };
 
@@ -3905,12 +3946,10 @@ async function iniciarScannerNativo(){
     if(!scanAtivo) return;
     try{
       const alvo = await capturarFrame();
-      /* O recorte central só entra no MODO GARIMPO: depois de ~45 turnos
-         (3–5 s) sem ver nenhum código, o código pequeno é que costuma
-         ser o problema. Enquanto houver leituras acontecendo, só quadro
-         cheio e contraste — é o recorte que partia etiqueta grande. */
-      const garimpo = turnosSemLeitura > 45;
-      const variante = garimpo ? (turno % 4) : (turno % 2);
+      /* QUATRO variações SEMPRE rodando: quadro cheio, contraste, recorte
+         e recorte+contraste (no 47 o recorte só entrava no "modo garimpo"
+         e a leitura nunca chegava a confirmar). */
+      const variante = turno % 4;
       await checar(
         variante === 0 ? alvo :
         variante === 1 ? copiarTratado() :
@@ -3938,22 +3977,30 @@ async function iniciarScannerNativo(){
 function confirmarLeitura(bruto){
   const digitos = normalizarCodigoLido(bruto);
   if(!digitos) return false;
-  /* SEMPRE duas leituras iguais — inclusive para códigos longos. Antes,
-     8+ dígitos valia já na PRIMEIRA leitura: um quadro embaçado ou um
-     recorte cortado preenchia o campo incompleto/trocado (relato do dono
-     no celular — a 📸 Usar foto, cheia e estática, trazia certo). Duas
-     leituras iguais de quadros diferentes filtram o leitor errado. */
-  if(scanVotos.ultimo === digitos){
+  /* DUAS leituras da MESMA etiqueta valem — e "mesma" aceita leitura
+     parcial que depois COMPLETA: o recorte pode entregar "1234" e o quadro
+     cheio "123456" (prefixo em comum com ≥4 dígitos); sem esta regra as
+     duas ficavam se trocando e NUNCA confirmava — era o sintoma do código
+     47 ("não consegue ler nada"). O candidato guarda sempre a leitura MAIS
+     COMPLETA, que é a que é aplicada; leituras diferentes de verdade
+     (outro número) zeram a sequência. */
+  const ultimo = scanVotos.ultimo;
+  const familia = !!ultimo && (ultimo === digitos ||
+    (ultimo.length >= 4 && digitos.length >= 4 &&
+     (ultimo.startsWith(digitos) || digitos.startsWith(ultimo))));
+  if(familia){
+    scanVotos.ultimo = (digitos.length > ultimo.length) ? digitos : ultimo;
     scanVotos.contagem++;
   } else {
     scanVotos.ultimo = digitos;
     scanVotos.contagem = 1;
   }
-  $('#scanStatus').textContent = 'lendo ('+scanVotos.contagem+'/2): '+digitos+'…';
+  $('#scanStatus').textContent = 'lendo ('+scanVotos.contagem+'/2): '+scanVotos.ultimo+'…';
   if(scanVotos.contagem >= 2){
+    const pronto = scanVotos.ultimo;
     scanVotos = { ultimo: null, contagem: 0 };
-    $('#scanStatus').textContent = 'lido ✓ ' + digitos;
-    return true;
+    $('#scanStatus').textContent = 'lido ✓ ' + pronto;
+    return pronto;   /* devolve os DÍGITOS a aplicar (string = verdadeiro) */
   }
   return false;
 }
@@ -3988,8 +4035,9 @@ async function iniciarScannerHtml5(){
         experimentalFeatures: { useBarCodeDetectorIfSupported: true }
       },
       texto=>{
-        if(!confirmarLeitura(texto)) return;   /* duas leituras iguais, como no caminho nativo */
-        aplicarLeitura(texto);
+        const pronto = confirmarLeitura(texto);   /* duas da mesma etiqueta (família), como no nativo */
+        if(!pronto) return;
+        aplicarLeitura(pronto);
         /* Ordem importa: ANTES era pararScanner() → aplicarLeitura(), mas
            o parar zera o scanTarget e o campo ficava SEM preencher no
            fallback. Aplica e só então fecha (igual ao caminho nativo); no
@@ -4117,16 +4165,22 @@ function pararScanner(){
 document.addEventListener('change',async e=>{
   if(e.target && e.target.id==='fileScanFoto'){
     const f = e.target.files[0]; if(!f) return;
+    toast('Lendo a foto…');
     const alvoGuardado = scanTarget;
     pararScanner();
     scanTarget = alvoGuardado;
     try{ await tentarLerFoto(f); }
-    finally{ scanTarget = null; }
+    finally{ scanTarget = null; scanFotoAte = Date.now() + 15000; }
   }
 });
 document.addEventListener('click',e=>{
   if(e.target.closest('#btnScanFoto')){
     e.preventDefault();
+    /* Foto conta como uso por enquanto (o app da câmera fica em cima da
+       página e nenhum toque chega aqui): grace de 3 min — se cancelar a
+       captura, o relógio comum volta a correr sozinho, sem furar a saída
+       por inatividade. */
+    scanFotoAte = Date.now() + 180000;
     const inp = $('#fileScanFoto');
     inp.value = '';
     inp.click();
@@ -4169,10 +4223,20 @@ async function tentarLerFoto(file){
     { escala: 1.5, filtro: 'grayscale(1) contrast(1.5)' }
   ];
 
+  /* Teto de 2400 px no maior lado: foto de câmera moderna tem 12 MP e as
+     quatro estratégias em resolução cheia (a última ainda AMPLIAVA 1,5×)
+     travavam o aparelho por vários segundos no meio da leitura. Abaixo do
+     teto nada muda; acima, reduz só o que excede. */
+  const LIMITE = 2400;
+  const maxLado = Math.max(img.naturalWidth, img.naturalHeight) || 1;
+  const fatorMax = Math.min(1, LIMITE / maxLado);
+
   for(const est of estrategias){
+    let escala = est.escala * fatorMax;
+    if(est.escala > 1) escala = Math.min(LIMITE / maxLado, est.escala * fatorMax);
     const c = document.createElement('canvas');
-    c.width  = Math.max(1, Math.round(img.naturalWidth  * est.escala));
-    c.height = Math.max(1, Math.round(img.naturalHeight * est.escala));
+    c.width  = Math.max(1, Math.round(img.naturalWidth  * escala));
+    c.height = Math.max(1, Math.round(img.naturalHeight * escala));
     const x = c.getContext('2d');
     if(est.filtro) x.filter = est.filtro;
     x.drawImage(img, 0, 0, c.width, c.height);
