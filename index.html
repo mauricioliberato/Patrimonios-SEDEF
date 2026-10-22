@@ -760,6 +760,32 @@
         o ZXing passou a ler o MAIOR RECORTE FIEL (que enxerga a
         etiqueta) em vez do quadro cheio, que não dava conta a ~1 m.
 
+    59. 🔄📸 TROCA AUTOMÁTICA DE LEITOR + fim do reload — código 59
+        (22/10). Relato do dono: "apontando a camera para o patrimonio
+        ele não consegue ler e se usar o modo Usar foto e da o reload na
+        pagina e aparece a mensagem de restaurando a sessão. Estou quase
+        desistindo". DOIS achados de auditoria. (A) O fallback
+        html5-qrcode estava com
+        experimentalFeatures.useBarCodeDetectorIfSupported: true — ou
+        seja, ele TAMBÉM delegava para o MESMO ML Kit quando existia:
+        trocar de "leitor" não trocava decoder nenhum no S23+. E o
+        AppSheet não usa ML Kit, usa OUTRA família (ZXing). Agora existe
+        scanLeitorAtual ('nativo' | 'zxing'): se o leitor atual não
+        CONFIRMAR nada por 30 s, trocarLeitorSePrecisar() reinicia o
+        scanner no outro decoder (ZXing = html5-qrcode forçado com
+        useBarCodeDetectorIfSupported:false, 10 fps p/ CPU) e o rodapé
+        avisa; teto de 2 trocas por sessão; confirmarLeitura reseta o
+        relógio; pararScanner(preservaLeitor) limpa o vigia e volta ao
+        ML Kit (a troca chama pararScanner(true)). O rodapé nativo
+        também perdeu a frase falsa "o mesmo do AppSheet". (B) O
+        reload/"Restaurando sua sessão" ao usar a câmera do celular: o
+        app da câmera do Samsung (~400 MB) sobia COM NOSSA câmera ainda
+        aberta (stream + canvases) → Chrome descartava a aba → página
+        reabria do zero e o arquivo da foto se perdia. Agora o handler
+        do 📸 fecha o scanner ANTES de abrir a câmera do celular
+        (abrirCameraCelular), com scanTarget restaurado para o handler
+        do arquivo; aba leve quase nunca é descartada.
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -767,7 +793,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261022-104356">
+<meta name="nii-build" content="20261022-111420">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -4155,6 +4181,10 @@ let scanZoomAtual = 1, scanInstavelAte = 0, scanTrocas = 0, scanSoFotoAvisado = 
 let scanFotoDims = '';                                                        /* tamanho real do takePhoto, p/ diagnóstico (código 54) */
 let _fotoNaoChegouAte = 0;                                                    /* dedup do aviso de foto que não chega (código 54) */
 let tmpTratado = null, tmpCentro = null, tmpAmpliado = null;                  /* canvases REUTILIZADOS do laço de vídeo (cód. 58) */
+let scanLeitorAtual = 'nativo';   /* qual decoder o scanner usa: ML Kit ('nativo') ou ZXing ('zxing') — cód. 59 */
+let scanLeitorTrocas = 0;         /* trocas de leitor nesta sessão (teto 2, para não reiniciar a câmera em loop) */
+let scanSemConfirmaDesde = 0;     /* quando houve a última leitura CONFIRMADA (relógio da troca automática) */
+let scanLeitorTimer = null;       /* intervalo que vigia os 30 s sem confirmação (cód. 59) */
 
 const FORMATOS_1D = ['code_128','code_39','code_93','codabar','ean_13','ean_8','upc_a','upc_e','itf'];
 const FORMATOS_QR = ['qr_code','data_matrix','pdf417','aztec'];
@@ -4182,6 +4212,13 @@ async function abrirScanner(targetId){
     scanSoFotoAvisado = false;
     scanFotoDims = '';
     _fotoNaoChegouAte = 0;
+    /* CÓDIGO 59 — TROCA AUTOMÁTICA DE LEITOR: relógio + vigia. Enquanto
+       o leitor atual não CONFIRMAR nada por 30 s, o app troca sozinho
+       de decoder (ML Kit ↔ ZXing) e o rodapé avisa — teto de 2 trocas
+       por sessão para não reiniciar a câmera em loop. */
+    scanSemConfirmaDesde = Date.now();
+    if(scanLeitorTimer) clearInterval(scanLeitorTimer);
+    scanLeitorTimer = setInterval(trocarLeitorSePrecisar, 6000);
     $('#modalScan').classList.add('show');
     $('#scanControles').style.display='none';
     $('#scanGuia').style.display='none';
@@ -4189,6 +4226,14 @@ async function abrirScanner(targetId){
     await new Promise(r=>setTimeout(r,120));
     $('#scanReader').innerHTML = '<div style="padding:20px;color:#8ba3b6;text-align:center;font-size:13px">Iniciando câmera…</div>';
 
+    /* CÓDIGO 59: sessão aberta em ZXING (resultado da troca automática
+       anterior) — começa direto no decoder alternativo. O html5-qrcode
+       é forçado a NÃO delegar para o BarcodeDetector (linha do config),
+       senão seria o MESMO ML Kit de antes com outro nome. */
+    if(scanLeitorAtual === 'zxing'){
+      await iniciarScannerHtml5(true);
+      return;
+    }
     if('BarcodeDetector' in window){
       try{ await iniciarScannerNativo(); return; }
       catch(e){
@@ -4202,6 +4247,31 @@ async function abrirScanner(targetId){
     toast('Erro ao abrir o scanner: '+esc(String(err && err.message || err)),'bad');
     pararScanner();
   }
+}
+
+/* ===== TROCA AUTOMÁTICA DE LEITOR (código 59) ===========================
+   Relato do dono: "apontando a camera para o patrimonio ele não consegue
+   ler". DADO dos relatos que fecha o diagnóstico: o ML Kit (BarcodeDetector)
+   do Chrome do S23+ NUNCA confirmou leitura no campo, enquanto o AppSheet
+   lê — e o AppSheet não usa o ML Kit, usa OUTRA família de decoder (ZXing).
+   O ZXing já está embutido na página desde o código 1 (dentro do
+   html5-qrcode 2.3.8), nada novo para baixar. Enquanto o leitor atual não
+   CONFIRMAR nada por 30 s, este vigia troca o decoder sozinho e o rodapé
+   avisa; teto de 2 trocas por sessão (o fechar o scanner volta ao início). */
+function trocarLeitorSePrecisar(){
+  try{
+    if(!scanAtivo || !scanTarget) return;
+    if(scanLeitorTrocas >= 2) return;
+    if(!scanSemConfirmaDesde || Date.now() - scanSemConfirmaDesde < 30000) return;
+    scanLeitorTrocas++;
+    scanLeitorAtual = (scanLeitorAtual === 'zxing') ? 'nativo' : 'zxing';
+    const alvo = scanTarget;
+    const nome = (scanLeitorAtual === 'zxing') ? 'ZXing' : 'ML Kit';
+    toast('troca de leitor → '+nome+' (o outro não confirmou nada em 30 s)…','warn');
+    pararScanner(true);   /* true = mantém a escolha do leitor na troca */
+    scanTarget = alvo;
+    abrirScanner(alvo);   /* async com try/catch interno */
+  }catch(_){}
 }
 
 async function iniciarScannerNativo(){
@@ -4304,7 +4374,7 @@ async function iniciarScannerNativo(){
   {
     const focoInfo = (scanCaps && Array.isArray(scanCaps.focusMode) && scanCaps.focusMode.length) ? scanCaps.focusMode.join(', ') : 'não informado';
     const modo = scanImageCapture ? 'ImageCapture' : 'video';
-    $('#scanHint').innerHTML = `Decoder: <b>ML Kit</b> (o mesmo do AppSheet) · Captura: <b>${canvas.width}×${canvas.height}</b> (${modo}) · Foco: <b>${esc(focoInfo)}</b>${soFocoManual?' <b>(varredura ligada)</b>':''} · zoom de <b>software 1–4×</b> · só os números são aproveitados.`;
+    $('#scanHint').innerHTML = `Decoder: <b>ML Kit</b> (se não confirmar nada em 30 s, o app troca sozinho para o ZXing) · Captura: <b>${canvas.width}×${canvas.height}</b> (${modo}) · Foco: <b>${esc(focoInfo)}</b>${soFocoManual?' <b>(varredura ligada)</b>':''} · zoom de <b>software 1–4×</b> · só os números são aproveitados.`;
   }
   $('#scanControles').style.display='flex';
   ativarControles(track);
@@ -4534,6 +4604,7 @@ function confirmarLeitura(bruto){
     scanVotos = { ultimo: null, contagem: 0 };
     scanTrocas = 0;   /* leitura fechou: quadro bom, calmaria */
     scanSemLeitura = 0; scanSemLeituraAvisado = false;   /* leu: some a dica da câmera do celular (57) */
+    scanSemConfirmaDesde = Date.now();   /* leitor provou que lê: para o relógio da troca (59) */
     $('#scanStatus').textContent = 'lido ✓ ' + pronto;
     return pronto;   /* devolve os DÍGITOS a aplicar (string = verdadeiro) */
   }
@@ -4852,17 +4923,26 @@ function focoAutomaticoDisponivel(){
   return m.includes('continuous') || m.includes('single-shot');
 }
 
-async function iniciarScannerHtml5(){
+async function iniciarScannerHtml5(forcarZXing){
   try{
     const F = Html5QrcodeSupportedFormats;
     scanHtml5 = new Html5Qrcode('scanReader', false);
     $('#scanGuia').style.display='block';
-    $('#scanHint').innerHTML = 'Decoder: <b>html5-qrcode</b> · só os números são aproveitados.';
+    /* CÓDIGO 59: quando a troca automática manda, o html5-qrcode é
+       FORÇADO a usar o ZXing JS embutido (useBarCodeDetectorIfSupported:
+       false) — sem isso ele delegava para o MESMO BarcodeDetector do
+       Chrome e a "troca" não trocava decoder nenhum (era por isso que o
+       fallback parecia não adiantar nada no aparelho do dono). */
+    $('#scanHint').innerHTML = forcarZXing
+      ? 'Decoder: <b>ZXing</b> (troca automática · 30 s sem leitura confirmada muda de leitor) · só os números são aproveitados.'
+      : 'Decoder: <b>html5-qrcode</b> · só os números são aproveitados.';
     scanAtivo = true;
     await scanHtml5.start(
       { facingMode: { ideal: 'environment' } },
       {
-        fps: 20,
+        /* ZXing é JS puro: 10 fps dá folga de CPU ao aparelho (o ML Kit
+           rodava a 20 fps). */
+        fps: forcarZXing ? 10 : 20,
         qrbox: (w, h) => {
           /* Caixa maior e mais alta: a anterior era uma faixa curta
              (h×0.65 e no máximo 55% da largura) e um QR grande — etiqueta
@@ -4879,7 +4959,7 @@ async function iniciarScannerHtml5(){
           F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E, F.ITF,
           F.QR_CODE, F.DATA_MATRIX, F.PDF_417, F.AZTEC
         ],
-        experimentalFeatures: { useBarCodeDetectorIfSupported: true }
+        experimentalFeatures: { useBarCodeDetectorIfSupported: !forcarZXing }   /* cód. 59: false = ZXing de verdade */
       },
       texto=>{
         /* MODO SÓ FOTO (código 53): o vídeo reamostrado decodia errado —
@@ -5082,11 +5162,16 @@ function aplicarLeitura(bruto){
   }
 }
 
-function pararScanner(){
+function pararScanner(preservaLeitor){
   if(scanIdleTimer){ clearInterval(scanIdleTimer); scanIdleTimer = null; }
   if(scanRefocoInterval){ clearInterval(scanRefocoInterval); scanRefocoInterval = null; }
   if(scanFocusTimer){ clearInterval(scanFocusTimer); scanFocusTimer = null; }
   if(scanFocoTimer){ clearInterval(scanFocoTimer); scanFocoTimer = null; }
+  /* CÓDIGO 59: o vigia da troca automática morre aqui; e fechar o
+     scanner é fim de sessão — a próxima começa no ML Kit de novo (a
+     troca chama pararScanner(true) e aí a escolha sobrevive). */
+  if(scanLeitorTimer){ clearInterval(scanLeitorTimer); scanLeitorTimer = null; }
+  if(!preservaLeitor){ scanLeitorAtual = 'nativo'; scanLeitorTrocas = 0; }
   scanAtivo = false;
   scanContinuo = false;
   scanTorchOn = false;
@@ -5169,12 +5254,27 @@ document.addEventListener('click',e=>{
        o arquivo (mensagem "sem espaço" enganosa, aparelho com 250 GB
        livres). */
     const inp = $('#fileScanFoto');
+    /* CÓDIGO 59 — ANTES de abrir a câmera do celular, fecha a NOSSA:
+       o app da câmera do Samsung é um monstro de memória (~400 MB) e o
+       Chrome DESCARTA a aba quando ele sobe com nossa câmera ainda
+       aberta (stream + canvases vivos em cima). Ao voltar, a página
+       reabre do zero — é o "reload" e a cortina "Restaurando sua
+       sessão" que o dono viu — e o arquivo da foto se perde no meio.
+       Com a aba leve (stream parado, canvases zerados), o Chrome quase
+       nunca descarta; e scanTarget é restaurado porque o handler do
+       arquivo (change) lê o alvo no momento em que a foto volta. */
+    const abrirCameraCelular = ()=>{
+      const alvo = scanTarget;
+      pararScanner();
+      scanTarget = alvo;
+      inp.value = '';
+      inp.click();
+    };
     tentarFotoInterna().then(lido=>{
       if(lido){ if(!scanContinuo) pararScanner(); return; }
       toast('Não li pela foto interna — abrindo a câmera do celular…','warn');
-      inp.value = '';
-      inp.click();
-    }).catch(()=>{ inp.value = ''; inp.click(); });
+      abrirCameraCelular();
+    }).catch(abrirCameraCelular);
   }
 });
 document.addEventListener('click',e=>{
