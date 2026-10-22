@@ -841,6 +841,25 @@
         confirmação. Colar no campo já adiciona sozinho (evento
         paste); Enter também. O campo limpa ao abrir/editar empréstimo.
 
+    63. 📷✂️ CÂMERA REMOVIDA DO SISTEMA (decisão do dono) — código 63
+        (22/10). Depois de 8+ rodadas sem sucesso no scanner do S23+ e
+        do plano B do campo de colar (62), o dono decidiu: "remover do
+        nosso sistema tudo que envolva a captura do patrimônio pela
+        câmera do celular — vou digitar ou usar um leitor de código de
+        barras USB". Removido INTEIRO: o bloco SCANNER v4 (ML Kit,
+        ZXing/html5-qrcode, foto automática, foco/zoom/lanterna, troca
+        de leitor), o modal 📷 Ler código, os 4 botões 📷 (busca de
+        equipamentos, patrimônio e série do cadastro, inventário), o
+        <script> do html5-qrcode (CDN), o CSS do scanner e todos os
+        usos esparsos (câmera contava como uso de inatividade; adiava a
+        atualização automática; pararScanner no fecharModais; listener
+        'leitura' do inventário). Fonte: 548.589 → ~427 mil caracteres
+        (−67 mil). FICAM: digitação, colagem e o leitor USB — que
+        digita como teclado: no inventário e na busca de equipamentos
+        o número já filtra sozinho, em empPatCola o Enter adiciona ao
+        empréstimo e no cadastro o Enter avança de campo — além do
+        campo de colar do 62 e de todos os dados.
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -848,7 +867,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261022-152340">
+<meta name="nii-build" content="20261022-160647">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -957,10 +976,6 @@ input.leitura-ok{animation:leituraOk 1.1s ease}
 .form-actions{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
 .input-with-cam{position:relative;display:flex;gap:6px}
 .input-with-cam input{flex:1}
-.btn-cam{flex:0 0 auto;width:40px;height:40px;padding:0;display:grid;place-items:center;background:var(--ink);color:#fff;border:none;border-radius:6px;cursor:pointer;box-shadow:0 2px 0 #061220;transition:.15s}
-.btn-cam:hover{background:#1a3348;transform:translateY(-1px)}
-.btn-cam:active{transform:translateY(1px)}
-.btn-cam svg{width:20px;height:20px}
 
 .switch{display:inline-flex;align-items:center;gap:8px;cursor:pointer;user-select:none;padding:7px 0}
 .switch input{position:absolute;opacity:0;width:0;height:0}
@@ -1188,9 +1203,6 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
 .multi-sel-opt .qt{font:600 11.5px var(--mono);color:var(--muted)}
 .multi-sel-opt.marcado .nome{font-weight:600;color:var(--accent-dk)}
 
-#scanReader{width:100%}
-#scanReader video{width:100%!important;height:auto!important;display:block}
-#scanZoom{accent-color:var(--accent);height:6px}
 
 #toasts{position:fixed;right:20px;bottom:20px;z-index:300;display:flex;flex-direction:column;gap:10px}
 .toast{background:var(--ink);color:#fff;padding:13px 18px 13px 14px;border-radius:8px;border-left:4px solid var(--ok);font-size:13px;box-shadow:0 10px 26px rgba(0,0,0,.28);animation:toastIn .28s ease both;max-width:360px;transition:opacity .35s,transform .35s}
@@ -1464,13 +1476,6 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
             <h3>Equipamentos cadastrados (unidades)</h3>
             <div class="toolbar">
               <input type="text" id="eqBusca" placeholder="🔍 Buscar patrimônio, série, obs…">
-              <button type="button" class="btn-cam" data-scan-target="eqBusca"
-                      title="Buscar por código de barras (câmera do celular)">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M3 8V5a2 2 0 012-2h3M21 8V5a2 2 0 00-2-2h-3M3 16v3a2 2 0 002 2h3M21 16v3a2 2 0 01-2 2h-3"/>
-                  <circle cx="12" cy="12" r="3"/>
-                </svg>
-              </button>
               <select id="eqFiltroTipo"></select>
               <div class="multi-sel" id="eqFiltroSetorWrap">
                 <button type="button" class="multi-sel-btn" id="eqFiltroSetorBtn">
@@ -1557,7 +1562,7 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
           <div class="card-h">
             <h3 id="eqFormTitle">2 · Cadastro de unidade (patrimônio)</h3>
             <span class="pill warn" id="eqEditBadge" style="display:none">✎ EDITANDO</span>
-            <span class="sub">📷 use a câmera para ler o código de barras — leitor físico também funciona (Enter avança)</span>
+            <span class="sub">⌨️ digite, cole ou use o leitor USB — o leitor físico digita sozinho (Enter avança)</span>
           </div>
           <div class="card-b">
             <form id="formEquip" autocomplete="off">
@@ -1567,19 +1572,13 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
                   <label>Nº de Patrimônio</label>
                   <div class="input-with-cam">
                     <input type="text" id="eqPatrimonio" class="mono" inputmode="numeric" placeholder="Somente números" autocomplete="off">
-                    <button type="button" class="btn-cam" data-scan-target="eqPatrimonio" title="Ler código de barras com a câmera">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8V5a2 2 0 012-2h3M21 8V5a2 2 0 00-2-2h-3M3 16v3a2 2 0 002 2h3M21 16v3a2 2 0 01-2 2h-3"/><circle cx="12" cy="12" r="3"/></svg>
-                    </button>
                   </div>
-                  <span class="hint"><span class="dot"></span>Digite, use leitor físico ou a câmera 📷</span>
+                  <span class="hint"><span class="dot"></span>Digite ou use o leitor USB — o leitor digita sozinho, sem o mouse</span>
                 </div>
                 <div class="field c3">
                   <label>Número de Série</label>
                   <div class="input-with-cam">
                     <input type="text" id="eqSerie" class="mono" placeholder="S/N" autocomplete="off">
-                    <button type="button" class="btn-cam" data-scan-target="eqSerie" title="Ler código de barras com a câmera">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8V5a2 2 0 012-2h3M21 8V5a2 2 0 00-2-2h-3M3 16v3a2 2 0 002 2h3M21 16v3a2 2 0 01-2 2h-3"/><circle cx="12" cy="12" r="3"/></svg>
-                    </button>
                   </div>
                 </div>
                 <div class="field c4">
@@ -1644,10 +1643,10 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
                   </div>
                   <div style="display:flex;gap:8px;margin-top:6px">
                     <input type="text" id="empPatCola" class="mono" inputmode="numeric" autocomplete="off"
-                           placeholder="Cole aqui o nº do patrimônio: 100001163744" style="flex:1">
-                    <button type="button" class="btn btn-dark btn-sm" id="btnColaPat" title="Adicionar pelo número colado, sem câmera">📋 Abrir</button>
+                           placeholder="Nº do patrimônio — digite, cole ou leitor USB: 100001163744" style="flex:1">
+                    <button type="button" class="btn btn-dark btn-sm" id="btnColaPat" title="Adicionar pelo número digitado, colado ou lido no leitor USB">📋 Abrir</button>
                   </div>
-                  <span class="hint"><span class="dot"></span>Cole o número lido fora do app (câmera/Planilha) e toque em 📋 — ou cole direto no campo, que ele adiciona sozinho.</span>
+                  <span class="hint"><span class="dot"></span>Digite, cole ou leia no leitor USB (12 números) e toque em 📋 — ou cole direto no campo, que ele adiciona sozinho.</span>
                 </div>
                 <div class="field c4">
                   <label>Neste empréstimo: <b id="empCartCount" style="color:var(--ink)">0</b> item(ns)</label>
@@ -2432,14 +2431,8 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
             </div>
             <div class="row" style="gap:8px;flex-wrap:wrap;align-items:center">
               <input id="invBusca" placeholder="Parte do patrimônio, tipo ou marca… (Enter confirma o primeiro)" style="flex:1;min-width:220px" autocomplete="off">
-              <button type="button" class="btn-cam" data-scan-target="invBusca" title="Ler código de barras com a câmera">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M3 8V5a2 2 0 012-2h3M21 8V5a2 2 0 00-2-2h-3M3 16v3a2 2 0 002 2h3M21 16v3a2 2 0 01-2 2h-3"/>
-                  <circle cx="12" cy="12" r="3"/>
-                </svg>
-              </button>
             </div>
-            <div class="subtle" style="margin:8px 0;font-size:12px">Toque na linha (ou Enter) para confirmar — toque de novo para desfazer. A câmera confirma na hora, etiqueta após etiqueta. Bem de outro setor abre o aviso de divergência.</div>
+            <div class="subtle" style="margin:8px 0;font-size:12px">Toque na linha (ou Enter) para confirmar — toque de novo para desfazer. Bem de outro setor abre o aviso de divergência.</div>
             <div id="invLista"></div>
           </div>
         </div>
@@ -2674,40 +2667,6 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
   </div>
 </div>
 
-<div class="modal-overlay" id="modalScan">
-  <div class="modal" style="width:min(600px,100%)">
-    <div class="modal-h">
-      <h3>📷 Ler código de barras</h3>
-      <button class="x-close" data-close>&times;</button>
-    </div>
-    <div class="modal-b">
-      <div id="scanWrapper" style="position:relative;background:#0a1620;border-radius:8px;overflow:hidden;min-height:260px;display:grid;place-items:center">
-        <div id="scanReader" style="width:100%">
-          <div style="padding:20px;color:#8ba3b6;text-align:center;font-size:13px">Iniciando câmera…</div>
-        </div>
-        <div id="scanGuia" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:82%;height:30%;border:2px solid rgba(255,140,26,.85);border-radius:6px;box-shadow:0 0 0 9999px rgba(0,0,0,.35);pointer-events:none;display:none">
-          <div style="position:absolute;left:0;right:0;top:-22px;text-align:center;color:#ffb061;font:600 11px 'IBM Plex Sans',sans-serif;letter-spacing:.1em;text-transform:uppercase">aponte para o código</div>
-        </div>
-      </div>
-      <div id="scanControles" style="display:none;gap:8px;align-items:center;flex-wrap:wrap">
-        <button class="btn btn-ghost btn-sm" id="btnScanFoco" type="button" title="Forçar reajuste de foco">🎯 Focar</button>
-        <button class="btn btn-ghost btn-sm" id="btnScanTorch" type="button" title="Ligar lanterna">🔦 Lanterna</button>
-        <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink-soft);flex:1;min-width:180px">
-          Zoom <input type="range" id="scanZoom" min="100" max="400" value="100" style="flex:1" disabled>
-          <span class="mono" id="scanZoomVal" style="width:38px;text-align:right">1.0×</span>
-        </label>
-        <span class="subtle" id="scanStatus"></span>
-      </div>
-      <p class="subtle" id="scanHint">Aponte a câmera para o código, ou toque na imagem para focar. A leitura é automática — só os <b>números</b> são aproveitados.</p>
-    </div>
-    <div class="modal-f">
-      <button class="btn btn-ghost" id="btnScanFoto" type="button">📸 Usar foto</button>
-      <button class="btn btn-ghost" data-close>Cancelar</button>
-    </div>
-    <input type="file" id="fileScanFoto" accept="image/*" capture="environment" style="display:none">
-  </div>
-</div>
-
 <div class="modal-overlay" id="modalConf">
   <div class="modal" style="width:min(430px,100%)">
     <div class="modal-h"><h3 id="confTitulo">Confirmar</h3><button class="x-close" data-close>&times;</button></div>
@@ -2828,7 +2787,6 @@ setTimeout(function(){
 <!-- SheetJS 0.20.3: a 0.18.5 tinha a CVE-2023-30533 (poluição de protótipo ao
      ler planilha XLSX). Ela saiu do cdnjs — o CDN oficial é o cdn.sheetjs.com. -->
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" integrity="sha384-EnyY0/GSHQGSxSgMwaIPzSESbqoOLSexfnSMN2AP+39Ckmn92stwABZynq1JyzdT" crossorigin="anonymous"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js" integrity="sha384-c9d8RFSL+u3exBOJ4Yp3HUJXS4znl9f+z66d1y54ig+ea249SpqR+w1wyvXz/lk+" crossorigin="anonymous"></script>
 
 <script>
 'use strict';
@@ -3648,12 +3606,7 @@ function resetarRelogioInatividade(){
 const btnContinuar=$('#btnContinuarSessao');
 if(btnContinuar)btnContinuar.addEventListener('click',()=>{resetarRelogioInatividade();toast('Sessão mantida.');});
 function vigiarInatividade(){
-  /* CÂMERA CONTA COMO USO: com o scanner aberto (mirar o celular sem
-     tocar na tela por 20 min era o bastante para a saída automática
-     disparar — e o aviso ficava atrás do modal da câmera) ou durante a
-     captura de foto (tempo no app da câmera). Voltar de app externo
-     também conta (visibilitychange, lá em cima). */
-  if(scanAtivo || Date.now() < scanFotoAte) resetarRelogioInatividade();
+  /* Voltar de um app externo conta como uso (visibilitychange, lá em cima). */
   const temSessao=!!(usuarioAtual&&typeof auth!=='undefined'&&auth.currentUser);
   if(!temSessao){sessaoVigiada=false;esconderAvisoInatividade();return;}
   /* sessão nova (ou primeira checagem) começa com o relógio zerado */
@@ -3760,10 +3713,6 @@ function pintarDiagSessao(){
 pintarDiagSessao();
 function aplicarConfere(a){
   if(a!=='atualizando')return;
-  /* Scanner/foto em andamento: NÃO recarrega agora — matar a leitura no
-     meio (volta da câmera, foto em curso) e o dono lia como "deslogou"
-     (código 55). A atualização espera a próxima volta natural. */
-  try{ if(scanAtivo || Date.now() < scanFotoAte){ console.log('[NII] atualização disponível, mas o scanner está em uso — aplico depois.'); return; } }catch(_){}
   try{ /* aviso à prova de erro: o reload acontece de qualquer jeito */
     const c=document.createElement('div');
     c.style.cssText='position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#f5f7fa;color:#4b5563;font:600 14px system-ui;z-index:99999';
@@ -4226,1304 +4175,6 @@ $('#sigDevClear').addEventListener('click',()=>sigDev.limpar());
 $('#sigGuiaClear').addEventListener('click',()=>sigGuia.limpar());
 $('#sigGuiaPatClear').addEventListener('click',()=>sigGuiaPat.limpar());
 $('#sigGuiaDestClear').addEventListener('click',()=>sigGuiaDest.limpar());
-
-/* ============== SCANNER v4 ============== */
-let scanStream = null;
-let scanTrack  = null;
-let scanHtml5  = null;
-let scanAtivo  = false;
-let scanTarget = null;
-let scanVotos  = { ultimo: null, contagem: 0 };
-let scanCaps   = null;
-let scanTorchOn = false;
-let scanFocusTimer = null;
-let scanRefocoInterval = null;
-let scanImageCapture = null;
-let scanContinuo = false;    /* leitura contínua (inventário): não fecha a câmera a cada código */
-let scanUltCodigo = '';      /* evita reaplicar a mesma etiqueta em sequência */
-let scanUltHora = 0;
-let scanFotoAte = 0;         /* até quando a captura de foto conta como uso (grça p/ inatividade) */
-let scanHtml5UltimaVez = 0, scanHtml5SemAviso = false, scanIdleTimer = null;   /* rodapé do caminho html5 */
-let scanAssistOcupada = false, scanAssistProx = 0, scanAssistTentou = 0;       /* auxílio da foto ao vivo (código 51) */
-let scanSemLeitura = 0, scanSemLeituraAvisado = false;   /* fotos sem nada seguidas → aponta a câmera do celular (57) */
-let detectorAssist = null;                                                      /* leitor do auxílio no caminho html5 */
-let scanAssistFalhas = 0;                                                       /* takePhoto falhando seguido? (código 52) */
-let scanFocoTimer = null, scanFocoIdx = 0, scanVistoEm = 0;                     /* varredura de foco p/ aparelhos só-manual (código 52) */
-let scanZoomAtual = 1, scanInstavelAte = 0, scanTrocas = 0, scanSoFotoAvisado = false;  /* modo só-foto (código 53) */
-let scanFotoDims = '';                                                        /* tamanho real do takePhoto, p/ diagnóstico (código 54) */
-let _fotoNaoChegouAte = 0;                                                    /* dedup do aviso de foto que não chega (código 54) */
-let tmpTratado = null, tmpCentro = null, tmpAmpliado = null;                  /* canvases REUTILIZADOS do laço de vídeo (cód. 58) */
-let scanLeitorAtual = 'nativo';   /* qual decoder o scanner usa: ML Kit ('nativo') ou ZXing ('zxing') — cód. 59 */
-let scanLeitorTrocas = 0;         /* trocas de leitor nesta sessão (teto 2, para não reiniciar a câmera em loop) */
-let scanSemConfirmaDesde = 0;     /* quando houve a última leitura CONFIRMADA (relógio da troca automática) */
-let scanLeitorTimer = null;       /* intervalo que vigia os 30 s sem confirmação (cód. 59) */
-
-const FORMATOS_1D = ['code_128','code_39','code_93','codabar','ean_13','ean_8','upc_a','upc_e','itf'];
-const FORMATOS_QR = ['qr_code','data_matrix','pdf417','aztec'];
-const FORMATOS = [...FORMATOS_1D, ...FORMATOS_QR];
-
-function normalizarCodigoLido(texto){
-  if(texto==null)return '';
-  return String(texto).replace(/\D/g,'');
-}
-
-async function abrirScanner(targetId){
-  try{
-    scanTarget = targetId;
-    scanContinuo = (targetId === 'invBusca');   /* só a tela de inventário lê em sequência */
-    scanVotos = { ultimo: null, contagem: 0 };
-    scanAssistProx = 0;   /* auxílio da foto ao vivo: primeira tentativa liberada na hora */
-    scanAssistTentou = 0;
-    scanSemLeitura = 0;
-    scanSemLeituraAvisado = false;
-    scanAssistFalhas = 0;
-    scanVistoEm = 0;
-    scanZoomAtual = 1;
-    scanInstavelAte = 0;
-    scanTrocas = 0;
-    scanSoFotoAvisado = false;
-    scanFotoDims = '';
-    _fotoNaoChegouAte = 0;
-    /* CÓDIGO 59 — TROCA AUTOMÁTICA DE LEITOR: relógio + vigia. Enquanto
-       o leitor atual não CONFIRMAR nada por 30 s, o app troca sozinho
-       de decoder (ML Kit ↔ ZXing) e o rodapé avisa — teto de 2 trocas
-       por sessão para não reiniciar a câmera em loop. */
-    scanSemConfirmaDesde = Date.now();
-    if(scanLeitorTimer) clearInterval(scanLeitorTimer);
-    scanLeitorTimer = setInterval(trocarLeitorSePrecisar, 6000);
-    $('#modalScan').classList.add('show');
-    $('#scanControles').style.display='none';
-    $('#scanGuia').style.display='none';
-    $('#scanStatus').textContent='';
-    await new Promise(r=>setTimeout(r,120));
-    $('#scanReader').innerHTML = '<div style="padding:20px;color:#8ba3b6;text-align:center;font-size:13px">Iniciando câmera…</div>';
-
-    /* CÓDIGO 59: sessão aberta em ZXING (resultado da troca automática
-       anterior) — começa direto no decoder alternativo. O html5-qrcode
-       é forçado a NÃO delegar para o BarcodeDetector (linha do config),
-       senão seria o MESMO ML Kit de antes com outro nome. */
-    if(scanLeitorAtual === 'zxing'){
-      try{
-        await iniciarScannerHtml5(true);
-        return;
-      }catch(eZX){
-        /* CÓDIGO 61 — QUEDA ELEGANTE (relato/print do dono: a troca
-           derrubava "Não foi possível acessar a câmera" e FECHAVA o
-           scanner, voltando à tela inicial). Se o ZXing não abrir a
-           câmera, volta para o ML Kit DENTRO DO MESMO MODAL — a
-           câmera acabou de provar que responde (o outro leitor a
-           estava usando); só o decoder muda, o usuário nem percebe. */
-        console.warn('ZXing não abriu a câmera, voltando para o ML Kit:', eZX);
-        $('#scanReader').innerHTML = '';
-        scanLeitorAtual = 'nativo';
-        try{ await iniciarScannerNativo(); return; }
-        catch(_){ /* sem câmera de verdade: cai no erro comum abaixo */ }
-      }
-    }
-    if('BarcodeDetector' in window){
-      try{ await iniciarScannerNativo(); return; }
-      catch(e){
-        console.warn('BarcodeDetector indisponível, caindo para html5-qrcode:', e);
-        $('#scanReader').innerHTML = '';
-      }
-    }
-    await iniciarScannerHtml5();
-  }catch(err){
-    console.error('abrirScanner falhou:', err);
-    toast('Erro ao abrir o scanner: '+esc(String(err && err.message || err)),'bad');
-    pararScanner();
-  }
-}
-
-/* ===== TROCA AUTOMÁTICA DE LEITOR (código 59) ===========================
-   Relato do dono: "apontando a camera para o patrimonio ele não consegue
-   ler". DADO dos relatos que fecha o diagnóstico: o ML Kit (BarcodeDetector)
-   do Chrome do S23+ NUNCA confirmou leitura no campo, enquanto o AppSheet
-   lê — e o AppSheet não usa o ML Kit, usa OUTRA família de decoder (ZXing).
-   O ZXing já está embutido na página desde o código 1 (dentro do
-   html5-qrcode 2.3.8), nada novo para baixar. Enquanto o leitor atual não
-   CONFIRMAR nada por 30 s, este vigia troca o decoder sozinho e o rodapé
-   avisa; teto de 2 trocas por sessão (o fechar o scanner volta ao início). */
-function trocarLeitorSePrecisar(){
-  try{
-    if(!scanAtivo || !scanTarget) return;
-    if(scanLeitorTrocas >= 2) return;
-    if(!scanSemConfirmaDesde || Date.now() - scanSemConfirmaDesde < 30000) return;
-    scanLeitorTrocas++;
-    scanLeitorAtual = (scanLeitorAtual === 'zxing') ? 'nativo' : 'zxing';
-    const alvo = scanTarget;
-    const nome = (scanLeitorAtual === 'zxing') ? 'ZXing' : 'ML Kit';
-    toast('troca de leitor → '+nome+' (o outro não confirmou nada em 30 s)…','warn');
-    pararScanner(true);   /* true = mantém a escolha do leitor na troca */
-    scanTarget = alvo;
-    /* CÓDIGO 61 — FOLGA PARA O HAL LIBERAR A LENTE: relato real do dono
-       (print): a troca para o ZXing derrubava "Não foi possível acessar
-       a câmera" e fechava o scanner. O HAL do S23+ demora ~1 s para
-       liberar a lente depois de fechar um stream de 4K; reabrir em
-       120 ms (o atraso comum do abrirScanner) faz o Chrome recusar.
-       Reabre com 900 ms de folga — e só se o scanner ainda estiver
-       aberto (o dono pode ter cancelado no meio). */
-    setTimeout(()=>{ if(scanTarget===alvo) abrirScanner(alvo); }, 900);
-  }catch(_){}
-}
-
-async function iniciarScannerNativo(){
-  const suportados = await BarcodeDetector.getSupportedFormats();
-  const wanted = FORMATOS.filter(f => suportados.includes(f));
-  if(!wanted.length) throw new Error('Nenhum formato suportado');
-  const detector = new BarcodeDetector({ formats: wanted });
-
-  /* CÓDIGO 56: 4K na frente — se o aparelho deixar, o dobro de pixels
-     no vídeo dobra o tamanho aparente do código a ~1 m. Quem não
-     aceitar cai sozinho no 1080p (degrau seguinte), sem erro. */
-  const tentativas = [
-    { audio:false, video:{ facingMode:{ ideal:'environment' }, width:{ ideal:3840 }, height:{ ideal:2160 } } },
-    { audio:false, video:{ facingMode:{ ideal:'environment' }, width:{ ideal:1920 }, height:{ ideal:1080 } } },
-    { audio:false, video:{ facingMode:{ ideal:'environment' }, width:{ ideal:1280 }, height:{ ideal:720 } } },
-    { audio:false, video:{ facingMode:{ ideal:'environment' } } },
-    { audio:false, video:{ facingMode:'environment' } }
-  ];
-
-  let stream = null, ultimoErro = null;
-  for(const c of tentativas){
-    try{ stream = await navigator.mediaDevices.getUserMedia(c); break; }
-    catch(e){ ultimoErro = e; }
-  }
-  if(!stream) throw ultimoErro || new Error('Não foi possível acessar a câmera');
-
-  const track = stream.getVideoTracks()[0];
-  scanStream = stream;
-  scanTrack = track;
-  scanCaps = track.getCapabilities ? track.getCapabilities() : {};
-
-  const aplicar = async (c) => { try{ await track.applyConstraints({ advanced:[c] }); return true; }catch(_){ return false; } };
-  await aplicar({ focusMode:'continuous' });
-  await aplicar({ focusMode:'single-shot' });
-  await aplicar({ focusMode:'manual' });
-  await aplicar({ exposureMode:'continuous' });
-  await aplicar({ whiteBalanceMode:'continuous' });
-
-  if(scanRefocoInterval) clearInterval(scanRefocoInterval);
-  scanRefocoInterval = setInterval(async ()=>{
-    if(!scanAtivo || !scanTrack) return;
-    if(await aplicar({ focusMode:'continuous' })) return;
-    if(await aplicar({ focusMode:'single-shot' })) return;
-    if(await aplicar({ focusMode:'manual' })) return;
-    if(scanCaps && scanCaps.focusDistance){
-      const min = scanCaps.focusDistance.min ?? 0;
-      const max = scanCaps.focusDistance.max ?? 10;
-      const alvo = Math.min(max, Math.max(min, 0.25));
-      await aplicar({ focusDistance: alvo });
-    }
-  }, 1500);
-
-  const video = document.createElement('video');
-  video.setAttribute('playsinline','true');
-  video.setAttribute('autoplay','true');
-  video.muted = true;
-  video.style.cssText = 'width:100%;height:auto;display:block;background:#000';
-  $('#scanReader').innerHTML = '';
-  $('#scanReader').appendChild(video);
-  video.srcObject = stream;
-
-  await new Promise(r=>{
-    if(video.readyState >= 2) return r();
-    video.onloadedmetadata = () => r();
-    setTimeout(r, 2500);
-  });
-  await video.play();
-  /* Primeiro foco na cena antes de começar a caçar o código: o intervalo de
-     refoco abaixo só insiste quando "continuous" não é aceito — sem este
-     empurrão, alguns aparelhos abrem desfocados e a primeira tentativa
-     morre no quadro embaçado. */
-  await aplicar({ focusMode:'single-shot' });
-  await new Promise(r=>setTimeout(r, 900));
-
-  try{
-    scanImageCapture = (typeof ImageCapture !== 'undefined') ? new ImageCapture(track) : null;
-  }catch(_){ scanImageCapture = null; }
-
-  const canvas = document.createElement('canvas');
-  const settings = track.getSettings ? track.getSettings() : {};
-  canvas.width  = settings.width  || video.videoWidth  || 1280;
-  canvas.height = settings.height || video.videoHeight || 720;
-  const ctx = canvas.getContext('2d');
-  /* Enquadra o canvas no TAMANHO REAL do quadro capturado — e nunca
-     amplia: alguns aparelhos dizem 1920×1080 nas settings mas entregam o
-     grabFrame/bitmap menor; esticar o quadro embaçava os pixels e o leitor
-     não enxergava o código (a foto, em resolução cheia, sempre lia). */
-  const enquadrar = (w, h) => {
-    if(w > 0 && h > 0 && (canvas.width !== w || canvas.height !== h)){
-      canvas.width = w; canvas.height = h;
-    }
-  };
-
-  $('#scanGuia').style.display='block';
-  /* Aparelhos SÓ com foco 'manual' (ex.: S23+ no Chrome): o app varre a
-     distância de foco sozinho — sem isso o foco fica preso e o ML Kit
-     falha mesmo com a etiqueta no quadro. */
-  const soFocoManual = !focoAutomaticoDisponivel() && !!(scanCaps && scanCaps.focusDistance);
-  if(soFocoManual) iniciarVarreduraFoco();
-  {
-    const focoInfo = (scanCaps && Array.isArray(scanCaps.focusMode) && scanCaps.focusMode.length) ? scanCaps.focusMode.join(', ') : 'não informado';
-    const modo = scanImageCapture ? 'ImageCapture' : 'video';
-    $('#scanHint').innerHTML = `Decoder: <b>ML Kit</b> (se não confirmar nada em 30 s, o app troca sozinho para o ZXing) · Captura: <b>${canvas.width}×${canvas.height}</b> (${modo}) · Foco: <b>${esc(focoInfo)}</b>${soFocoManual?' <b>(varredura ligada)</b>':''} · zoom de <b>software 1–4×</b> · só os números são aproveitados.`;
-  }
-  $('#scanControles').style.display='flex';
-  ativarControles(track);
-
-  scanAtivo = true;
-  let turno = 0;
-
-  const capturarFrame = async () => {
-    if(scanImageCapture){
-      try{
-        const bitmap = await scanImageCapture.grabFrame();
-        enquadrar(bitmap.width, bitmap.height);
-        ctx.drawImage(bitmap, 0, 0);
-        if(bitmap.close) bitmap.close();
-        return canvas;
-      }catch(_){}
-    }
-    enquadrar(video.videoWidth, video.videoHeight);
-    ctx.drawImage(video, 0, 0);
-    return canvas;
-  };
-
-  /* CÓDIGO 58: os canvases temporários são REUTILIZADOS (não um novo por
-     frame). Antas eram criados ~60×/s e deixados ao Deus-dá do GC — num
-     aparelho com orçamento de memória apertado (S23+) o Chrome acumula e
-     chega a reiniciar a aba. Agora cada tmp é alocado uma vez e zerado
-     (width=0) depois de detectar, para devolver a RAM na hora. */
-  const servir = (alvo, w, h, vezes) => {   /* os tmp* são de módulo (cód. 58) */
-    const larg = Math.min(2560, Math.round(w * (vezes || 1)));
-    const alt  = Math.min(1440, Math.round(h * (vezes || 1)));
-    if(!alvo) alvo = document.createElement('canvas');
-    if(alvo.width !== larg || alvo.height !== alt){ alvo.width = larg; alvo.height = alt; }
-    return alvo;
-  };
-
-  const copiarTratado = () => {
-    tmpTratado = servir(tmpTratado, canvas.width, canvas.height, 1);
-    const tctx = tmpTratado.getContext('2d');
-    tctx.filter = 'grayscale(1) contrast(1.9) brightness(1.05)';
-    tctx.drawImage(canvas, 0, 0);
-    return tmpTratado;
-  };
-  /* Recorte central a 75% do quadro — SEMPRE no ciclo. Dá zoom no código
-     (etiqueta pequena no cheio não lia) sem partir a etiqueta: 60% no
-     código 46 partia e gerava número incompleto; no 47 o recorte saiu do
-     ciclo (só no "modo garimpo") e a leitura nunca confirmava — era o
-     "não consegue ler nada". O residual de parcial é coberto pela regra
-     de FAMÍLIA em confirmarLeitura (prefixo em comum = mesma etiqueta). */
-  const copiarCentro = (tratar, frac) => {
-    frac = frac || 0.75;
-    const w = Math.max(1, Math.round(canvas.width  * frac));
-    const h = Math.max(1, Math.round(canvas.height * frac));
-    tmpCentro = servir(tmpCentro, w, h, 1);
-    const tctx = tmpCentro.getContext('2d');
-    if(tratar) tctx.filter = 'grayscale(1) contrast(1.9) brightness(1.05)';
-    tctx.drawImage(canvas, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h, 0, 0, w, h);
-    return tmpCentro;
-  };
-  /* Recorte central AMPLIADO (código 56): código distante (etiqueta de
-     4 cm a ~1 m ≈ 55 px em 1080p) fica abaixo do limiar do ML Kit —
-     ampliar o recorte com suavização empurra as features acima do
-     limiar. Mesma informação, leitura melhor: é o que o zoom do HAL
-     tentava fazer reamostrando (e errando dígito). */
-  const ampliarCentro = (frac, vezes) => {
-    frac = frac || 0.75; vezes = vezes || 2;
-    const w = Math.max(1, Math.round(canvas.width  * frac));
-    const h = Math.max(1, Math.round(canvas.height * frac));
-    tmpAmpliado = servir(tmpAmpliado, w, h, vezes);
-    const tctx = tmpAmpliado.getContext('2d');
-    tctx.filter = 'grayscale(1) contrast(1.6) brightness(1.05)';
-    tctx.imageSmoothingEnabled = true;
-    tctx.imageSmoothingQuality = 'high';
-    tctx.drawImage(canvas, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h, 0, 0, tmpAmpliado.width, tmpAmpliado.height);
-    return tmpAmpliado;
-  };
-
-  let semConfirmar = 0, ultimaVezViu = Date.now(), quadroSemCodigoAvisado = false;
-  /* O MESMO tratamento vem do quadro de vídeo E do takePhoto do auxílio:
-     um só lugar confirma e aplica — as duas fontes disputam os MESMOS
-     votos da família, e a mais completa vence. */
-  const verCodigos = (codigos) => {
-    ultimaVezViu = Date.now();
-    scanVistoEm = Date.now();   /* varredura de foco congela: o ponto atual está vendo código */
-    quadroSemCodigoAvisado = false;
-    /* confirmarLeitura devolve OS DÍGITOS a aplicar (o bruto desta
-       leitura pode ser o parcial — vale o mais completo). */
-    const pronto = confirmarLeitura(codigos[0].rawValue);
-    if(pronto){
-      semConfirmar = 0;
-      aplicarLeitura(pronto);
-      if(!scanContinuo) pararScanner();
-    }else{
-      /* vendo candidato mas ainda não confirmou: empurra o foco de vez
-         em quando — quadro embaçado é o que mais trava a confirmação */
-      semConfirmar++;
-      if(semConfirmar >= 30){ semConfirmar = 0; aplicar({ focusMode:'single-shot' }); }
-    }
-  };
-  const checar = async (quadro) => {
-    const codigos = await detector.detect(quadro);
-    if(codigos && codigos.length){
-      verCodigos(codigos);
-      return;
-    }
-    if(!quadroSemCodigoAvisado && scanVotos.contagem===0 && Date.now()-ultimaVezViu>6000){
-      /* Nada visto há 6 s: o rodapé fala em vez de ficar mudo. Quem lê
-         "nenhum código no quadro" sabe que a câmera está rodando e só
-         precisa aproximar; "lendo (1/2)…" significa que VÊ o código mas
-         ainda não confirmou — os dois relatos se diferenciam na hora. */
-      quadroSemCodigoAvisado=true;
-      $('#scanStatus').textContent = rodapeSemCodigo();
-    }
-    /* AUXÍLIO DA FOTO AO VIVO (código 51): 3 s sem nada — ou leitura
-       pendente que o vídeo não confirma — o app dispara sozinho o
-       takePhoto (resolução cheia + foco no disparo, o MESMO pipeline da
-       📸 Usar foto que já lia) e tenta ler enquanto você mira. O laço de
-       vídeo aguarda aqui (uma foto por vez, sem fila). */
-    if(Date.now()-ultimaVezViu > 3000 || scanVotos.contagem >= 1){
-      await assistenciaPorFoto(detector, verCodigos);
-    }
-  };
-
-  let falhas = 0;
-  const loop = async () => {
-    if(!scanAtivo) return;
-    try{
-      /* MODO SÓ FOTO (código 53): com zoom ≥ 1,5× (ou leituras
-         trocando) o vídeo de 1080p reamostrado decodia NÚMEROS ERRADOS
-         (relato do dono no 2×: "mostra números… mas não o correto") e
-         aplicar número errado é pior que não aplicar. Nesse modo o
-         vídeo vira SÓ MIRA (nem o quadro é capturado): quem lê é o
-         takePhoto full-res, a mesma 📸 que o dono já provou que lê
-         certo — e o rodapé diz isso. */
-      if(modoSoFoto()){
-        if(!scanSoFotoAvisado){
-          scanSoFotoAvisado = true;
-          $('#scanStatus').textContent = 'leitura pela foto (o vídeo só mira)…';
-        }
-        await assistenciaPorFoto(detector, verCodigos);
-        if(!quadroSemCodigoAvisado && scanVotos.contagem===0 && Date.now()-ultimaVezViu>6000){
-          quadroSemCodigoAvisado = true;
-          $('#scanStatus').textContent = rodapeSemCodigo();
-        }
-        falhas = 0;
-        requestAnimationFrame(loop);
-        return;
-      }
-      if(scanSoFotoAvisado){
-        scanSoFotoAvisado = false;
-        quadroSemCodigoAvisado = false;   /* deixa o aviso de 6 s recomeçar no modo normal */
-      }
-      const alvo = await capturarFrame();
-      /* SEIS variações SEMPRE rodando — e ZOOM-AWARE (código 56): com
-         zoom de SOFTWARE os recortes seguem a MESMA região que o
-         preview mostra (1/fator do quadro cheio — pixels verdadeiros
-         do sensor, sem o HAL reamostrar) e a sexta variação amplia o
-         recorte 2× com suavização: é o que faz o código pequeno
-         (etiqueta a ~1 m) cruzar o limiar do ML Kit sem depender do
-         zoom reamostrado que trocava dígitos. */
-      const fracZoom = scanZoomAtual > 1.1 ? Math.max(0.25, 1/scanZoomAtual) : 0.75;
-      const variante = turno % 6;
-      await checar(
-        variante === 0 ? alvo :
-        variante === 1 ? copiarTratado() :
-        variante === 2 ? copiarCentro(false, fracZoom) :
-        variante === 3 ? copiarCentro(true, fracZoom) :
-        variante === 4 ? copiarCentro(true, Math.max(0.2, fracZoom/2)) :
-                         ampliarCentro(fracZoom, 2)
-      );
-      falhas = 0;
-      turno++;
-    }catch(err){
-      falhas++;
-      if(falhas === 1){
-        console.warn('BarcodeDetector falhou no quadro ao vivo (seguindo tentando):', err);
-      }else if(falhas === 25){
-        /* uns 4 s de erro seguido: em vez de silêncio, avisa que a câmera
-           está viva mas com dificuldade — e aponta a saída que sempre
-           funcionou (📸 Usar foto). */
-        $('#scanStatus').textContent = 'câmera com dificuldade — tente 📸 Usar foto';
-      }
-    }
-    requestAnimationFrame(loop);
-  };
-  loop();
-}
-
-function confirmarLeitura(bruto){
-  const digitos = normalizarCodigoLido(bruto);
-  if(!digitos) return false;
-  let avisoInstavel = '';   /* modo só-foto (código 53): explica a troca no rodapé */
-  /* DUAS leituras da MESMA etiqueta valem — e "mesma" aceita leitura
-     parcial que depois COMPLETA: o recorte pode entregar "1234" e o quadro
-     cheio "123456" (prefixo em comum com ≥4 dígitos); sem esta regra as
-     duas ficavam se trocando e NUNCA confirmava — era o sintoma do código
-     47 ("não consegue ler nada"). O candidato guarda sempre a leitura MAIS
-     COMPLETA, que é a que é aplicada; leituras diferentes de verdade
-     (outro número) zeram a sequência. */
-  const ultimo = scanVotos.ultimo;
-  const familia = !!ultimo && (ultimo === digitos ||
-    (ultimo.length >= 4 && digitos.length >= 4 &&
-     (ultimo.startsWith(digitos) || digitos.startsWith(ultimo))));
-  if(familia){
-    scanVotos.ultimo = (digitos.length > ultimo.length) ? digitos : ultimo;
-    scanVotos.contagem++;
-  } else {
-    /* TROCA de família: no 48 só recomeçava. Agora, se isso acontece
-       seguido, a imagem está FRACA (zoom reamostrado, foco ruim) e
-       aplicar um número ERRADO é pior que não aplicar nada: por 12 s o
-       app passa a ler só pela foto full-res (modo só-foto) e o rodapé
-       explica — as duas trocas em janela curta são o sinal. */
-    if(ultimo && scanVotos.contagem >= 1){
-      scanTrocas++;
-      if(scanTrocas >= 2){
-        scanTrocas = 0;
-        scanInstavelAte = Date.now() + 12000;
-        scanSoFotoAvisado = true;   /* não deixa o laço sobrescrever o aviso */
-        avisoInstavel = 'leituras trocando — lendo pela foto agora (mais preciso)…';
-      }
-    }
-    scanVotos.ultimo = digitos;
-    scanVotos.contagem = 1;
-  }
-  $('#scanStatus').textContent = avisoInstavel || ('lendo ('+scanVotos.contagem+'/2): '+scanVotos.ultimo+'…');
-  if(scanVotos.contagem >= 2){
-    const pronto = scanVotos.ultimo;
-    scanVotos = { ultimo: null, contagem: 0 };
-    scanTrocas = 0;   /* leitura fechou: quadro bom, calmaria */
-    scanSemLeitura = 0; scanSemLeituraAvisado = false;   /* leu: some a dica da câmera do celular (57) */
-    scanSemConfirmaDesde = Date.now();   /* leitor provou que lê: para o relógio da troca (59) */
-    $('#scanStatus').textContent = 'lido ✓ ' + pronto;
-    return pronto;   /* devolve os DÍGITOS a aplicar (string = verdadeiro) */
-  }
-  return false;
-}
-
-/* ===== AUXÍLIO DA FOTO AO VIVO (código 51) ==============================
-   O ao vivo só decodificava QUADROS DE VÍDEO (1920×1080, foco instável)
-   e a etiqueta passava em branco — "nenhum código no quadro" mesmo com a
-   câmera em cima dela — enquanto 📸 Usar foto (resolução cheia + foco no
-   disparo) lia perfeito. A lista de formatos era e é a MESMA; o que
-   faltava era resolução. Enquanto nada aparece no ao vivo, o app agora
-   dispara sozinho um takePhoto() — o MESMO pipeline da foto que funciona
-   — e tenta ler; achou, alimenta os votos da família e aplica. */
-async function detectarNaFotoViva(detector, direto){
-  if(!detector || !scanImageCapture || !scanAtivo) return null;
-  try{
-    const tira = scanImageCapture.takePhoto();
-    tira.catch(()=>{});   /* um takePhoto que chega tarde não pode virar erro na aba */
-    const foto = await Promise.race([
-      tira,
-      new Promise((_,rej)=>setTimeout(()=>rej(new Error('takePhoto sem resposta')), 5000))
-    ]);
-    const bmp = await createImageBitmap(foto);
-    scanAssistFalhas = 0;   /* a foto saiu: o takePhoto VIVE neste aparelho */
-    /* Diagnóstico (código 54): o tamanho REAL que o aparelho entrega no
-       takePhoto — se um dia ele só entregar 1080p (ou ignorar o zoom),
-       esta linha no rodapé denuncia na hora. */
-    if(!scanFotoDims){
-      scanFotoDims = bmp.width+'×'+bmp.height;
-      try{ const g=$('#scanHint'); if(g) g.innerHTML += ' · Foto: <b>'+scanFotoDims+'</b>'; }catch(_){}
-    }
-    /* Mesmo teto de 2400 px e as MESMAS cinco estratégias da 📸 Usar
-       foto (cru + afiada + escalas + recortes) — só muda a origem
-       (aqui, o disparo automático de quem mira). */
-    const LIMITE = 2400;
-    const maxLado = Math.max(bmp.width, bmp.height) || 1;
-    const fatorMax = Math.min(1, LIMITE / maxLado);
-    const base = document.createElement('canvas');
-    base.width  = Math.max(1, Math.round(bmp.width  * fatorMax));
-    base.height = Math.max(1, Math.round(bmp.height * fatorMax));
-    base.getContext('2d').drawImage(bmp, 0, 0, base.width, base.height);
-    if(bmp.close) bmp.close();
-    /* Mesmo teto de 2400 px e as MESMAS quatro estratégias da 📸 Usar
-       foto — só muda a origem (aqui, o disparo automático de quem mira).
-       CÓDIGO 58: sem variante de afiação — a foto da câmera do celular já
-       vem afiada pelo HAL (é por isso que ela lia e o quadro cru do
-       Chrome não); aqui ela só atrasava e segurava RAM. */
-    const estrategias = [
-      { escala: 1.0, filtro: null },
-      { escala: 0.7, filtro: 'grayscale(1) contrast(1.5)' },
-      { escala: 0.5, filtro: 'grayscale(1) contrast(1.8) brightness(1.05)' },
-      { escala: 1.5, filtro: 'grayscale(1) contrast(1.5)' }
-    ];
-    for(const est of estrategias){
-      const c = document.createElement('canvas');
-      c.width  = Math.max(1, Math.round(base.width  * est.escala));
-      c.height = Math.max(1, Math.round(base.height * est.escala));
-      const x = c.getContext('2d');
-      if(est.filtro) x.filter = est.filtro;
-      x.drawImage(base, 0, 0, c.width, c.height);
-      try{
-        const codigos = await detector.detect(c);
-        if(codigos && codigos.length) return codigos;
-      }catch(_){}
-      c.width = c.height = 0;   /* devolve a memória antes da próxima estratégia */
-    }
-    /* Recortes centrais tratados — e AMPLIADOS (código 56): 75%/50%
-       dão pixels relativos ao código; as versões 2×/3× empurram o
-       código DISTANTE (~1 m: ~117 px em foto 4032, ~70 px no teto
-       2400) acima do limiar do ML Kit. É o AppSheet lê "rápido e
-       preciso" com o MESMO decodificador nativo que usamos — o que
-       faltava aqui era entregar o código em tamanho que ele aceita. */
-    for(const [frac, esc] of [[0.75, 1], [0.5, 1], [0.5, 2], [0.3, 3]]){
-      const w = Math.max(1, Math.round(base.width  * frac));
-      const h = Math.max(1, Math.round(base.height * frac));
-      const c = document.createElement('canvas');
-      c.width  = Math.max(1, Math.round(w * esc));
-      c.height = Math.max(1, Math.round(h * esc));
-      const x = c.getContext('2d');
-      x.filter = 'grayscale(1) contrast(1.9) brightness(1.05)';
-      if(esc > 1){ x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high'; }
-      x.drawImage(base, (base.width - w) / 2, (base.height - h) / 2, w, h, 0, 0, c.width, c.height);
-      try{
-        const codigos = await detector.detect(c);
-        if(codigos && codigos.length) return codigos;
-      }catch(_){}
-      c.width = c.height = 0;
-    }
-    /* RECORTES CENTRAIS NA HORA (código 58). Antes só rodavam com zoom
-       > 1,1 — e no S23+ o takePhoto IGNORA o zoom (código 54), então com
-       zoom 1× o 📸 Usar foto dependia só das escalas e nunca enxergava a
-       etiqueta miúda. Agora os recortes 75%/50% (e as ampliações 2×/3×)
-       rodam SEMPRE: dão zoom de verdade na resolução cheia da foto, sem
-       depender do HAL. */
-    const recortes = [[0.75, 1], [0.5, 1], [0.5, 2], [0.3, 3]];
-    if(scanZoomAtual > 1.1){
-      /* REGIÃO DO ZOOM (código 54): o recorte segue a MESMA região do
-         preview (1/fator do quadro cheio) — a etiqueta que o usuário vê
-         com zoom é a que é lida. */
-      const fracZ = Math.max(0.25, Math.min(0.9, 1 / scanZoomAtual));
-      recortes.unshift([fracZ, 1], [fracZ, 2]);
-    }
-    /* CÓDIGO 61 — CORREÇÃO DE BUG (58/59): o recorte "fiel" escolhido era
-       ZERADO (c.width=c.height=0) logo DEPOIS de virar a fonte do ZXing —
-       a "segunda opinião" lia um canvas EM BRANCO e nunca achava nada (era
-       por isso que ela não mudava nada no aparelho do dono). Agora os
-       recortes fiéis (e a base) ficam VIVOS até o ZXing rezar sobre cada
-       um — do MAIOR ao menor (mais contexto primeiro) — e são zerados
-       logo depois, na mesma disciplina de memória do 58. */
-    const fieis = [base];   /* base cheia + recortes fiéis (esc===1) */
-    for(const [frac, esc] of recortes){
-      const w = Math.max(1, Math.round(base.width  * frac));
-      const h = Math.max(1, Math.round(base.height * frac));
-      const c = document.createElement('canvas');
-      c.width  = Math.max(1, Math.round(w * esc));
-      c.height = Math.max(1, Math.round(h * esc));
-      const x = c.getContext('2d');
-      x.filter = 'grayscale(1) contrast(1.9) brightness(1.05)';
-      if(esc > 1){ x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high'; }
-      x.drawImage(base, (base.width - w) / 2, (base.height - h) / 2, w, h, 0, 0, c.width, c.height);
-      try{
-        const codigos = await detector.detect(c);
-        if(codigos && codigos.length){
-          c.width = c.height = 0;
-          for(const f of fieis){ if(f!==base) f.width = f.height = 0; }
-          base.width = base.height = 0;
-          return codigos;
-        }
-      }catch(_){}
-      if(esc === 1){ fieis.push(c); }   /* fiel (sem ampliação): fonte honesta do ZXing */
-      else c.width = c.height = 0;
-    }
-    /* SEGUNDA OPINIÃO — ZXing embutido (código 57): o ML Kit devolveu
-       nada. O ZXing reza com binarizador híbrido próprio: acha 1D em
-       foto "mole" onde o ML Kit passa em branco (e vice-versa). CÓDIGO
-       61: tenta a base INTEIRA (a foto da câmera do celular lia assim,
-       com sucesso histórico) e depois os recortes fiéis — todos
-       reduzidos a ≤1600 px (mesma leitura; o ZXing tem scale interno),
-       sem o dobro de RAM que derrubava a aba. */
-    let segundo = null;
-    for(const fonte of fieis){
-      const zx = document.createElement('canvas');
-      const lado = Math.max(fonte.width, fonte.height) || 1;
-      const fZx = Math.min(1, 1600 / lado);
-      zx.width  = Math.max(1, Math.round(fonte.width  * fZx));
-      zx.height = Math.max(1, Math.round(fonte.height * fZx));
-      zx.getContext('2d').drawImage(fonte, 0, 0, zx.width, zx.height);
-      segundo = await segundaOpiniaoFoto(zx);
-      zx.width = zx.height = 0;                /* devolve a RAM na hora */
-      if(segundo) break;
-    }
-    for(const f of fieis){ f.width = f.height = 0; }   /* devolve tudo */
-    if(segundo) return [{ rawValue: segundo }];
-    return [];
-  }catch(_){ scanAssistFalhas++; return null; }
-}
-
-/* SEGUNDA OPINIÃO NA FOTO (código 57): o html5-qrcode (ZXing embutido)
-   já está na página desde o código 1 — nada novo para baixar. Instância
-   única e escondida, só para o auto-auxílio; o caminho manual continua
-   com o seu scanFile de sempre.
-   CÓDIGO 58: recebe a fonte JÁ reduzida (Image/canvas de ≤1600 px) em
-   vez do arquivo cru de 12 MP — o ZXing tem up/down-scale interno e não
-   perde leitura, mas a memória de pico cai de ~12 MP para ~1600 px, que
-   é o que segura o reload da página no aparelho do dono. */
-let _h5Segunda = null;
-/* CÓDIGO 61: o scanFile do html5-qrcode só aceita ARQUIVO (File/Blob) —
-   passar um canvas falhava em SILÊNCIO (createObjectURL(canvas) lança) e
-   a "segunda opinião" nunca lia nada. Converte canvas → JPEG File. */
-function canvasParaArquivo(c){
-  return new Promise(res=>{
-    if(!c || !c.toBlob){ res(null); return; }
-    c.toBlob(b=>{
-      if(!b){ res(null); return; }
-      res((typeof File !== 'undefined') ? new File([b], 'foto-scan.jpg', { type: 'image/jpeg' }) : b);
-    }, 'image/jpeg', 0.9);
-  });
-}
-async function segundaOpiniaoFoto(fonte){
-  try{
-    if(typeof Html5Qrcode === 'undefined' || !fonte) return null;
-    if(!_h5Segunda){
-      let tmp = document.getElementById('scanSegundaOpiniao');
-      if(!tmp){ tmp = document.createElement('div'); tmp.id = 'scanSegundaOpiniao'; tmp.style.display='none'; document.body.appendChild(tmp); }
-      _h5Segunda = new Html5Qrcode('scanSegundaOpiniao', false);
-    }
-    const arq = (fonte instanceof Blob) ? fonte : await canvasParaArquivo(fonte);
-    if(!arq) return null;
-    const r = await Promise.race([
-      _h5Segunda.scanFile(arq, false),
-      new Promise((_,rej)=>setTimeout(()=>rej(new Error('ZXing sem resposta')), 6000))
-    ]);
-    const txt = (typeof r === 'string') ? r : (r && r.decodedText ? r.decodedText : null);
-    if(txt) console.log('[NII] segunda opinião (ZXing) leu:', txt);
-    return txt;
-  }catch(_){ return null; }
-}
-
-/* Dispara com intervalo mínimo e trava anti-sobreposição: o caminho
-   nativo ESPERA (pausando o laço de vídeo — uma foto por vez, sem fila);
-   o caminho html5 chama solto (a biblioteca continua lendo sozinha). */
-async function assistenciaPorFoto(detector, aoVer){
-  if(!scanAtivo || scanAssistOcupada || !scanImageCapture) return;
-  if(Date.now() < scanAssistProx) return;
-  scanAssistOcupada = true;
-  /* Folga entre disparos: no modo só-foto a foto É a única fonte de
-     leitura — 1,2 s mantém o ritmo; fora dele, 2 s (cada foto demora). */
-  scanAssistProx = Date.now() + (modoSoFoto() ? 1200 : 2000);
-  scanAssistTentou++;
-  try{
-    const det = detector || await obterDetectorAssist();
-    if(!det) return;
-    const codigos = await detectarNaFotoViva(det);
-    if(codigos && codigos.length && scanAtivo){
-      aoVer(codigos);
-    } else if(scanAtivo && codigos){
-      /* CINCO fotos seguidas sem nada (código 57): o automático já
-         esgotou o repertório (cru, afiado, tratado, recortes 2×/3×,
-         região do zoom, ZXing). O caminho que já leu no aparelho do
-         dono é a foto da CÂMERA DO CELULAR — aponta o botão. */
-      scanSemLeitura++;
-      if(scanSemLeitura >= 5 && !scanSemLeituraAvisado){
-        scanSemLeituraAvisado = true;
-        try{ $('#scanStatus').textContent = 'a foto automática não leu — toque em 📸 Usar foto (a câmera do celular lê estas etiquetas)…'; }catch(_){}
-      }
-    }
-  }finally{ scanAssistOcupada = false; }
-}
-
-async function obterDetectorAssist(){
-  if(detectorAssist) return detectorAssist;
-  try{
-    const sup = await BarcodeDetector.getSupportedFormats();
-    const wanted = FORMATOS.filter(f => sup.includes(f));
-    if(!wanted.length) return null;
-    detectorAssist = new BarcodeDetector({ formats: wanted });
-    return detectorAssist;
-  }catch(_){ return null; }
-}
-
-/* FOTO INTERNA ANTES DA CÂMERA DO CELULAR (código 55): a câmera do
-   S23+ relata "não foi salva por falta de espaço" SEM ter o aparelho
-   cheio (relato 22/10: 250 GB livres) e a foto nem chega ao
-   navegador. O app já tem a MESMA leitura full-res na mão (takePhoto
-   do auxílio, a mesma 📸 que o dono provou que lê) — tenta ela na
-   hora, sem trocar de app; só se não ler que a câmera do celular abre
-   como sempre abriu. */
-async function tentarFotoInterna(){
-  try{
-    if(!scanAtivo || !scanImageCapture) return false;
-    if(scanAssistOcupada) return false;          /* foto em voo: o automático segue */
-    const det = await obterDetectorAssist();
-    if(!det) return false;
-    /* CÓDIGO 58 — CAMINHO DIRETO E IMEDIATO: antes o 📸 Usar foto passava
-       pelo mesmo trilho do automático (cooldown de 1,2–2 s + DOIS votos
-       da família para confirmar) — o botão que o dono foi instruído a usar
-       respondia com atraso e podia nem fechar. Aqui o toque lê NA HORA:
-       duas tentativas full-res imediatas, sem folga de cooldown, e UMA
-       leitura limpa basta (foto de resolução cheia é alta confiabilidade;
-       o voto duplo era atraso puro num botão manual). Se as duas falham,
-       devolve false e o handler abre a câmera do celular — o plano B que
-       sempre funcionou. */
-    scanAssistProx = 0;
-    toast('Tirando a foto (full-res)…');
-    for(let t = 0; t < 2; t++){
-      const codigos = await detectarNaFotoViva(det, true);
-      if(codigos && codigos.length && scanAtivo){
-        const pronto = confirmarLeitura(codigos[0].rawValue) || normalizarCodigoLido(codigos[0].rawValue);
-        if(pronto){ aplicarLeitura(pronto); return true; }
-      }
-    }
-    return false;
-  }catch(_){ return false; }
-}
-
-/* ===== VARREDURA DE FOCO (código 52) ====================================
-   O S23+ (e outros) expõe ao Chrome APENAS focusMode 'manual': o
-   continuous/single-shot é rejeitado, o foco fica PRESO no ponto em que
-   a lente abriu e até o botão 🎯 Focar virava no-op (aplicava 'manual'
-   de novo). O preview parecia legível para o olho, mas o ML Kit falha
-   com módulos de ~3 px quando o foco está fora de ponto — e o takePhoto
-   do auxílio herdava o mesmo foco travado, enquanto a foto da câmera do
-   Android (📸 Usar foto) focava sozinha. Agora, nesses aparelhos, o
-   app VARE o foco (de perto a longe) enquanto nada é visto; achou
-   código, congela no ponto bom. */
-function passoDeFoco(){
-  try{
-    if(!scanAtivo || !scanTrack || !scanCaps || !scanCaps.focusDistance) return;
-    if(Date.now() - scanVistoEm < 700) return;   /* vendo código: o foco está bom — congela */
-    const min = scanCaps.focusDistance.min ?? 0;
-    const max = scanCaps.focusDistance.max ?? 10;
-    if(!(max > min)) return;
-    const N = 8;
-    const volta = scanFocoIdx++ % (2 * N);
-    const i = volta < N ? volta : (2 * N - 1 - volta);   /* perto ↔ longe */
-    const d = min + (max - min) * (i / (N - 1));
-    scanTrack.applyConstraints({ advanced: [{ focusDistance: d }] }).catch(()=>{});
-  }catch(_){}
-}
-
-/* ===== MODO SÓ FOTO (código 53) ========================================
-   Relato do dono no zoom 2×: "mostra números no rodapé… mas não o
-   correto" e "a qualidade da imagem não é boa nessa configuração" — o
-   vídeo de 1080p com zoom reamostrado fazia o ML Kit devolver dígitos
-   TROCADOS em quadro fraco (leitura errada é pior que nenhuma). Nesse
-   modo o vídeo vira SÓ MIRA: quem lê é o takePhoto full-res — a mesma
-   📸 Usar foto que o dono já provou que lê certo. Entra com zoom ≥
-   1,5× (qualidade ruim conhecida) ou quando as leituras TROCAM de
-   família duas vezes seguidas (sinal de quadro fraco a 1× também);
-   sai sozinho em ~12 s de calmaria. */
-function modoSoFoto(){
-  return scanZoomAtual >= 1.5 || Date.now() < scanInstavelAte;
-}
-
-/* Rodapé quando nada aparece: além de orientar, DIZ o estado do auxílio
-   — "automática ativa" = fotografou e não leu; "automática sem resposta"
-   = o takePhoto do aparelho está morto (aí só a 📸 manual resolve). */
-function rodapeSemCodigo(){
-  /* Dica da câmera do celular (código 57): depois de 5 fotos automáticas
-     sem nada, o app para de insistir sozinho e aponta o caminho que já
-     leu no aparelho do dono. */
-  const dica = (scanSemLeitura >= 5) ? ' · 📸 Usar foto: a câmera do celular lê estas etiquetas' : '';
-  if(modoSoFoto()){
-    return 'nenhum código na foto — aproxime (uns 30 cm) (ou 📸 Usar foto)' + dica +
-      (scanAssistFalhas >= 3 ? ' · 📸 automática sem resposta' :
-       scanAssistTentou  > 0 ? ' · 📸 automática ativa' : '') +
-      ' · leitura pela foto (vídeo só mira)';
-  }
-  return 'nenhum código no quadro — aproxime (uns 30 cm) ou suba o zoom (ou 📸 Usar foto)' + dica +
-    (scanAssistFalhas >= 3 ? ' · 📸 automática sem resposta' :
-     scanAssistTentou  > 0 ? ' · 📸 automática ativa' : '');
-}
-
-/* Só para aparelhos SEM foco automático (continuous/single-shot). */
-function iniciarVarreduraFoco(){
-  if(scanFocoTimer) clearInterval(scanFocoTimer);
-  scanFocoIdx = 0;
-  scanFocoTimer = setInterval(()=>{
-    if(!scanAtivo){ return; }
-    passoDeFoco();
-  }, 550);
-}
-
-function focoAutomaticoDisponivel(){
-  const m = (scanCaps && Array.isArray(scanCaps.focusMode)) ? scanCaps.focusMode : [];
-  return m.includes('continuous') || m.includes('single-shot');
-}
-
-async function iniciarScannerHtml5(forcarZXing){
-  try{
-    const F = Html5QrcodeSupportedFormats;
-    scanHtml5 = new Html5Qrcode('scanReader', false);
-    $('#scanGuia').style.display='block';
-    /* CÓDIGO 59: quando a troca automática manda, o html5-qrcode é
-       FORÇADO a usar o ZXing JS embutido (useBarCodeDetectorIfSupported:
-       false) — sem isso ele delegava para o MESMO BarcodeDetector do
-       Chrome e a "troca" não trocava decoder nenhum (era por isso que o
-       fallback parecia não adiantar nada no aparelho do dono). */
-    $('#scanHint').innerHTML = forcarZXing
-      ? 'Decoder: <b>ZXing</b> (troca automática · 30 s sem leitura confirmada muda de leitor) · só os números são aproveitados.'
-      : 'Decoder: <b>html5-qrcode</b> · só os números são aproveitados.';
-    scanAtivo = true;
-    await scanHtml5.start(
-      { facingMode: { ideal: 'environment' } },
-      {
-        /* ZXing é JS puro: 10 fps dá folga de CPU ao aparelho (o ML Kit
-           rodava a 20 fps). */
-        fps: forcarZXing ? 10 : 20,
-        qrbox: (w, h) => {
-          /* Caixa maior e mais alta: a anterior era uma faixa curta
-             (h×0.65 e no máximo 55% da largura) e um QR grande — etiqueta
-             aproximada da câmera — ficava FORA da área lida; só a foto
-             conseguia. Agora o código tem folga para caber. */
-          const larg = Math.floor(w * 0.92);
-          const alt  = Math.floor(Math.min(h * 0.85, larg * 0.9));
-          return { width: larg, height: alt };
-        },
-        aspectRatio: 1.777,
-        disableFlip: false,
-        formatsToSupport: [
-          F.CODE_128, F.CODE_39, F.CODE_93, F.CODABAR,
-          F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E, F.ITF,
-          F.QR_CODE, F.DATA_MATRIX, F.PDF_417, F.AZTEC
-        ],
-        experimentalFeatures: { useBarCodeDetectorIfSupported: !forcarZXing }   /* cód. 59: false = ZXing de verdade */
-      },
-      texto=>{
-        /* MODO SÓ FOTO (código 53): o vídeo reamostrado decodia errado —
-           ignora os votos daqui E não marca scanHtml5UltimaVez (senão o
-           disparo do auxílio da foto pararia); quem confirma é o
-           takePhoto full-res. */
-        if(modoSoFoto()) return;
-        scanHtml5UltimaVez = Date.now();
-        scanVistoEm = Date.now();   /* varredura de foco congela ao ver código */
-        scanHtml5SemAviso = false;
-        const pronto = confirmarLeitura(texto);   /* duas da mesma etiqueta (família), como no nativo */
-        if(!pronto) return;
-        aplicarLeitura(pronto);
-        /* Ordem importa: ANTES era pararScanner() → aplicarLeitura(), mas
-           o parar zera o scanTarget e o campo ficava SEM preencher no
-           fallback. Aplica e só então fecha (igual ao caminho nativo); no
-           modo contínuo segue lendo as próximas etiquetas. */
-        if(!scanContinuo) pararScanner();
-      },
-      ()=>{}
-    );
-    /* RODAPÉ NO FALLBACK: o #scanControles (status "lendo (1/2)…",
-       "nenhum código…", botões) nunca era exibido no caminho html5 —
-       por isso ele parecia MUDO (relato do dono: "fica mudo, nada
-       muda"). Mostra; se o vídeo do html5 expuser o track, reativa
-       foco como no nativo; senão, lanterna/zoom ficam inertes. */
-    $('#scanControles').style.display='flex';
-    const vid=$('#scanReader video');
-    const trk=vid&&vid.srcObject&&vid.srcObject.getVideoTracks?vid.srcObject.getVideoTracks()[0]:null;
-    if(trk){
-      /* Guarda o track: lanterna/zoom/foco passam a funcionar também no
-         fallback (antes scanCaps ficava nulo e os botões ficavam inertes)
-         e a varredura de foco ganha o mesmo poder do caminho nativo. */
-      scanTrack = trk;
-      scanCaps = trk.getCapabilities ? trk.getCapabilities() : {};
-      ativarControles(trk);
-      if(!focoAutomaticoDisponivel() && scanCaps && scanCaps.focusDistance){
-        iniciarVarreduraFoco();
-      }
-      /* AUXÍLIO DA FOTO AO VIVO também no fallback: o takePhoto usa o
-         MESMO track que o html5-qrcode está lendo — mesma fonte da 📸
-         Usar foto, que é o que sempre funcionou neste aparelho. */
-      scanImageCapture = null;
-      if(typeof ImageCapture !== 'undefined'){
-        try{ scanImageCapture = new ImageCapture(trk); }catch(_){ scanImageCapture = null; }
-      }
-    }
-    else{
-      const bt=$('#btnScanTorch'),bf=$('#btnScanFoco'),iz=$('#scanZoom');
-      if(bt){bt.disabled=true;bt.style.opacity='.4';}
-      if(bf){bf.disabled=true;bf.style.opacity='.4';}
-      if(iz){iz.disabled=true;}
-      $('#scanZoomVal').textContent='—';
-    }
-    /* Mesmo aviso do caminho nativo: sem nada visto há 6 s, o rodapé
-       orienta em vez de ficar calado. */
-    scanHtml5UltimaVez = Date.now();
-    scanHtml5SemAviso = false;
-    if(scanIdleTimer) clearInterval(scanIdleTimer);
-    scanIdleTimer = setInterval(()=>{
-      if(!scanAtivo) return;
-      const semVer = Date.now() - scanHtml5UltimaVez;
-      if(scanVotos.contagem===0 && !scanHtml5SemAviso && semVer>6000){
-        scanHtml5SemAviso=true;
-        $('#scanStatus').textContent = rodapeSemCodigo();
-      }
-      /* AUXÍLIO DA FOTO AO VIVO (código 51): 3 s sem nada — ou leitura
-         pendente que o html5 não confirma — fotografar sozinho e tentar
-         pelo pipeline da 📸 (só se o aparelho tiver BarcodeDetector;
-         senão, só a 📸 manual dá conta). Chamada solta: a trava interna
-         evita sobreposição e a biblioteca segue lendo no caminho dela. */
-      if((semVer > 3000 || scanVotos.contagem >= 1) && typeof BarcodeDetector !== 'undefined' && scanImageCapture){
-        assistenciaPorFoto(null, (codigos)=>{
-          scanHtml5UltimaVez = Date.now();
-          scanVistoEm = Date.now();   /* varredura de foco congela */
-          scanHtml5SemAviso = false;
-          const pronto = confirmarLeitura(codigos[0].rawValue);
-          if(!pronto) return;
-          aplicarLeitura(pronto);
-          /* Igual ao callback da biblioteca: aplica e só então fecha. */
-          if(!scanContinuo) pararScanner();
-        });
-      }
-    },1000);
-  }catch(e){
-    console.error('html5-qrcode falhou:', e);
-    toast('Não foi possível acessar a câmera. Verifique as permissões do navegador.','bad');
-    pararScanner();
-  }
-}
-
-function ativarControles(track){
-  const btnTorch = $('#btnScanTorch');
-  const btnFoco  = $('#btnScanFoco');
-  const inpZoom  = $('#scanZoom');
-  const lblZoom  = $('#scanZoomVal');
-
-  async function forcarFoco(){
-    const aplicar = async (c) => { try{ await track.applyConstraints({ advanced:[c] }); return true; }catch(_){ return false; } };
-    if(await aplicar({ focusMode:'continuous' })) return;
-    if(await aplicar({ focusMode:'single-shot' })) return;
-    /* Aparelhos só-manual (S23+ e cia.): antes o botão reaplicava
-       'manual' e não fazia NADA. Agora foca na DISTÂNCIA DE LEITURA
-       (~50 cm = 2 dpt) e segura a varredura por 2,5 s para o ponto
-       escolhido valer. */
-    if(await aplicar({ focusMode:'manual' })){
-      if(scanCaps && scanCaps.focusDistance){
-        const min = scanCaps.focusDistance.min ?? 0;
-        const max = scanCaps.focusDistance.max ?? 10;
-        await aplicar({ focusDistance: Math.min(max, Math.max(min, 2.0)) });
-        scanVistoEm = Date.now() + 2500;   /* congela a varredura: foco pedido pelo usuário */
-      }
-      return;
-    }
-    if(scanCaps && scanCaps.focusDistance){
-      const min = scanCaps.focusDistance.min ?? 0;
-      const max = scanCaps.focusDistance.max ?? 10;
-      await aplicar({ focusDistance: Math.min(max, Math.max(min, 0.25)) });
-    }
-  }
-
-  btnFoco.disabled = false;
-  btnFoco.onclick = () => {
-    btnFoco.textContent = '🎯 Focando…';
-    forcarFoco().finally(()=>{ btnFoco.textContent = '🎯 Focar'; });
-  };
-  const video = $('#scanReader video');
-  if(video) video.addEventListener('click', forcarFoco);
-
-  if(scanCaps && scanCaps.torch){
-    btnTorch.disabled = false;
-    btnTorch.onclick = async () => {
-      try{
-        scanTorchOn = !scanTorchOn;
-        await track.applyConstraints({ advanced: [{ torch: scanTorchOn }] });
-        btnTorch.textContent = scanTorchOn ? '🔦 ON' : '🔦 Lanterna';
-        btnTorch.classList.toggle('btn-accent', scanTorchOn);
-      }catch(e){}
-    };
-  } else {
-    btnTorch.disabled = true;
-    btnTorch.style.opacity = '.4';
-  }
-
-  /* ZOOM DE SOFTWARE (código 56) — o zoom do HAL saiu de cena: no
-     S23+ ele reamostrava o vídeo e o ML Kit devolvia dígitos TROCADOS
-     ("mostra números… mas não o correto", relato do dono) — e o
-     takePhoto IGNORA o zoom (54), então nem a foto acompanhava. Agora
-     o stream permanece em resolução CHEIA e o zoom é um RECORTE
-     central ampliado: preview nítido (CSS), detecção nos pixels
-     verdadeiros do sensor, e a MESMA região vale para a foto
-     full-res do auxílio (recorte 1/fator, código 54). Funciona em
-     TODO aparelho, com ou sem suporte a zoom nativo. */
- {
-    const maxFator = 4;
-    inpZoom.min = 100;
-    inpZoom.max = maxFator * 100;
-    inpZoom.step = 10;
-    inpZoom.value = 100;
-    inpZoom.disabled = false;
-    const aplicarZoomSoftware = (fator) => {
-      scanZoomAtual = fator;
-      lblZoom.textContent = fator.toFixed(1) + '×';
-      try{
-        if(video){
-          video.style.transformOrigin = 'center center';
-          video.style.transform = (fator > 1.01) ? ('scale(' + fator.toFixed(3) + ')') : '';
-        }
-        const leitor = $('#scanReader'); if(leitor) leitor.style.overflow = 'hidden';
-      }catch(_){}
-    };
-    inpZoom.oninput = () => {
-      aplicarZoomSoftware(Math.max(1, Math.min(maxFator, Number(inpZoom.value)/100)));
-    };
-    aplicarZoomSoftware(1);
-  }
-}
-
-function aplicarLeitura(bruto){
-  const digitos = normalizarCodigoLido(bruto);
-  if(!digitos){
-    toast('Código lido, mas sem números: <b class="mono">'+esc(String(bruto).slice(0,30))+'</b>','warn');
-    return;
-  }
-  if(scanContinuo){
-    /* mesma etiqueta diante da câmera dispara a cada quadro: só reprocessa
-       depois de 1,5 s, para o alvo dar conta de cada leitura. */
-    const agora = Date.now();
-    if(digitos === scanUltCodigo && agora - scanUltHora < 1500) return;
-    scanUltCodigo = digitos; scanUltHora = agora;
-  }
-  const el = $('#'+scanTarget);
-  if(el){
-    el.value = digitos;
-    el.classList.remove('leitura-ok'); void el.offsetWidth; el.classList.add('leitura-ok');
-    beep();
-    el.dispatchEvent(new Event('input',{bubbles:true}));
-    el.dispatchEvent(new CustomEvent('leitura',{bubbles:true,detail:{digitos}}));
-    if(el.id==='eqBusca' && typeof renderEquipamentos==='function'){ eqPagina=1; renderEquipamentos(); }
-  }
-}
-
-function pararScanner(preservaLeitor){
-  if(scanIdleTimer){ clearInterval(scanIdleTimer); scanIdleTimer = null; }
-  if(scanRefocoInterval){ clearInterval(scanRefocoInterval); scanRefocoInterval = null; }
-  if(scanFocusTimer){ clearInterval(scanFocusTimer); scanFocusTimer = null; }
-  if(scanFocoTimer){ clearInterval(scanFocoTimer); scanFocoTimer = null; }
-  /* CÓDIGO 59: o vigia da troca automática morre aqui; e fechar o
-     scanner é fim de sessão — a próxima começa no ML Kit de novo (a
-     troca chama pararScanner(true) e aí a escolha sobrevive). */
-  if(scanLeitorTimer){ clearInterval(scanLeitorTimer); scanLeitorTimer = null; }
-  if(!preservaLeitor){ scanLeitorAtual = 'nativo'; scanLeitorTrocas = 0; }
-  scanAtivo = false;
-  scanContinuo = false;
-  scanTorchOn = false;
-  scanCaps = null;
-  scanImageCapture = null;
-  scanTrack = null;   /* no caminho html5 o stream é da biblioteca: o track guardado morre aqui mesmo */
-  /* Auxílio da foto ao vivo: próxima sessão começa do zero (a trava
-     scanAssistOcupada quem zera é o finally do disparo em voo). */
-  scanAssistProx = 0;
-  scanAssistTentou = 0;
-  scanSemLeitura = 0;
-  scanSemLeituraAvisado = false;
-  scanAssistFalhas = 0;
-  /* Modo só-foto: próxima sessão começa em modo normal (zoom novo = stream novo). */
-  scanZoomAtual = 1;
-  scanInstavelAte = 0;
-  scanTrocas = 0;
-  scanSoFotoAvisado = false;
-  scanFotoDims = '';
-  _fotoNaoChegouAte = 0;
-  /* CÓDIGO 58: devolve na hora a RAM dos canvases temporários do laço de
-     vídeo (reutilizados, mas que ficavam com dimensão cheia entre sessões).
-     Eram locais ao iniciarScannerNativo e morriam só no GC — aqui eles são
-     de módulo e o fechamento devolve a memória no instante certo. */
-  for(const c of [tmpTratado, tmpCentro, tmpAmpliado]){ if(c){ c.width = c.height = 0; } }
-  tmpTratado = tmpCentro = tmpAmpliado = null;
-  try{ const v=$('#scanReader video'); if(v) v.style.transform=''; }catch(_){}   /* zoom de software: próximo scanner começa em 1× */
-  if(scanStream){
-    try{ scanStream.getTracks().forEach(t=>t.stop()); }catch(_){}
-    scanStream = null; scanTrack = null;
-  }
-  if(scanHtml5){
-    try{ scanHtml5.stop().then(()=>{ try{scanHtml5.clear();}catch(_){} }).catch(()=>{}); }catch(_){}
-    scanHtml5 = null;
-  }
-  const r = $('#scanReader'); if(r) r.innerHTML = '';
-  $('#scanGuia').style.display='none';
-  $('#modalScan').classList.remove('show');
-  scanTarget = null;
-}
-
-/* Aviso quando a foto NÃO CHEGA (código 54): câmera do aparelho sem
-   espaço (relato real do dono: "a foto não foi salva por falta de
-   espaço") ou captura cancelada — o navegador recebe NENHUM arquivo e
-   antes era silêncio: ele não sabia se o app leu, errou ou nem
-   recebeu. O 'cancel' não bubbla → escuta em captura; os dois eventos
-   podem disparar para a mesma volta, então dedup de 3 s. */
-function avisoFotoNaoChegou(){
-  const agora = Date.now();
-  if(agora < _fotoNaoChegouAte) return;
-  _fotoNaoChegouAte = agora + 3000;
-  toast('A foto <b>não chegou</b> ao sistema — o app da câmera cancelou ou falhou (às vezes avisa "falta de espaço" mesmo com o aparelho com espaço livre: force a parada do app <b>Câmera</b> e tente de novo). O scanner continua aberto.','warn');
-}
-document.addEventListener('cancel',e=>{
-  if(e.target && e.target.id==='fileScanFoto') avisoFotoNaoChegou();
-}, true);
-document.addEventListener('change',async e=>{
-  if(e.target && e.target.id==='fileScanFoto'){
-    const f = e.target.files[0];
-    if(!f){ avisoFotoNaoChegou(); return; }
-    toast('Lendo a foto…');
-    const alvoGuardado = scanTarget;
-    pararScanner();
-    scanTarget = alvoGuardado;
-    try{ await tentarLerFoto(f); }
-    finally{ scanTarget = null; scanFotoAte = Date.now() + 15000; }
-  }
-});
-document.addEventListener('click',e=>{
-  if(e.target.closest('#btnScanFoto')){
-    e.preventDefault();
-    /* Foto conta como uso por enquanto (o app da câmera fica em cima da
-       página e nenhum toque chega aqui): grace de 10 min — câmera de
-       aparelho SEM ESPAÇO demora (reprocessa e avisa erro) e a grace de
-       3 min do 52 ficava curta; se ele desistir, o relógio comum volta a
-       correr sozinho, sem furar a saída por inatividade. */
-    scanFotoAte = Date.now() + 600000;
-    /* Código 55: 1º a foto interna (takePhoto full-res, sem trocar de
-       app); a câmera do celular é o plano B — ela às vezes nem devolve
-       o arquivo (mensagem "sem espaço" enganosa, aparelho com 250 GB
-       livres). */
-    const inp = $('#fileScanFoto');
-    /* CÓDIGO 59 — ANTES de abrir a câmera do celular, fecha a NOSSA:
-       o app da câmera do Samsung é um monstro de memória (~400 MB) e o
-       Chrome DESCARTA a aba quando ele sobe com nossa câmera ainda
-       aberta (stream + canvases vivos em cima). Ao voltar, a página
-       reabre do zero — é o "reload" e a cortina "Restaurando sua
-       sessão" que o dono viu — e o arquivo da foto se perde no meio.
-       Com a aba leve (stream parado, canvases zerados), o Chrome quase
-       nunca descarta; e scanTarget é restaurado porque o handler do
-       arquivo (change) lê o alvo no momento em que a foto volta. */
-    const abrirCameraCelular = ()=>{
-      const alvo = scanTarget;
-      pararScanner();
-      scanTarget = alvo;
-      inp.value = '';
-      inp.click();
-    };
-    tentarFotoInterna().then(lido=>{
-      if(lido){ if(!scanContinuo) pararScanner(); return; }
-      toast('Não li pela foto interna — abrindo a câmera do celular…','warn');
-      abrirCameraCelular();
-    }).catch(abrirCameraCelular);
-  }
-});
-document.addEventListener('click',e=>{
-  const b = e.target.closest('[data-scan-target]');
-  if(!b) return;
-  e.preventDefault();
-  e.stopPropagation();
-  if(typeof abrirScanner !== 'function'){
-    console.error('[NII] abrirScanner não definida');
-    toast('Função do scanner não carregou. Recarregue a página.','bad');
-    return;
-  }
-  abrirScanner(b.dataset.scanTarget);
-});
-
-function carregarImagemArquivo(file){
-  return new Promise(resolve=>{
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = ()=>{ URL.revokeObjectURL(url); resolve(img); };
-    img.onerror = ()=>{ URL.revokeObjectURL(url); resolve(null); };
-    img.src = url;
-  });
-}
-
-async function tentarLerFoto(file){
-  const img = await carregarImagemArquivo(file);
-  if(!img){
-    toast('Não consegui abrir a imagem.','bad');
-    return;
-  }
-
-  /* ===== MEMÓRIA (código 58): o reload na página é estouro de RAM =====
-     Cada tentativa usa UM canvas e o libera na hora (width=height=0) antes
-     da próxima — nunca há mais de um canvas de foto vivo por vez. */
-  const estrategias = [
-    { escala: 1.0, filtro: null },
-    { escala: 0.7, filtro: 'grayscale(1) contrast(1.5)' },
-    { escala: 0.5, filtro: 'grayscale(1) contrast(1.8) brightness(1.05)' },
-    { escala: 1.5, filtro: 'grayscale(1) contrast(1.5)' }
-  ];
-
-  /* Teto de 2400 px no maior lado: foto de câmera moderna tem 12 MP e as
-     quatro estratégias em resolução cheia (a última ainda AMPLIAVA 1,5×)
-     travavam o aparelho por vários segundos no meio da leitura. Abaixo do
-     teto nada muda; acima, reduz só o que excede. */
-  const LIMITE = 2400;
-  const maxLado = Math.max(img.naturalWidth, img.naturalHeight) || 1;
-  const fatorMax = Math.min(1, LIMITE / maxLado);
-
-  const temNativo = ('BarcodeDetector' in window);
-  let detector = null;
-  if(temNativo){
-    try{
-      const suportados = await BarcodeDetector.getSupportedFormats();
-      const wanted = FORMATOS.filter(f => suportados.includes(f));
-      detector = new BarcodeDetector({ formats: wanted });
-    }catch(_){ detector = null; }
-  }
-
-  for(const est of estrategias){
-    let escala = est.escala * fatorMax;
-    if(est.escala > 1) escala = Math.min(LIMITE / maxLado, est.escala * fatorMax);
-    const c = document.createElement('canvas');
-    c.width  = Math.max(1, Math.round(img.naturalWidth  * escala));
-    c.height = Math.max(1, Math.round(img.naturalHeight * escala));
-    const x = c.getContext('2d');
-    if(est.filtro) x.filter = est.filtro;
-    x.drawImage(img, 0, 0, c.width, c.height);
-
-    if(detector){
-      try{
-        const codigos = await detector.detect(c);
-        c.width = c.height = 0;            /* devolve a RAM na hora (cód. 58) */
-        if(codigos && codigos.length){ aplicarLeitura(codigos[0].rawValue); return; }
-        continue;
-      }catch(err){ console.warn('detect tentativa falhou:', err); }
-    }
-    c.width = c.height = 0;                /* devolve a RAM na hora (cód. 58) */
-  }
-
-  try{
-    /* ===== ZXing SEM redecodificar o arquivo (cód. 58) =====
-       O Html5Qrcode.scanFile() redecodificava o arquivo da câmera do zero
-       (outros ~12 MP em RAM, em cima dos ~250 MB que já estão vivos) — era
-       um dos motivos do reload. Agora passamos um canvas JÁ reduzido a
-       1600 px: o ZXing tem seus próprios up/down-scales internos e não
-       perde nada de leitura, mas a memória de pico cai muito. O arquivo
-       original é usado só se nem o nativo nem o canvas reduzido existirem. */
-    const tmpId = 'scanFileTmp';
-    let tmp = document.getElementById(tmpId);
-    if(!tmp){ tmp = document.createElement('div'); tmp.id = tmpId; tmp.style.display='none'; document.body.appendChild(tmp); }
-    const html5 = new Html5Qrcode(tmpId, false);
-    const alvoCanvas = document.createElement('canvas');
-    const fatorZx = Math.min(1, 1600 / (maxLado || 1));
-    alvoCanvas.width  = Math.max(1, Math.round(img.naturalWidth  * fatorZx));
-    alvoCanvas.height = Math.max(1, Math.round(img.naturalHeight * fatorZx));
-    alvoCanvas.getContext('2d').drawImage(img, 0, 0, alvoCanvas.width, alvoCanvas.height);
-    /* CÓDIGO 61: scanFile só aceita ARQUIVO — o canvas direto falhava em
-       silêncio e o ZXing desta foto nunca rodava. Converte antes. */
-    const alvoZx = await canvasParaArquivo(alvoCanvas);
-    alvoCanvas.width = alvoCanvas.height = 0;   /* devolve a RAM na hora */
-    let res = null;
-    try{
-      if(alvoZx) res = await html5.scanFile(alvoZx, false);
-    }catch(zErr){
-      console.warn('scanFile no arquivo reduzido falhou:', zErr);
-    }
-    try{ html5.clear(); }catch(_){}
-    if(res != null){ aplicarLeitura(res); return; }
-    toast('Não consegui ler o código nesta foto. Aproxime mais e deixe o código ocupar boa parte do quadro.','bad');
-  }catch(err){
-    console.error('scanFile falhou:', err);
-    toast('Não consegui ler o código nesta foto. Aproxime mais e deixe o código ocupar boa parte do quadro.','bad');
-  }
-}
-
-async function preProcessarImagem(bitmap){
-  const c = document.createElement('canvas');
-  c.width = bitmap.width; c.height = bitmap.height;
-  const x = c.getContext('2d');
-  x.filter = 'grayscale(1) contrast(1.8) brightness(1.1)';
-  x.drawImage(bitmap, 0, 0);
-  return c;
-}
 
 /* ============== SELECTS AUXILIARES ============== */
 let selSig='';
@@ -6770,18 +5421,19 @@ $('#btnAddEq').addEventListener('click',()=>{
   addEqForm(id);
 });
 $('#empEqSel').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('#btnAddEq').click();}});
-/* ===== CÓDIGO 62 — CAMINHO SEM CÂMERA (pedido do dono, 22/10) =====
-   O scanner do app não lê no aparelho dele; mas o AppSheet e a câmera
-   do Samsung leem. Agora ele lê lá fora, COPIA o número e cola aqui:
-   o app normaliza (só números), acha a unidade no cadastro, confere se
-   ela está liberada e adiciona ao empréstimo — sem 12 dígitos na unha
-   e sem depender do ML Kit/ZXing. Colar no campo já adiciona sozinho. */
+/* ===== CÓDIGO 62/63 — ENTRADA DO NÚMERO SEM CÂMERA =====
+   Decisão do dono (63): o app NÃO lê código pela câmera — a leitura
+   acontece fora (AppSheet, câmera do celular ou leitor USB) e o número
+   entra aqui por digitação/colagem. O app normaliza (só números), acha
+   a unidade no cadastro, confere se ela está liberada e adiciona ao
+   empréstimo — sem 12 dígitos na unha. Colar no campo já adiciona
+   sozinho; o leitor USB digita sozinho e o Enter confirma. */
 function colarPatrimonioEmp(){
   const inp=$('#empPatCola');
   if(!inp)return;
-  const digitos=normalizarCodigoLido(inp.value);
+  const digitos=soDigitos(inp.value);
   if(!digitos)return toast('Cole ou digite o número do patrimônio (ex.: 100001163744).','warn');
-  const achados=db.equipamentos.filter(e=>normalizarCodigoLido(e.patrimonio)===digitos);
+  const achados=db.equipamentos.filter(e=>soDigitos(e.patrimonio)===digitos);
   if(!achados.length){
     return toast(digitos.length!==12
       ? 'Número com '+digitos.length+' dígito(s) — a etiqueta do Estado tem 12 (ex.: 100001163744). Confira o que foi colado.'
@@ -7982,7 +6634,6 @@ $('#btnConfOk').addEventListener('click',()=>{const cb=confCb;fecharModais();cb&
 function fecharModais(){
   $$('.modal-overlay').forEach(m=>m.classList.remove('show'));
   confCb=null;devId=null;
-  pararScanner();
 }
 $$('.modal-overlay').forEach(m=>m.addEventListener('click',e=>{if(e.target===m||e.target.closest('[data-close]'))fecharModais();}));
 document.addEventListener('keydown',e=>{if(e.key==='Escape')fecharModais();});
@@ -8210,8 +6861,8 @@ $('#btnGuiaBkpTxt').addEventListener('click',()=>{
 
 /* ============== INVENTÁRIO PATRIMONIAL (código 45) ============== */
 /* Coleta anual: um inventário por ano, conferência bens a bens dentro de
-   cada setor — com busca por parte do patrimônio, Enter, toque na linha ou
-   câmera lendo etiqueta em sequência. As conferências ficam em UM documento
+   cada setor — com busca por parte do patrimônio, Enter no primeiro
+   resultado ou toque na linha para confirmar. As conferências ficam em UM documento
    por inventário×setor (sistema/invC_…) — nunca dentro da seção
    equipamentos, que passa de 1 MiB num doc só e não aceita gravação em
    massa. O db guarda um espelho (db.invConfs) que entra sozinho no backup
@@ -8500,17 +7151,6 @@ $('#invBusca').addEventListener('input',()=>invRenderSetor());
    (o input vive fora do innerHTML, então o termo digitado permanece). */
 $('#invBuscaSetor').addEventListener('input',()=>{
   if(invSelId&&$('#invPainel').style.display!=='none')invRenderPainel(invDe(invSelId));
-});
-$('#invBusca').addEventListener('leitura',e=>{
-  /* veio da câmera: confirma o código lido na hora (fluxo de coleta) */
-  const dig=soDigitos(e.detail&&e.detail.digitos);
-  if(!dig)return;
-  if($('#modalInvDiv').classList.contains('show'))return;   /* divergência esperando resposta */
-  const alvo=db.equipamentos.find(x=>soDigitos(x.patrimonio)===dig);
-  if(!alvo){toast('Patrimônio <b class="mono">'+esc(dig)+'</b> não encontrado no cadastro.','bad');return;}
-  invConferir(alvo.id,{});
-  $('#invBusca').value='';
-  invRenderSetor();
 });
 $('#btnInvVoltar').addEventListener('click',()=>{invSetorAtual=null;invTela('painel');invRender();});
 $('#btnInvConcluir').addEventListener('click',()=>{
