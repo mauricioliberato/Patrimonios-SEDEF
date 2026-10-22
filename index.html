@@ -786,6 +786,25 @@
         (abrirCameraCelular), com scanTarget restaurado para o handler
         do arquivo; aba leve quase nunca é descartada.
 
+    60. 📋🔍 Inventário no celular: linha clicável + filtro de setores
+        — código 60 (22/10). Pedidos do dono: (1) "poder clicar na linha
+        por exemplo do setor e já abrir para começar a fazer o
+        inventário — hoje preciso clicar em Conferir e isso no celular
+        fica meio complicado pois tenho que rolar a tela para a direita
+        até chegar no botão"; (2) "ter uma busca no inicio pelo setor,
+        como tenho muitos setores facilita na hora ao invés de ficar
+        procurando rolando a tela do celular". O que mudou: (1) a <tr>
+        de cada setor ganhou data-invsetor (o closest do handler
+        existente acha o botão OU a linha — os dois abrem o mesmo
+        setor) e cursor:pointer — QUALQUER toque na linha já abre a
+        conferência, sem rolar até o botão; (2) novo input
+        #invBuscaSetor (type="search", ✕ de limpar nativo) acima da
+        tabela, que filtra os setores por NOME ignorando caixa e
+        acentos (semAcento: NFD + remove combining marks — "secretaria"
+        acha "Secretária"); vazio mostra "nenhum setor com esse nome";
+        o termo permanece entre redesenhos (o input vive fora do
+        innerHTML) e só redesenha o painel.
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -793,7 +812,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261022-111420">
+<meta name="nii-build" content="20261022-114046">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -2345,6 +2364,17 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
           <div class="card-h"><h3 id="invPainelTitulo">—</h3><span class="sub" id="invPainelSub"></span></div>
           <div class="card-b">
             <div class="inv-kpis" id="invKpis"></div>
+            <!-- CÓDIGO 60 — FILTRO DE SETORES: com muitos setores, achar um
+                 deles no celular virava rolagem infinita. type="search" traz o
+                 ✕ de limpar nativo do Android; filtra por nome, ignorando
+                 caixa e acentos ("secretaria" acha "Secretária"). -->
+            <div class="row" style="gap:8px;margin:10px 0;align-items:center">
+              <input id="invBuscaSetor" type="search" placeholder="🔍 Filtre o setor pelo nome…" style="flex:1;min-width:200px" autocomplete="off">
+              <span class="subtle" id="invSetoresVazio" style="display:none">nenhum setor com esse nome.</span>
+            </div>
+            <!-- Linha inteira clicável (cód. 60): o toque em QUALQUER célula
+                 abre o setor — no celular não precisa mais rolar até o
+                 botão "▶ Conferir" no fim da tabela. -->
             <div style="overflow-x:auto"><table id="invTabelaSetores"></table></div>
             <p class="subtle" id="invSemSetores" style="display:none">Cadastre os setores primeiro (menu Cadastros auxiliares → Setores).</p>
           </div>
@@ -8163,7 +8193,13 @@ function invRenderPainel(inv){
     '<div class="inv-kpi"><b>'+(p.total-p.conf)+'</b><span>a conferir</span></div>'+
     '<div class="inv-kpi"><b>'+p.concluidos+'/'+p.qtdSetores+'</b><span>setores concluídos</span></div>'+
     (semSetor?'<div class="inv-kpi" style="min-width:210px"><b>⚠ '+semSetor+'</b><span>sem setor — fora do inventário</span></div>':'');
-  const linhas=db.setores.map(s=>{
+  /* CÓDIGO 60 — FILTRO DE SETORES: "tenho muitos setores… facilita na
+     hora ao invés de ficar procurando rolando a tela do celular". O
+     termo ignora CAIXA e ACENTOS ("secretaria" acha "Secretária"). */
+  const semAcento=(s)=>(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+  const termoSetor=semAcento($('#invBuscaSetor')?$('#invBuscaSetor').value:'');
+  const setoresLista=db.setores.filter(s=>!termoSetor||semAcento(setNome(s.id)).includes(termoSetor));
+  const linhas=setoresLista.map(s=>{
     const cs=invConfsSetor(inv.id,s.id);
     let total=0,conf=0;
     for(const e of db.equipamentos){
@@ -8174,7 +8210,11 @@ function invRenderPainel(inv){
     }
     const fechado=!!(inv.setores&&inv.setores[s.id]);
     const pc=total?Math.round(conf*100/total):(fechado?100:0);
-    return '<tr>'+
+    /* CÓDIGO 60 — LINHA INTEIRA CLICÁVEL: data-invsetor também na <tr>
+       (o closest do handler existente acha o botão ou a linha — os dois
+       abrem o mesmo setor). No celular o toque em qualquer célula já
+       abre: não precisa rolar até o botão "▶ Conferir". */
+    return '<tr data-invsetor="'+s.id+'" style="cursor:pointer">'+
       '<td>'+esc(setNome(s.id))+'</td>'+
       '<td class="mono">'+total+'</td>'+
       '<td class="mono">'+conf+'</td>'+
@@ -8186,6 +8226,7 @@ function invRenderPainel(inv){
   $('#invTabelaSetores').innerHTML=linhas
     ?'<thead><tr><th>Setor</th><th>Bens</th><th>Conferidos</th><th>Progresso</th><th>Situação</th><th></th></tr></thead><tbody>'+linhas+'</tbody>'
     :'';
+  $('#invSetoresVazio').style.display=(db.setores.length&&!setoresLista.length)?'':'none';
   $('#invSemSetores').style.display=db.setores.length?'none':'';
 }
 $('#invTabelaSetores').addEventListener('click',e=>{
@@ -8319,6 +8360,11 @@ $('#invBusca').addEventListener('keydown',e=>{
   invConferir(primeira.dataset.id,{});
 });
 $('#invBusca').addEventListener('input',()=>invRenderSetor());
+/* CÓDIGO 60: o filtro de setores do painel — redesenha só o painel
+   (o input vive fora do innerHTML, então o termo digitado permanece). */
+$('#invBuscaSetor').addEventListener('input',()=>{
+  if(invSelId&&$('#invPainel').style.display!=='none')invRenderPainel(invDe(invSelId));
+});
 $('#invBusca').addEventListener('leitura',e=>{
   /* veio da câmera: confirma o código lido na hora (fluxo de coleta) */
   const dig=soDigitos(e.detail&&e.detail.digitos);
