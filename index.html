@@ -805,6 +805,28 @@
         o termo permanece entre redesenhos (o input vive fora do
         innerHTML) e só redesenha o painel.
 
+    61. 🔄🔍 TROCA DE LEITOR CONCERTADA + ZXing que NÃO lia (2 bugs) —
+        código 61 (22/10). O dono mandou o PRINT da sequência: a troca
+        para o ZXing DISPAROU ("troca de leitor → ZXing…") e derrubou
+        "Não foi possível acessar a câmera", fechando o scanner. Três
+        achados de auditoria. (A) TROCA MORRIA NA CÂMERA: o HAL do S23+
+        demora ~1 s para liberar a lente depois de fechar um stream de
+        4K (a captura era 2160×3840); reabríamos em 120 ms e o Chrome
+        recusava. Agora a troca espera 900 ms (só se o scanner ainda
+        estiver aberto) e, se o ZXing ainda assim falhar, o abrirScanner
+        VOLTA PARA O ML KIT dentro do MESMO modal (queda elegante —
+        antes ele fechava e jogava o dono na tela inicial). (B) BUG DO
+        58: o recorte "fiel" que virava a fonte do ZXing era ZERADO
+        (c.width=0) logo em seguida — a "segunda opinião" lia um canvas
+        EM BRANCO e nunca achava NADA (por isso ela não mudava nada). Agora
+        os fiéis (e a base) ficam vivos até o ZXing rezar sobre cada um —
+        base cheia → 75% → 50%, do maior ao menor — zerados depois. (C)
+        BUG DO 57/58: o scanFile do html5-qrcode só aceita ARQUIVO
+        (File/Blob); passar canvas falhava em SILÊNCIO (createObjectURL
+       (canvas) lança) — ou seja, o ZXing desta foto NUNCA RODAVA. Novo
+        canvasParaArquivo() converte canvas→JPEG File; usado na segunda
+        opinião E no caminho da 📸 Usar foto (que também passava canvas).
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -812,7 +834,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261022-114046">
+<meta name="nii-build" content="20261022-141105">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -4261,8 +4283,22 @@ async function abrirScanner(targetId){
        é forçado a NÃO delegar para o BarcodeDetector (linha do config),
        senão seria o MESMO ML Kit de antes com outro nome. */
     if(scanLeitorAtual === 'zxing'){
-      await iniciarScannerHtml5(true);
-      return;
+      try{
+        await iniciarScannerHtml5(true);
+        return;
+      }catch(eZX){
+        /* CÓDIGO 61 — QUEDA ELEGANTE (relato/print do dono: a troca
+           derrubava "Não foi possível acessar a câmera" e FECHAVA o
+           scanner, voltando à tela inicial). Se o ZXing não abrir a
+           câmera, volta para o ML Kit DENTRO DO MESMO MODAL — a
+           câmera acabou de provar que responde (o outro leitor a
+           estava usando); só o decoder muda, o usuário nem percebe. */
+        console.warn('ZXing não abriu a câmera, voltando para o ML Kit:', eZX);
+        $('#scanReader').innerHTML = '';
+        scanLeitorAtual = 'nativo';
+        try{ await iniciarScannerNativo(); return; }
+        catch(_){ /* sem câmera de verdade: cai no erro comum abaixo */ }
+      }
     }
     if('BarcodeDetector' in window){
       try{ await iniciarScannerNativo(); return; }
@@ -4300,7 +4336,14 @@ function trocarLeitorSePrecisar(){
     toast('troca de leitor → '+nome+' (o outro não confirmou nada em 30 s)…','warn');
     pararScanner(true);   /* true = mantém a escolha do leitor na troca */
     scanTarget = alvo;
-    abrirScanner(alvo);   /* async com try/catch interno */
+    /* CÓDIGO 61 — FOLGA PARA O HAL LIBERAR A LENTE: relato real do dono
+       (print): a troca para o ZXing derrubava "Não foi possível acessar
+       a câmera" e fechava o scanner. O HAL do S23+ demora ~1 s para
+       liberar a lente depois de fechar um stream de 4K; reabrir em
+       120 ms (o atraso comum do abrirScanner) faz o Chrome recusar.
+       Reabre com 900 ms de folga — e só se o scanner ainda estiver
+       aberto (o dono pode ter cancelado no meio). */
+    setTimeout(()=>{ if(scanTarget===alvo) abrirScanner(alvo); }, 900);
   }catch(_){}
 }
 
@@ -4738,7 +4781,14 @@ async function detectarNaFotoViva(detector, direto){
       const fracZ = Math.max(0.25, Math.min(0.9, 1 / scanZoomAtual));
       recortes.unshift([fracZ, 1], [fracZ, 2]);
     }
-    let baseUsada = base;
+    /* CÓDIGO 61 — CORREÇÃO DE BUG (58/59): o recorte "fiel" escolhido era
+       ZERADO (c.width=c.height=0) logo DEPOIS de virar a fonte do ZXing —
+       a "segunda opinião" lia um canvas EM BRANCO e nunca achava nada (era
+       por isso que ela não mudava nada no aparelho do dono). Agora os
+       recortes fiéis (e a base) ficam VIVOS até o ZXing rezar sobre cada
+       um — do MAIOR ao menor (mais contexto primeiro) — e são zerados
+       logo depois, na mesma disciplina de memória do 58. */
+    const fieis = [base];   /* base cheia + recortes fiéis (esc===1) */
     for(const [frac, esc] of recortes){
       const w = Math.max(1, Math.round(base.width  * frac));
       const h = Math.max(1, Math.round(base.height * frac));
@@ -4751,26 +4801,36 @@ async function detectarNaFotoViva(detector, direto){
       x.drawImage(base, (base.width - w) / 2, (base.height - h) / 2, w, h, 0, 0, c.width, c.height);
       try{
         const codigos = await detector.detect(c);
-        if(codigos && codigos.length){ base.width = base.height = 0; return codigos; }
+        if(codigos && codigos.length){
+          c.width = c.height = 0;
+          for(const f of fieis){ if(f!==base) f.width = f.height = 0; }
+          base.width = base.height = 0;
+          return codigos;
+        }
       }catch(_){}
-      if(esc === 1){ baseUsada = c; }   /* o maior recorte fiel vira a fonte do ZXing */
-      c.width = c.height = 0;
+      if(esc === 1){ fieis.push(c); }   /* fiel (sem ampliação): fonte honesta do ZXing */
+      else c.width = c.height = 0;
     }
     /* SEGUNDA OPINIÃO — ZXing embutido (código 57): o ML Kit devolveu
        nada. O ZXing reza com binarizador híbrido próprio: acha 1D em
        foto "mole" onde o ML Kit passa em branco (e vice-versa). CÓDIGO
-       58: recebe uma cópia já reduzida a ≤1600 px — mesma leitura (o
-       ZXing tem scale interno), sem o dobro de RAM que derrubava a aba;
-       e a fonte é o RECORTE CENTRAL FIEL, que é o que enxerga a
-       etiqueta miúda (o quadro cheio não dava conta a ~1 m). */
-    const zx = document.createElement('canvas');
-    const fatorZx = Math.min(1, 1600 / (baseUsada.width > baseUsada.height ? baseUsada.width : baseUsada.height));
-    zx.width  = Math.max(1, Math.round(baseUsada.width  * fatorZx));
-    zx.height = Math.max(1, Math.round(baseUsada.height * fatorZx));
-    zx.getContext('2d').drawImage(baseUsada, 0, 0, zx.width, zx.height);
-    base.width = base.height = 0;            /* devolve a base na hora */
-    const segundo = await segundaOpiniaoFoto(zx);
-    zx.width = zx.height = 0;                /* devolve a RAM na hora */
+       61: tenta a base INTEIRA (a foto da câmera do celular lia assim,
+       com sucesso histórico) e depois os recortes fiéis — todos
+       reduzidos a ≤1600 px (mesma leitura; o ZXing tem scale interno),
+       sem o dobro de RAM que derrubava a aba. */
+    let segundo = null;
+    for(const fonte of fieis){
+      const zx = document.createElement('canvas');
+      const lado = Math.max(fonte.width, fonte.height) || 1;
+      const fZx = Math.min(1, 1600 / lado);
+      zx.width  = Math.max(1, Math.round(fonte.width  * fZx));
+      zx.height = Math.max(1, Math.round(fonte.height * fZx));
+      zx.getContext('2d').drawImage(fonte, 0, 0, zx.width, zx.height);
+      segundo = await segundaOpiniaoFoto(zx);
+      zx.width = zx.height = 0;                /* devolve a RAM na hora */
+      if(segundo) break;
+    }
+    for(const f of fieis){ f.width = f.height = 0; }   /* devolve tudo */
     if(segundo) return [{ rawValue: segundo }];
     return [];
   }catch(_){ scanAssistFalhas++; return null; }
@@ -4785,6 +4845,18 @@ async function detectarNaFotoViva(detector, direto){
    perde leitura, mas a memória de pico cai de ~12 MP para ~1600 px, que
    é o que segura o reload da página no aparelho do dono. */
 let _h5Segunda = null;
+/* CÓDIGO 61: o scanFile do html5-qrcode só aceita ARQUIVO (File/Blob) —
+   passar um canvas falhava em SILÊNCIO (createObjectURL(canvas) lança) e
+   a "segunda opinião" nunca lia nada. Converte canvas → JPEG File. */
+function canvasParaArquivo(c){
+  return new Promise(res=>{
+    if(!c || !c.toBlob){ res(null); return; }
+    c.toBlob(b=>{
+      if(!b){ res(null); return; }
+      res((typeof File !== 'undefined') ? new File([b], 'foto-scan.jpg', { type: 'image/jpeg' }) : b);
+    }, 'image/jpeg', 0.9);
+  });
+}
 async function segundaOpiniaoFoto(fonte){
   try{
     if(typeof Html5Qrcode === 'undefined' || !fonte) return null;
@@ -4793,8 +4865,10 @@ async function segundaOpiniaoFoto(fonte){
       if(!tmp){ tmp = document.createElement('div'); tmp.id = 'scanSegundaOpiniao'; tmp.style.display='none'; document.body.appendChild(tmp); }
       _h5Segunda = new Html5Qrcode('scanSegundaOpiniao', false);
     }
+    const arq = (fonte instanceof Blob) ? fonte : await canvasParaArquivo(fonte);
+    if(!arq) return null;
     const r = await Promise.race([
-      _h5Segunda.scanFile(fonte, false),
+      _h5Segunda.scanFile(arq, false),
       new Promise((_,rej)=>setTimeout(()=>rej(new Error('ZXing sem resposta')), 6000))
     ]);
     const txt = (typeof r === 'string') ? r : (r && r.decodedText ? r.decodedText : null);
@@ -5403,13 +5477,15 @@ async function tentarLerFoto(file){
     alvoCanvas.width  = Math.max(1, Math.round(img.naturalWidth  * fatorZx));
     alvoCanvas.height = Math.max(1, Math.round(img.naturalHeight * fatorZx));
     alvoCanvas.getContext('2d').drawImage(img, 0, 0, alvoCanvas.width, alvoCanvas.height);
+    /* CÓDIGO 61: scanFile só aceita ARQUIVO — o canvas direto falhava em
+       silêncio e o ZXing desta foto nunca rodava. Converte antes. */
+    const alvoZx = await canvasParaArquivo(alvoCanvas);
+    alvoCanvas.width = alvoCanvas.height = 0;   /* devolve a RAM na hora */
     let res = null;
     try{
-      res = await html5.scanFile(alvoCanvas, false);
+      if(alvoZx) res = await html5.scanFile(alvoZx, false);
     }catch(zErr){
-      console.warn('scanFile no canvas reduzido falhou:', zErr);
-    }finally{
-      alvoCanvas.width = alvoCanvas.height = 0;   /* devolve a RAM na hora */
+      console.warn('scanFile no arquivo reduzido falhou:', zErr);
     }
     try{ html5.clear(); }catch(_){}
     if(res != null){ aplicarLeitura(res); return; }
