@@ -706,6 +706,33 @@
         … zoom de software 1–4×". Física continua valendo: ~30–40 cm
         é a distância amigável; a ~1 m nem o AppSheet nativo lê.
 
+    57. 📸🔍 NITIDEZ + SEGUNDA OPINIÃO (ZXing) + ponteiro da câmera do
+        celular (código 57): dono relata "continua a mesma coisa". Dado
+        novo dos relatos: a ÚNICA coisa que já leu com segurança no
+        S23+ foi a foto vindo do APP DA CÂMERA DO SAMSUNG — tudo pelo
+        Chrome falha ou lê errado. Diagnóstico: o HAL do Samsung AFIA a
+        etiqueta antes de salvar (por isso a foto dele lia); os quadros
+        e takePhoto do Chrome chegam "moles" e o ML Kit passa em
+        branco. O que mudou: (1) SVG #niiNitidez (feConvolveMatrix
+        3×3 de afiação, logo após <body>) usado como VARIANTE de
+        pré-processamento — 'url(#niiNitidez) grayscale(1)
+        contrast(1.6)' como 2ª estratégia na foto automática E na 📸
+        Usar foto (se o navegador não suitar o filtro, a variante vira
+        quadro cru, sem dano); (2) SEGUNDA OPINIÃO: função
+        segundaOpiniaoFoto(blob) — quando o ML Kit devolve nada na
+        foto, o ZXing embutido no html5-qrcode 2.3.8 (dependência
+        antiga da página, nada novo para baixar) reza sobre o ARQUIVO
+        ORIGINAL via scanFile, com binarizador híbrido próprio que
+        acha 1D em foto "mole" onde o ML Kit passa em branco —
+        instância única escondida (#scanSegundaOpiniao), timeout 6 s,
+        entrega via [{rawValue}] no MESMO canal dos votos da família;
+        (3) PONTEIRO DA CÂMERA DO CELULAR: contadores
+        scanSemLeitura/scanSemLeituraAvisado — 5 fotos automáticas
+        seguidas sem nada e o rodapé passa a dizer "📸 Usar foto: a
+        câmera do celular lê estas etiquetas" (resete na leitura
+        confirmada e ao fechar o scanner), com aviso imediato no
+        #scanStatus na 5ª falha.
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -713,7 +740,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261022-093418">
+<meta name="nii-build" content="20261022-100157">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -1153,6 +1180,15 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
 </style>
 </head>
 <body>
+<!-- NITIDEZ (código 57): filtro de convolução 3×3 usado como variante de
+     pré-processamento nas fotos. O app da câmera do Samsung AFIA a
+     etiqueta antes de salvar — por isso a foto dele lia e os quadros
+     crus do Chrome chegam "moles" e passam em branco no leitor. -->
+<svg id="svgFiltros" width="0" height="0" style="position:absolute" aria-hidden="true">
+  <filter id="niiNitidez" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+    <feConvolveMatrix order="3" preserveAlpha="true" kernelMatrix="0 -1 0 -1 5 -1 0 -1 0"/>
+  </filter>
+</svg>
 
 <div class="app">
   <aside class="sidebar">
@@ -4092,6 +4128,7 @@ let scanUltHora = 0;
 let scanFotoAte = 0;         /* até quando a captura de foto conta como uso (grça p/ inatividade) */
 let scanHtml5UltimaVez = 0, scanHtml5SemAviso = false, scanIdleTimer = null;   /* rodapé do caminho html5 */
 let scanAssistOcupada = false, scanAssistProx = 0, scanAssistTentou = 0;       /* auxílio da foto ao vivo (código 51) */
+let scanSemLeitura = 0, scanSemLeituraAvisado = false;   /* fotos sem nada seguidas → aponta a câmera do celular (57) */
 let detectorAssist = null;                                                      /* leitor do auxílio no caminho html5 */
 let scanAssistFalhas = 0;                                                       /* takePhoto falhando seguido? (código 52) */
 let scanFocoTimer = null, scanFocoIdx = 0, scanVistoEm = 0;                     /* varredura de foco p/ aparelhos só-manual (código 52) */
@@ -4115,6 +4152,8 @@ async function abrirScanner(targetId){
     scanVotos = { ultimo: null, contagem: 0 };
     scanAssistProx = 0;   /* auxílio da foto ao vivo: primeira tentativa liberada na hora */
     scanAssistTentou = 0;
+    scanSemLeitura = 0;
+    scanSemLeituraAvisado = false;
     scanAssistFalhas = 0;
     scanVistoEm = 0;
     scanZoomAtual = 1;
@@ -4465,6 +4504,7 @@ function confirmarLeitura(bruto){
     const pronto = scanVotos.ultimo;
     scanVotos = { ultimo: null, contagem: 0 };
     scanTrocas = 0;   /* leitura fechou: quadro bom, calmaria */
+    scanSemLeitura = 0; scanSemLeituraAvisado = false;   /* leu: some a dica da câmera do celular (57) */
     $('#scanStatus').textContent = 'lido ✓ ' + pronto;
     return pronto;   /* devolve os DÍGITOS a aplicar (string = verdadeiro) */
   }
@@ -4497,8 +4537,9 @@ async function detectarNaFotoViva(detector){
       scanFotoDims = bmp.width+'×'+bmp.height;
       try{ const g=$('#scanHint'); if(g) g.innerHTML += ' · Foto: <b>'+scanFotoDims+'</b>'; }catch(_){}
     }
-    /* Mesmo teto de 2400 px e as MESMAS quatro estratégias da 📸 Usar
-       foto — só muda a origem (aqui, o disparo automático de quem mira). */
+    /* Mesmo teto de 2400 px e as MESMAS cinco estratégias da 📸 Usar
+       foto (cru + afiada + escalas + recortes) — só muda a origem
+       (aqui, o disparo automático de quem mira). */
     const LIMITE = 2400;
     const maxLado = Math.max(bmp.width, bmp.height) || 1;
     const fatorMax = Math.min(1, LIMITE / maxLado);
@@ -4507,8 +4548,15 @@ async function detectarNaFotoViva(detector){
     base.height = Math.max(1, Math.round(bmp.height * fatorMax));
     base.getContext('2d').drawImage(bmp, 0, 0, base.width, base.height);
     if(bmp.close) bmp.close();
+    /* AFIAÇÃO (código 57): o app da câmera do Samsung afia a etiqueta
+       antes de salvar — por isso a foto dele lia e os quadros crus do
+       Chrome não. Esta variante aplica o mesmo tipo de afiação
+       (convolução 3×3 do SVG #niiNitidez) antes do contraste. Se o
+       navegador não suitar o filtro, a variante vira o quadro cru —
+       sem dano, a primeira já é o cru. */
     const estrategias = [
       { escala: 1.0, filtro: null },
+      { escala: 1.0, filtro: 'url(#niiNitidez) grayscale(1) contrast(1.6)' },
       { escala: 0.7, filtro: 'grayscale(1) contrast(1.5)' },
       { escala: 0.5, filtro: 'grayscale(1) contrast(1.8) brightness(1.05)' },
       { escala: 1.5, filtro: 'grayscale(1) contrast(1.5)' }
@@ -4574,8 +4622,41 @@ async function detectarNaFotoViva(detector){
       }
     }
     base.width = base.height = 0;
+    /* SEGUNDA OPINIÃO — ZXing embutido (código 57): o ML Kit devolveu
+       nada nesta foto. O ZXing da 📸 Usar foto — o MESMO caminho que já
+       leu no aparelho do dono (foto da câmera do celular) — reza em
+       cima do ARQUIVO ORIGINAL, com binarizador híbrido próprio: acha
+       1D em foto "mole" onde o ML Kit passa em branco (e vice-versa). */
+    const segundo = await segundaOpiniaoFoto(foto);
+    if(segundo) return [{ rawValue: segundo }];
     return [];
   }catch(_){ scanAssistFalhas++; return null; }
+}
+
+/* SEGUNDA OPINIÃO NA FOTO (código 57): o html5-qrcode (ZXing embutido)
+   já está na página desde o código 1 — nada novo para baixar. Instância
+   única e escondida, só para o auto-auxílio; o caminho manual continua
+   com o seu scanFile de sempre. */
+let _h5Segunda = null;
+async function segundaOpiniaoFoto(blob){
+  try{
+    if(typeof Html5Qrcode === 'undefined' || !blob) return null;
+    if(!_h5Segunda){
+      let tmp = document.getElementById('scanSegundaOpiniao');
+      if(!tmp){ tmp = document.createElement('div'); tmp.id = 'scanSegundaOpiniao'; tmp.style.display='none'; document.body.appendChild(tmp); }
+      _h5Segunda = new Html5Qrcode('scanSegundaOpiniao', false);
+    }
+    const arq = (typeof File !== 'undefined')
+      ? new File([blob], 'foto-viva.jpg', { type: blob.type || 'image/jpeg' })
+      : blob;
+    const r = await Promise.race([
+      _h5Segunda.scanFile(arq, false),
+      new Promise((_,rej)=>setTimeout(()=>rej(new Error('ZXing sem resposta')), 6000))
+    ]);
+    const txt = (typeof r === 'string') ? r : (r && r.decodedText ? r.decodedText : null);
+    if(txt) console.log('[NII] segunda opinião (ZXing) leu:', txt);
+    return txt;
+  }catch(_){ return null; }
 }
 
 /* Dispara com intervalo mínimo e trava anti-sobreposição: o caminho
@@ -4593,7 +4674,19 @@ async function assistenciaPorFoto(detector, aoVer){
     const det = detector || await obterDetectorAssist();
     if(!det) return;
     const codigos = await detectarNaFotoViva(det);
-    if(codigos && codigos.length && scanAtivo) aoVer(codigos);
+    if(codigos && codigos.length && scanAtivo){
+      aoVer(codigos);
+    } else if(scanAtivo && codigos){
+      /* CINCO fotos seguidas sem nada (código 57): o automático já
+         esgotou o repertório (cru, afiado, tratado, recortes 2×/3×,
+         região do zoom, ZXing). O caminho que já leu no aparelho do
+         dono é a foto da CÂMERA DO CELULAR — aponta o botão. */
+      scanSemLeitura++;
+      if(scanSemLeitura >= 5 && !scanSemLeituraAvisado){
+        scanSemLeituraAvisado = true;
+        try{ $('#scanStatus').textContent = 'a foto automática não leu — toque em 📸 Usar foto (a câmera do celular lê estas etiquetas)…'; }catch(_){}
+      }
+    }
   }finally{ scanAssistOcupada = false; }
 }
 
@@ -4675,13 +4768,17 @@ function modoSoFoto(){
    — "automática ativa" = fotografou e não leu; "automática sem resposta"
    = o takePhoto do aparelho está morto (aí só a 📸 manual resolve). */
 function rodapeSemCodigo(){
+  /* Dica da câmera do celular (código 57): depois de 5 fotos automáticas
+     sem nada, o app para de insistir sozinho e aponta o caminho que já
+     leu no aparelho do dono. */
+  const dica = (scanSemLeitura >= 5) ? ' · 📸 Usar foto: a câmera do celular lê estas etiquetas' : '';
   if(modoSoFoto()){
-    return 'nenhum código na foto — aproxime (uns 30 cm) (ou 📸 Usar foto)' +
+    return 'nenhum código na foto — aproxime (uns 30 cm) (ou 📸 Usar foto)' + dica +
       (scanAssistFalhas >= 3 ? ' · 📸 automática sem resposta' :
        scanAssistTentou  > 0 ? ' · 📸 automática ativa' : '') +
       ' · leitura pela foto (vídeo só mira)';
   }
-  return 'nenhum código no quadro — aproxime (uns 30 cm) ou suba o zoom (ou 📸 Usar foto)' +
+  return 'nenhum código no quadro — aproxime (uns 30 cm) ou suba o zoom (ou 📸 Usar foto)' + dica +
     (scanAssistFalhas >= 3 ? ' · 📸 automática sem resposta' :
      scanAssistTentou  > 0 ? ' · 📸 automática ativa' : '');
 }
@@ -4946,6 +5043,8 @@ function pararScanner(){
      scanAssistOcupada quem zera é o finally do disparo em voo). */
   scanAssistProx = 0;
   scanAssistTentou = 0;
+  scanSemLeitura = 0;
+  scanSemLeituraAvisado = false;
   scanAssistFalhas = 0;
   /* Modo só-foto: próxima sessão começa em modo normal (zoom novo = stream novo). */
   scanZoomAtual = 1;
@@ -5048,8 +5147,12 @@ async function tentarLerFoto(file){
     return;
   }
 
+  /* AFIAÇÃO (código 57): mesma convolução da foto automática — a foto
+     da câmera do celular já vem afiada pelo HAL do Samsung; fotos de
+     print/edição chegam moles e esta variante equaliza. */
   const estrategias = [
     { escala: 1.0, filtro: null },
+    { escala: 1.0, filtro: 'url(#niiNitidez) grayscale(1) contrast(1.6)' },
     { escala: 0.7, filtro: 'grayscale(1) contrast(1.5)' },
     { escala: 0.5, filtro: 'grayscale(1) contrast(1.8) brightness(1.05)' },
     { escala: 1.5, filtro: 'grayscale(1) contrast(1.5)' }
