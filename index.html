@@ -827,6 +827,20 @@
         canvasParaArquivo() converte canvas→JPEG File; usado na segunda
         opinião E no caminho da 📸 Usar foto (que também passava canvas).
 
+    62. 📋 COLAR O Nº DO PATRIMÔNIO (sem câmera) — código 62 (22/10). O
+        dono desistiu do scanner do app ("realmente não dá certo") e
+        escolheu o plano B: o AppSheet/câmera do Samsung continua
+        LENDO, e o nosso sistema recebe o número sem digitação. No
+        formulário de Empréstimo, embaixo do combo de equipamentos,
+        campo novo "Cole aqui o nº do patrimônio" + botão 📋 Abrir:
+        cola (ou digita) o número → o app normaliza (só números), acha
+        a unidade no cadastro, confere se existe (avisando se o número
+        tem ≠12 dígitos ou se há mais de uma unidade igual) e se está
+        liberada (Indisponível / em outro empréstimo / não liberado →
+        avisa o motivo) e ADICIONA AO EMPRÉSTIMO, com beep e
+        confirmação. Colar no campo já adiciona sozinho (evento
+        paste); Enter também. O campo limpa ao abrir/editar empréstimo.
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -834,7 +848,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261022-141105">
+<meta name="nii-build" content="20261022-152340">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -1628,6 +1642,12 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
                     <select id="empEqSel" class="mono" style="flex:1"></select>
                     <button type="button" class="btn btn-dark btn-sm" id="btnAddEq">+ Adicionar</button>
                   </div>
+                  <div style="display:flex;gap:8px;margin-top:6px">
+                    <input type="text" id="empPatCola" class="mono" inputmode="numeric" autocomplete="off"
+                           placeholder="Cole aqui o nº do patrimônio: 100001163744" style="flex:1">
+                    <button type="button" class="btn btn-dark btn-sm" id="btnColaPat" title="Adicionar pelo número colado, sem câmera">📋 Abrir</button>
+                  </div>
+                  <span class="hint"><span class="dot"></span>Cole o número lido fora do app (câmera/Planilha) e toque em 📋 — ou cole direto no campo, que ele adiciona sozinho.</span>
                 </div>
                 <div class="field c4">
                   <label>Neste empréstimo: <b id="empCartCount" style="color:var(--ink)">0</b> item(ns)</label>
@@ -6750,6 +6770,44 @@ $('#btnAddEq').addEventListener('click',()=>{
   addEqForm(id);
 });
 $('#empEqSel').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('#btnAddEq').click();}});
+/* ===== CÓDIGO 62 — CAMINHO SEM CÂMERA (pedido do dono, 22/10) =====
+   O scanner do app não lê no aparelho dele; mas o AppSheet e a câmera
+   do Samsung leem. Agora ele lê lá fora, COPIA o número e cola aqui:
+   o app normaliza (só números), acha a unidade no cadastro, confere se
+   ela está liberada e adiciona ao empréstimo — sem 12 dígitos na unha
+   e sem depender do ML Kit/ZXing. Colar no campo já adiciona sozinho. */
+function colarPatrimonioEmp(){
+  const inp=$('#empPatCola');
+  if(!inp)return;
+  const digitos=normalizarCodigoLido(inp.value);
+  if(!digitos)return toast('Cole ou digite o número do patrimônio (ex.: 100001163744).','warn');
+  const achados=db.equipamentos.filter(e=>normalizarCodigoLido(e.patrimonio)===digitos);
+  if(!achados.length){
+    return toast(digitos.length!==12
+      ? 'Número com '+digitos.length+' dígito(s) — a etiqueta do Estado tem 12 (ex.: 100001163744). Confira o que foi colado.'
+      : 'Não encontrei o patrimônio <b class="mono">'+esc(digitos)+'</b> no cadastro.','bad');
+  }
+  if(achados.length>1)return toast('Achei <b>'+achados.length+'</b> unidades com o patrimônio <b class="mono">'+esc(digitos)+'</b> — confira o cadastro.','warn');
+  const eq=achados[0];
+  if(carrinho.includes(eq.id)){
+    inp.value='';
+    return toast('O patrimônio <b class="mono">'+esc(digitos)+'</b> já está neste empréstimo.','warn');
+  }
+  if(!disponiveisParaEmp(empEditId).some(e=>e.id===eq.id)){
+    const motivo=eq.indisponivel?'está marcado como <b>Indisponível</b>'
+      :(temEmprestimoAtivo(eq.id)?'está em <b>outro empréstimo aberto</b>'
+      :(eq.emprestavel!==true?'não é <b>liberado para empréstimo</b>':'não está disponível agora'));
+    return toast('O patrimônio <b class="mono">'+esc(digitos)+'</b> existe, mas '+motivo+'.','bad');
+  }
+  inp.value='';
+  addEqForm(eq.id);
+  beep();
+  toast('✓ <b class="mono">'+esc(eq.patrimonio)+'</b> — '+esc(eq.tipo||'')+' '+esc(eq.marca||'')+' adicionado ao empréstimo.','ok');
+}
+$('#btnColaPat').addEventListener('click',colarPatrimonioEmp);
+$('#empPatCola').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();colarPatrimonioEmp();}});
+/* Colou? Nem precisa apertar botão: o 'paste' já entra sozinho. */
+$('#empPatCola').addEventListener('paste',()=>{setTimeout(colarPatrimonioEmp,60);});
 /* Trocou o setor do chamado → o combo reagrupa na hora: o bem do setor
    solicitante volta para o topo (código 40). */
 $('#empSetor').addEventListener('change',preencherSelEquip);
@@ -6781,6 +6839,7 @@ $('#formEmp').addEventListener('reset',e=>{const n=Date.now();if(n-lastResetEmp<
 function resetEmpForm(){
   empEditId=null;empEditSig=null;carrinho=[];
   $('#empOS').value='';$('#empSolicitante').value='';$('#empRetirou').value='';
+  $('#empPatCola').value='';   /* código 62: o campo de colar também limpa */
   $('#empEqSel').value='';$('#empTecnico').value='';$('#empSetor').value='';
   $('#empStatus').value='Reservado';
   $('#empDataReserva').value=hojeISO();
@@ -6804,6 +6863,7 @@ function editarEmp(id){
     empEditId=id;empEditSig=emp.assinaturaRetirada||null;
     carrinho=(emp.equipIds||[]).filter(idEq=>infoEq(idEq));
     $('#empOS').value=emp.os||'';
+    $('#empPatCola').value='';   /* código 62: editar também limpa o campo de colar */
     $('#empDataReserva').value=emp.dataReserva||'';
     $('#empIni').value=emp.periodoIni||'';
     $('#empIniHora').value=emp.periodoIniHora||'';
