@@ -678,6 +678,34 @@
         mensagem enganosa e sugere forçar a parada do app Câmera;
         toast do 'avisar' sem a teoria do espaço (250 GB livres).
 
+    56. 🎯📸 LEITURA RÁPIDA E PRECISA — zoom de software + 4K +
+        recortes ampliados (código 56): o dono perguntou por "outra
+        forma ou outro sistema… igual ao AppSheet, que lê rápido e
+        preciso". A resposta honesta: o AppSheet lê com o MESMO
+        decodificador nativo do Android que já usamos (ML Kit) — a
+        diferença está em COMO os pixels chegam. No S23+ o zoom do HAL
+        REAMOSTRAVA o vídeo (dígitos trocados no 2×) e o takePhoto
+        IGNORA o zoom (código 54) — o pipeline lutava contra o
+        próprio HAL. O que mudou: (1) ZOOM DE SOFTWARE: o stream fica
+        em resolução CHEIA (pixels verdadeiros do sensor) e o slider
+        vira recorte central ampliado — preview nítido (CSS scale,
+        com overflow escondido no #scanReader), detecção na MESMA
+        região (frac = 1/fator no laço de vídeo e no recorte da foto
+        full-res do 54), funciona em TODO aparelho (sem depender de
+        scanCaps.zoom) e some ao fechar o scanner (reset do
+        transform); (2) 4K na frente do getUserMedia (ideal
+        3840×2160, degrau → 1080p → 720p → sem resolução: dobro de
+        pixels no vídeo dobra o tamanho aparente do código a ~1 m);
+        (3) laço de vídeo com SEIS variações (5 → 6): quadro cheio,
+        contraste, recorte zoom-aware 100%/50% e a NOVA variação que
+        AMPLIA o recorte 2× com suavização (ampliarCentro); (4) foto
+        full-res com recortes AMPLIADOS 2× e 3× ([0.75,1],[0.5,1],
+        [0.5,2],[0.3,3]) e região do zoom com ampliação 2× — código
+        distante (~1 m ≈ 70 px no teto 2400) cruza o limiar do ML
+        Kit; (5) rodapé assina "Decoder: ML Kit (o mesmo do AppSheet)
+        … zoom de software 1–4×". Física continua valendo: ~30–40 cm
+        é a distância amigável; a ~1 m nem o AppSheet nativo lê.
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -685,7 +713,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261022-084225">
+<meta name="nii-build" content="20261022-093418">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -4123,7 +4151,11 @@ async function iniciarScannerNativo(){
   if(!wanted.length) throw new Error('Nenhum formato suportado');
   const detector = new BarcodeDetector({ formats: wanted });
 
+  /* CÓDIGO 56: 4K na frente — se o aparelho deixar, o dobro de pixels
+     no vídeo dobra o tamanho aparente do código a ~1 m. Quem não
+     aceitar cai sozinho no 1080p (degrau seguinte), sem erro. */
   const tentativas = [
+    { audio:false, video:{ facingMode:{ ideal:'environment' }, width:{ ideal:3840 }, height:{ ideal:2160 } } },
     { audio:false, video:{ facingMode:{ ideal:'environment' }, width:{ ideal:1920 }, height:{ ideal:1080 } } },
     { audio:false, video:{ facingMode:{ ideal:'environment' }, width:{ ideal:1280 }, height:{ ideal:720 } } },
     { audio:false, video:{ facingMode:{ ideal:'environment' } } },
@@ -4213,7 +4245,7 @@ async function iniciarScannerNativo(){
   {
     const focoInfo = (scanCaps && Array.isArray(scanCaps.focusMode) && scanCaps.focusMode.length) ? scanCaps.focusMode.join(', ') : 'não informado';
     const modo = scanImageCapture ? 'ImageCapture' : 'video';
-    $('#scanHint').innerHTML = `Decoder: <b>ML Kit</b> · Captura: <b>${canvas.width}×${canvas.height}</b> (${modo}) · Foco: <b>${esc(focoInfo)}</b>${soFocoManual?' <b>(varredura ligada)</b>':''} · só os números são aproveitados.`;
+    $('#scanHint').innerHTML = `Decoder: <b>ML Kit</b> (o mesmo do AppSheet) · Captura: <b>${canvas.width}×${canvas.height}</b> (${modo}) · Foco: <b>${esc(focoInfo)}</b>${soFocoManual?' <b>(varredura ligada)</b>':''} · zoom de <b>software 1–4×</b> · só os números são aproveitados.`;
   }
   $('#scanControles').style.display='flex';
   ativarControles(track);
@@ -4259,6 +4291,25 @@ async function iniciarScannerNativo(){
     const tctx = tmp.getContext('2d');
     if(tratar) tctx.filter = 'grayscale(1) contrast(1.9) brightness(1.05)';
     tctx.drawImage(canvas, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h, 0, 0, w, h);
+    return tmp;
+  };
+  /* Recorte central AMPLIADO (código 56): código distante (etiqueta de
+     4 cm a ~1 m ≈ 55 px em 1080p) fica abaixo do limiar do ML Kit —
+     ampliar o recorte com suavização empurra as features acima do
+     limiar. Mesma informação, leitura melhor: é o que o zoom do HAL
+     tentava fazer reamostrando (e errando dígito). */
+  const ampliarCentro = (frac, vezes) => {
+    frac = frac || 0.75; vezes = vezes || 2;
+    const w = Math.max(1, Math.round(canvas.width  * frac));
+    const h = Math.max(1, Math.round(canvas.height * frac));
+    const tmp = document.createElement('canvas');
+    tmp.width  = Math.min(2560, Math.round(w * vezes));
+    tmp.height = Math.min(1440, Math.round(h * vezes));
+    const tctx = tmp.getContext('2d');
+    tctx.filter = 'grayscale(1) contrast(1.6) brightness(1.05)';
+    tctx.imageSmoothingEnabled = true;
+    tctx.imageSmoothingQuality = 'high';
+    tctx.drawImage(canvas, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h, 0, 0, tmp.width, tmp.height);
     return tmp;
   };
 
@@ -4338,17 +4389,22 @@ async function iniciarScannerNativo(){
         quadroSemCodigoAvisado = false;   /* deixa o aviso de 6 s recomeçar no modo normal */
       }
       const alvo = await capturarFrame();
-      /* CINCO variações SEMPRE rodando: quadro cheio, contraste, recorte
-         75%, recorte 75%+contraste e recorte 50%+contraste (o 50% dá o
-         dobro de pixels no código pequeno centralizado — a etiqueta do
-         Estado do Paraná a ~1 m tinha módulos de ~3 px e passava). */
-      const variante = turno % 5;
+      /* SEIS variações SEMPRE rodando — e ZOOM-AWARE (código 56): com
+         zoom de SOFTWARE os recortes seguem a MESMA região que o
+         preview mostra (1/fator do quadro cheio — pixels verdadeiros
+         do sensor, sem o HAL reamostrar) e a sexta variação amplia o
+         recorte 2× com suavização: é o que faz o código pequeno
+         (etiqueta a ~1 m) cruzar o limiar do ML Kit sem depender do
+         zoom reamostrado que trocava dígitos. */
+      const fracZoom = scanZoomAtual > 1.1 ? Math.max(0.25, 1/scanZoomAtual) : 0.75;
+      const variante = turno % 6;
       await checar(
         variante === 0 ? alvo :
         variante === 1 ? copiarTratado() :
-        variante === 2 ? copiarCentro(false) :
-        variante === 3 ? copiarCentro(true) :
-                         copiarCentro(true, 0.5)
+        variante === 2 ? copiarCentro(false, fracZoom) :
+        variante === 3 ? copiarCentro(true, fracZoom) :
+        variante === 4 ? copiarCentro(true, Math.max(0.2, fracZoom/2)) :
+                         ampliarCentro(fracZoom, 2)
       );
       falhas = 0;
       turno++;
@@ -4470,17 +4526,22 @@ async function detectarNaFotoViva(detector){
       }catch(_){}
       c.width = c.height = 0;   /* devolve a memória antes da próxima estratégia */
     }
-    /* Recortes centrais tratados (75% e 50%): a etiqueta pequena no
-       meio do quadro ganha pixels relativos — o código 52 aprendeu com
-       a foto do dono (Estado do Paraná a ~1 m passava em branco). */
-    for(const frac of [0.75, 0.5]){
+    /* Recortes centrais tratados — e AMPLIADOS (código 56): 75%/50%
+       dão pixels relativos ao código; as versões 2×/3× empurram o
+       código DISTANTE (~1 m: ~117 px em foto 4032, ~70 px no teto
+       2400) acima do limiar do ML Kit. É o AppSheet lê "rápido e
+       preciso" com o MESMO decodificador nativo que usamos — o que
+       faltava aqui era entregar o código em tamanho que ele aceita. */
+    for(const [frac, esc] of [[0.75, 1], [0.5, 1], [0.5, 2], [0.3, 3]]){
       const w = Math.max(1, Math.round(base.width  * frac));
       const h = Math.max(1, Math.round(base.height * frac));
       const c = document.createElement('canvas');
-      c.width = w; c.height = h;
+      c.width  = Math.max(1, Math.round(w * esc));
+      c.height = Math.max(1, Math.round(h * esc));
       const x = c.getContext('2d');
       x.filter = 'grayscale(1) contrast(1.9) brightness(1.05)';
-      x.drawImage(base, (base.width - w) / 2, (base.height - h) / 2, w, h, 0, 0, w, h);
+      if(esc > 1){ x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high'; }
+      x.drawImage(base, (base.width - w) / 2, (base.height - h) / 2, w, h, 0, 0, c.width, c.height);
       try{
         const codigos = await detector.detect(c);
         if(codigos && codigos.length) return codigos;
@@ -4498,7 +4559,7 @@ async function detectarNaFotoViva(detector){
       const w0 = Math.max(1, Math.round(base.width  * frac));
       const h0 = Math.max(1, Math.round(base.height * frac));
       const x0 = (base.width - w0) / 2, y0 = (base.height - h0) / 2;
-      for(const esc of [1, 1.5]){
+      for(const esc of [1, 2]){
         const c = document.createElement('canvas');
         c.width  = Math.max(1, Math.round(w0 * esc));
         c.height = Math.max(1, Math.round(h0 * esc));
@@ -4812,26 +4873,37 @@ function ativarControles(track){
     btnTorch.style.opacity = '.4';
   }
 
-  if(scanCaps && scanCaps.zoom){
-    const min = scanCaps.zoom.min ?? 1;
-    const max = scanCaps.zoom.max ?? 5;
-    const step = scanCaps.zoom.step ?? 0.1;
+  /* ZOOM DE SOFTWARE (código 56) — o zoom do HAL saiu de cena: no
+     S23+ ele reamostrava o vídeo e o ML Kit devolvia dígitos TROCADOS
+     ("mostra números… mas não o correto", relato do dono) — e o
+     takePhoto IGNORA o zoom (54), então nem a foto acompanhava. Agora
+     o stream permanece em resolução CHEIA e o zoom é um RECORTE
+     central ampliado: preview nítido (CSS), detecção nos pixels
+     verdadeiros do sensor, e a MESMA região vale para a foto
+     full-res do auxílio (recorte 1/fator, código 54). Funciona em
+     TODO aparelho, com ou sem suporte a zoom nativo. */
+ {
+    const maxFator = 4;
     inpZoom.min = 100;
-    inpZoom.max = Math.round((max/min)*100);
-    inpZoom.step = Math.max(1, Math.round((step/min)*100));
+    inpZoom.max = maxFator * 100;
+    inpZoom.step = 10;
     inpZoom.value = 100;
     inpZoom.disabled = false;
-    inpZoom.oninput = async () => {
-      const fator = Number(inpZoom.value)/100;
-      const z = min*fator;
-      scanZoomAtual = fator;   /* ≥ 1,5× = vídeo reamostrado lê errado → modo só-foto (código 53) */
-      lblZoom.textContent = fator.toFixed(1)+'×';
-      try{ await track.applyConstraints({ advanced: [{ zoom: z }] }); }catch(_){}
+    const aplicarZoomSoftware = (fator) => {
+      scanZoomAtual = fator;
+      lblZoom.textContent = fator.toFixed(1) + '×';
+      try{
+        if(video){
+          video.style.transformOrigin = 'center center';
+          video.style.transform = (fator > 1.01) ? ('scale(' + fator.toFixed(3) + ')') : '';
+        }
+        const leitor = $('#scanReader'); if(leitor) leitor.style.overflow = 'hidden';
+      }catch(_){}
     };
-    lblZoom.textContent = '1.0×';
-  } else {
-    inpZoom.disabled = true;
-    lblZoom.textContent = '—';
+    inpZoom.oninput = () => {
+      aplicarZoomSoftware(Math.max(1, Math.min(maxFator, Number(inpZoom.value)/100)));
+    };
+    aplicarZoomSoftware(1);
   }
 }
 
@@ -4882,6 +4954,7 @@ function pararScanner(){
   scanSoFotoAvisado = false;
   scanFotoDims = '';
   _fotoNaoChegouAte = 0;
+  try{ const v=$('#scanReader video'); if(v) v.style.transform=''; }catch(_){}   /* zoom de software: próximo scanner começa em 1× */
   if(scanStream){
     try{ scanStream.getTracks().forEach(t=>t.stop()); }catch(_){}
     scanStream = null; scanTrack = null;
