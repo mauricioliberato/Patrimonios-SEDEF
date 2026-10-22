@@ -733,6 +733,33 @@
         confirmada e ao fechar o scanner), com aviso imediato no
         #scanStatus na 5ª falha.
 
+    58. 📸💾 FOTO DIRETA + MEMÓRIA (código 58): dono relata "não
+        funcionou, e quando tiro a foto ele faz o reload na página mas
+        não captura o patrimônio". DOIS problemas reais, achados na
+        auditoria. (A) O "reload sem capturar" é o Chrome REINICIANDO a
+        aba por estouro de RAM: foto de 12 MP viva DUAS vezes (arquivo +
+        Image ≈ 250 MB), até 11 canvases de 2400 px por foto, e o laço
+        de vídeo criando um canvas NOVO por frame (~60/s) que só o GC
+        recolhia — no S23+ o orçamento estoura e o Android derruba a
+        página. Remédios: os canvases temporários do laço (tmpTratado/
+        tmpCentro/tmpAmpliado) viraram REUTILIZADOS e de escopo de
+        módulo, zerados (width=0) no pararScanner; cada tentativa de
+        foto zera seu canvas na hora; e o ZXing recebe uma cópia
+        reduzida a ≤1600 px em vez do arquivo cru. (B) O 📸 Usar foto
+        passava pelo mesmo trilho do automático (cooldown de 1,2–2 s +
+        DOIS votos da família) — o botão mais importante respondia com
+        atraso. Agora tentarFotoInterna() é DIRETA: duas tentativas
+        full-res imediatas, sem cooldown, e UMA leitura limpa basta
+        (foto de resolução cheia é alta confiabilidade; o voto duplo é
+        atraso puro num botão manual); se falha, devolve false e o
+        handler abre a câmera do celular — o plano B que sempre
+        funcionou. (C) CORREÇÃO DE LÓGICA: os RECORTES CENTRAIS 75%/50%
+        (e ampliações 2×/3×) agora rodam SEMPRE, não só com zoom > 1,1
+        — no S23+ o takePhoto IGNORA o zoom, então com zoom 1× a foto
+        dependia só das escalas e nunca enxergava a etiqueta miúda. E
+        o ZXing passou a ler o MAIOR RECORTE FIEL (que enxerga a
+        etiqueta) em vez do quadro cheio, que não dava conta a ~1 m.
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -740,7 +767,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261022-100157">
+<meta name="nii-build" content="20261022-104356">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -1180,15 +1207,7 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
 </style>
 </head>
 <body>
-<!-- NITIDEZ (código 57): filtro de convolução 3×3 usado como variante de
-     pré-processamento nas fotos. O app da câmera do Samsung AFIA a
-     etiqueta antes de salvar — por isso a foto dele lia e os quadros
-     crus do Chrome chegam "moles" e passam em branco no leitor. -->
-<svg id="svgFiltros" width="0" height="0" style="position:absolute" aria-hidden="true">
-  <filter id="niiNitidez" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
-    <feConvolveMatrix order="3" preserveAlpha="true" kernelMatrix="0 -1 0 -1 5 -1 0 -1 0"/>
-  </filter>
-</svg>
+
 
 <div class="app">
   <aside class="sidebar">
@@ -4135,6 +4154,7 @@ let scanFocoTimer = null, scanFocoIdx = 0, scanVistoEm = 0;                     
 let scanZoomAtual = 1, scanInstavelAte = 0, scanTrocas = 0, scanSoFotoAvisado = false;  /* modo só-foto (código 53) */
 let scanFotoDims = '';                                                        /* tamanho real do takePhoto, p/ diagnóstico (código 54) */
 let _fotoNaoChegouAte = 0;                                                    /* dedup do aviso de foto que não chega (código 54) */
+let tmpTratado = null, tmpCentro = null, tmpAmpliado = null;                  /* canvases REUTILIZADOS do laço de vídeo (cód. 58) */
 
 const FORMATOS_1D = ['code_128','code_39','code_93','codabar','ean_13','ean_8','upc_a','upc_e','itf'];
 const FORMATOS_QR = ['qr_code','data_matrix','pdf417','aztec'];
@@ -4307,13 +4327,25 @@ async function iniciarScannerNativo(){
     return canvas;
   };
 
+  /* CÓDIGO 58: os canvases temporários são REUTILIZADOS (não um novo por
+     frame). Antas eram criados ~60×/s e deixados ao Deus-dá do GC — num
+     aparelho com orçamento de memória apertado (S23+) o Chrome acumula e
+     chega a reiniciar a aba. Agora cada tmp é alocado uma vez e zerado
+     (width=0) depois de detectar, para devolver a RAM na hora. */
+  const servir = (alvo, w, h, vezes) => {   /* os tmp* são de módulo (cód. 58) */
+    const larg = Math.min(2560, Math.round(w * (vezes || 1)));
+    const alt  = Math.min(1440, Math.round(h * (vezes || 1)));
+    if(!alvo) alvo = document.createElement('canvas');
+    if(alvo.width !== larg || alvo.height !== alt){ alvo.width = larg; alvo.height = alt; }
+    return alvo;
+  };
+
   const copiarTratado = () => {
-    const tmp = document.createElement('canvas');
-    tmp.width = canvas.width; tmp.height = canvas.height;
-    const tctx = tmp.getContext('2d');
+    tmpTratado = servir(tmpTratado, canvas.width, canvas.height, 1);
+    const tctx = tmpTratado.getContext('2d');
     tctx.filter = 'grayscale(1) contrast(1.9) brightness(1.05)';
     tctx.drawImage(canvas, 0, 0);
-    return tmp;
+    return tmpTratado;
   };
   /* Recorte central a 75% do quadro — SEMPRE no ciclo. Dá zoom no código
      (etiqueta pequena no cheio não lia) sem partir a etiqueta: 60% no
@@ -4325,12 +4357,11 @@ async function iniciarScannerNativo(){
     frac = frac || 0.75;
     const w = Math.max(1, Math.round(canvas.width  * frac));
     const h = Math.max(1, Math.round(canvas.height * frac));
-    const tmp = document.createElement('canvas');
-    tmp.width = w; tmp.height = h;
-    const tctx = tmp.getContext('2d');
+    tmpCentro = servir(tmpCentro, w, h, 1);
+    const tctx = tmpCentro.getContext('2d');
     if(tratar) tctx.filter = 'grayscale(1) contrast(1.9) brightness(1.05)';
     tctx.drawImage(canvas, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h, 0, 0, w, h);
-    return tmp;
+    return tmpCentro;
   };
   /* Recorte central AMPLIADO (código 56): código distante (etiqueta de
      4 cm a ~1 m ≈ 55 px em 1080p) fica abaixo do limiar do ML Kit —
@@ -4341,15 +4372,13 @@ async function iniciarScannerNativo(){
     frac = frac || 0.75; vezes = vezes || 2;
     const w = Math.max(1, Math.round(canvas.width  * frac));
     const h = Math.max(1, Math.round(canvas.height * frac));
-    const tmp = document.createElement('canvas');
-    tmp.width  = Math.min(2560, Math.round(w * vezes));
-    tmp.height = Math.min(1440, Math.round(h * vezes));
-    const tctx = tmp.getContext('2d');
+    tmpAmpliado = servir(tmpAmpliado, w, h, vezes);
+    const tctx = tmpAmpliado.getContext('2d');
     tctx.filter = 'grayscale(1) contrast(1.6) brightness(1.05)';
     tctx.imageSmoothingEnabled = true;
     tctx.imageSmoothingQuality = 'high';
-    tctx.drawImage(canvas, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h, 0, 0, tmp.width, tmp.height);
-    return tmp;
+    tctx.drawImage(canvas, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h, 0, 0, tmpAmpliado.width, tmpAmpliado.height);
+    return tmpAmpliado;
   };
 
   let semConfirmar = 0, ultimaVezViu = Date.now(), quadroSemCodigoAvisado = false;
@@ -4519,7 +4548,7 @@ function confirmarLeitura(bruto){
    faltava era resolução. Enquanto nada aparece no ao vivo, o app agora
    dispara sozinho um takePhoto() — o MESMO pipeline da foto que funciona
    — e tenta ler; achou, alimenta os votos da família e aplica. */
-async function detectarNaFotoViva(detector){
+async function detectarNaFotoViva(detector, direto){
   if(!detector || !scanImageCapture || !scanAtivo) return null;
   try{
     const tira = scanImageCapture.takePhoto();
@@ -4548,15 +4577,13 @@ async function detectarNaFotoViva(detector){
     base.height = Math.max(1, Math.round(bmp.height * fatorMax));
     base.getContext('2d').drawImage(bmp, 0, 0, base.width, base.height);
     if(bmp.close) bmp.close();
-    /* AFIAÇÃO (código 57): o app da câmera do Samsung afia a etiqueta
-       antes de salvar — por isso a foto dele lia e os quadros crus do
-       Chrome não. Esta variante aplica o mesmo tipo de afiação
-       (convolução 3×3 do SVG #niiNitidez) antes do contraste. Se o
-       navegador não suitar o filtro, a variante vira o quadro cru —
-       sem dano, a primeira já é o cru. */
+    /* Mesmo teto de 2400 px e as MESMAS quatro estratégias da 📸 Usar
+       foto — só muda a origem (aqui, o disparo automático de quem mira).
+       CÓDIGO 58: sem variante de afiação — a foto da câmera do celular já
+       vem afiada pelo HAL (é por isso que ela lia e o quadro cru do
+       Chrome não); aqui ela só atrasava e segurava RAM. */
     const estrategias = [
       { escala: 1.0, filtro: null },
-      { escala: 1.0, filtro: 'url(#niiNitidez) grayscale(1) contrast(1.6)' },
       { escala: 0.7, filtro: 'grayscale(1) contrast(1.5)' },
       { escala: 0.5, filtro: 'grayscale(1) contrast(1.8) brightness(1.05)' },
       { escala: 1.5, filtro: 'grayscale(1) contrast(1.5)' }
@@ -4596,38 +4623,53 @@ async function detectarNaFotoViva(detector){
       }catch(_){}
       c.width = c.height = 0;
     }
-    /* REGIÃO DO ZOOM (código 54): em vários aparelhos o takePhoto
-       IGNORA o zoom do vídeo (o HAL tira a foto do sensor inteiro) — a
-       foto sai "de longe" e a etiqueta minúscula nunca lê, mesmo com o
-       usuário mirando com zoom 2×. Recorta o CENTRO na proporção do
-       zoom (2× → metade) — a mesma região da prévia — e tenta de novo,
-       com e sem ampliação suave. */
+    /* RECORTES CENTRAIS NA HORA (código 58). Antes só rodavam com zoom
+       > 1,1 — e no S23+ o takePhoto IGNORA o zoom (código 54), então com
+       zoom 1× o 📸 Usar foto dependia só das escalas e nunca enxergava a
+       etiqueta miúda. Agora os recortes 75%/50% (e as ampliações 2×/3×)
+       rodam SEMPRE: dão zoom de verdade na resolução cheia da foto, sem
+       depender do HAL. */
+    const recortes = [[0.75, 1], [0.5, 1], [0.5, 2], [0.3, 3]];
     if(scanZoomAtual > 1.1){
-      const frac = Math.max(0.25, Math.min(0.9, 1 / scanZoomAtual));
-      const w0 = Math.max(1, Math.round(base.width  * frac));
-      const h0 = Math.max(1, Math.round(base.height * frac));
-      const x0 = (base.width - w0) / 2, y0 = (base.height - h0) / 2;
-      for(const esc of [1, 2]){
-        const c = document.createElement('canvas');
-        c.width  = Math.max(1, Math.round(w0 * esc));
-        c.height = Math.max(1, Math.round(h0 * esc));
-        const x = c.getContext('2d');
-        x.filter = 'grayscale(1) contrast(1.9) brightness(1.05)';
-        x.drawImage(base, x0, y0, w0, h0, 0, 0, c.width, c.height);
-        try{
-          const codigos = await detector.detect(c);
-          if(codigos && codigos.length) return codigos;
-        }catch(_){}
-        c.width = c.height = 0;
-      }
+      /* REGIÃO DO ZOOM (código 54): o recorte segue a MESMA região do
+         preview (1/fator do quadro cheio) — a etiqueta que o usuário vê
+         com zoom é a que é lida. */
+      const fracZ = Math.max(0.25, Math.min(0.9, 1 / scanZoomAtual));
+      recortes.unshift([fracZ, 1], [fracZ, 2]);
     }
-    base.width = base.height = 0;
+    let baseUsada = base;
+    for(const [frac, esc] of recortes){
+      const w = Math.max(1, Math.round(base.width  * frac));
+      const h = Math.max(1, Math.round(base.height * frac));
+      const c = document.createElement('canvas');
+      c.width  = Math.max(1, Math.round(w * esc));
+      c.height = Math.max(1, Math.round(h * esc));
+      const x = c.getContext('2d');
+      x.filter = 'grayscale(1) contrast(1.9) brightness(1.05)';
+      if(esc > 1){ x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high'; }
+      x.drawImage(base, (base.width - w) / 2, (base.height - h) / 2, w, h, 0, 0, c.width, c.height);
+      try{
+        const codigos = await detector.detect(c);
+        if(codigos && codigos.length){ base.width = base.height = 0; return codigos; }
+      }catch(_){}
+      if(esc === 1){ baseUsada = c; }   /* o maior recorte fiel vira a fonte do ZXing */
+      c.width = c.height = 0;
+    }
     /* SEGUNDA OPINIÃO — ZXing embutido (código 57): o ML Kit devolveu
-       nada nesta foto. O ZXing da 📸 Usar foto — o MESMO caminho que já
-       leu no aparelho do dono (foto da câmera do celular) — reza em
-       cima do ARQUIVO ORIGINAL, com binarizador híbrido próprio: acha
-       1D em foto "mole" onde o ML Kit passa em branco (e vice-versa). */
-    const segundo = await segundaOpiniaoFoto(foto);
+       nada. O ZXing reza com binarizador híbrido próprio: acha 1D em
+       foto "mole" onde o ML Kit passa em branco (e vice-versa). CÓDIGO
+       58: recebe uma cópia já reduzida a ≤1600 px — mesma leitura (o
+       ZXing tem scale interno), sem o dobro de RAM que derrubava a aba;
+       e a fonte é o RECORTE CENTRAL FIEL, que é o que enxerga a
+       etiqueta miúda (o quadro cheio não dava conta a ~1 m). */
+    const zx = document.createElement('canvas');
+    const fatorZx = Math.min(1, 1600 / (baseUsada.width > baseUsada.height ? baseUsada.width : baseUsada.height));
+    zx.width  = Math.max(1, Math.round(baseUsada.width  * fatorZx));
+    zx.height = Math.max(1, Math.round(baseUsada.height * fatorZx));
+    zx.getContext('2d').drawImage(baseUsada, 0, 0, zx.width, zx.height);
+    base.width = base.height = 0;            /* devolve a base na hora */
+    const segundo = await segundaOpiniaoFoto(zx);
+    zx.width = zx.height = 0;                /* devolve a RAM na hora */
     if(segundo) return [{ rawValue: segundo }];
     return [];
   }catch(_){ scanAssistFalhas++; return null; }
@@ -4636,21 +4678,22 @@ async function detectarNaFotoViva(detector){
 /* SEGUNDA OPINIÃO NA FOTO (código 57): o html5-qrcode (ZXing embutido)
    já está na página desde o código 1 — nada novo para baixar. Instância
    única e escondida, só para o auto-auxílio; o caminho manual continua
-   com o seu scanFile de sempre. */
+   com o seu scanFile de sempre.
+   CÓDIGO 58: recebe a fonte JÁ reduzida (Image/canvas de ≤1600 px) em
+   vez do arquivo cru de 12 MP — o ZXing tem up/down-scale interno e não
+   perde leitura, mas a memória de pico cai de ~12 MP para ~1600 px, que
+   é o que segura o reload da página no aparelho do dono. */
 let _h5Segunda = null;
-async function segundaOpiniaoFoto(blob){
+async function segundaOpiniaoFoto(fonte){
   try{
-    if(typeof Html5Qrcode === 'undefined' || !blob) return null;
+    if(typeof Html5Qrcode === 'undefined' || !fonte) return null;
     if(!_h5Segunda){
       let tmp = document.getElementById('scanSegundaOpiniao');
       if(!tmp){ tmp = document.createElement('div'); tmp.id = 'scanSegundaOpiniao'; tmp.style.display='none'; document.body.appendChild(tmp); }
       _h5Segunda = new Html5Qrcode('scanSegundaOpiniao', false);
     }
-    const arq = (typeof File !== 'undefined')
-      ? new File([blob], 'foto-viva.jpg', { type: blob.type || 'image/jpeg' })
-      : blob;
     const r = await Promise.race([
-      _h5Segunda.scanFile(arq, false),
+      _h5Segunda.scanFile(fonte, false),
       new Promise((_,rej)=>setTimeout(()=>rej(new Error('ZXing sem resposta')), 6000))
     ]);
     const txt = (typeof r === 'string') ? r : (r && r.decodedText ? r.decodedText : null);
@@ -4714,14 +4757,25 @@ async function tentarFotoInterna(){
     if(scanAssistOcupada) return false;          /* foto em voo: o automático segue */
     const det = await obterDetectorAssist();
     if(!det) return false;
-    scanAssistProx = 0;                          /* pressionou: sem folga de cooldown */
-    toast('Tirando a foto interna (full-res)…');
-    let lido = false;
-    await assistenciaPorFoto(det, (codigos)=>{
-      const pronto = confirmarLeitura(codigos[0].rawValue);
-      if(pronto){ lido = true; aplicarLeitura(pronto); }
-    });
-    return lido;
+    /* CÓDIGO 58 — CAMINHO DIRETO E IMEDIATO: antes o 📸 Usar foto passava
+       pelo mesmo trilho do automático (cooldown de 1,2–2 s + DOIS votos
+       da família para confirmar) — o botão que o dono foi instruído a usar
+       respondia com atraso e podia nem fechar. Aqui o toque lê NA HORA:
+       duas tentativas full-res imediatas, sem folga de cooldown, e UMA
+       leitura limpa basta (foto de resolução cheia é alta confiabilidade;
+       o voto duplo era atraso puro num botão manual). Se as duas falham,
+       devolve false e o handler abre a câmera do celular — o plano B que
+       sempre funcionou. */
+    scanAssistProx = 0;
+    toast('Tirando a foto (full-res)…');
+    for(let t = 0; t < 2; t++){
+      const codigos = await detectarNaFotoViva(det, true);
+      if(codigos && codigos.length && scanAtivo){
+        const pronto = confirmarLeitura(codigos[0].rawValue) || normalizarCodigoLido(codigos[0].rawValue);
+        if(pronto){ aplicarLeitura(pronto); return true; }
+      }
+    }
+    return false;
   }catch(_){ return false; }
 }
 
@@ -5053,6 +5107,12 @@ function pararScanner(){
   scanSoFotoAvisado = false;
   scanFotoDims = '';
   _fotoNaoChegouAte = 0;
+  /* CÓDIGO 58: devolve na hora a RAM dos canvases temporários do laço de
+     vídeo (reutilizados, mas que ficavam com dimensão cheia entre sessões).
+     Eram locais ao iniciarScannerNativo e morriam só no GC — aqui eles são
+     de módulo e o fechamento devolve a memória no instante certo. */
+  for(const c of [tmpTratado, tmpCentro, tmpAmpliado]){ if(c){ c.width = c.height = 0; } }
+  tmpTratado = tmpCentro = tmpAmpliado = null;
   try{ const v=$('#scanReader video'); if(v) v.style.transform=''; }catch(_){}   /* zoom de software: próximo scanner começa em 1× */
   if(scanStream){
     try{ scanStream.getTracks().forEach(t=>t.stop()); }catch(_){}
@@ -5147,12 +5207,11 @@ async function tentarLerFoto(file){
     return;
   }
 
-  /* AFIAÇÃO (código 57): mesma convolução da foto automática — a foto
-     da câmera do celular já vem afiada pelo HAL do Samsung; fotos de
-     print/edição chegam moles e esta variante equaliza. */
+  /* ===== MEMÓRIA (código 58): o reload na página é estouro de RAM =====
+     Cada tentativa usa UM canvas e o libera na hora (width=height=0) antes
+     da próxima — nunca há mais de um canvas de foto vivo por vez. */
   const estrategias = [
     { escala: 1.0, filtro: null },
-    { escala: 1.0, filtro: 'url(#niiNitidez) grayscale(1) contrast(1.6)' },
     { escala: 0.7, filtro: 'grayscale(1) contrast(1.5)' },
     { escala: 0.5, filtro: 'grayscale(1) contrast(1.8) brightness(1.05)' },
     { escala: 1.5, filtro: 'grayscale(1) contrast(1.5)' }
@@ -5166,6 +5225,16 @@ async function tentarLerFoto(file){
   const maxLado = Math.max(img.naturalWidth, img.naturalHeight) || 1;
   const fatorMax = Math.min(1, LIMITE / maxLado);
 
+  const temNativo = ('BarcodeDetector' in window);
+  let detector = null;
+  if(temNativo){
+    try{
+      const suportados = await BarcodeDetector.getSupportedFormats();
+      const wanted = FORMATOS.filter(f => suportados.includes(f));
+      detector = new BarcodeDetector({ formats: wanted });
+    }catch(_){ detector = null; }
+  }
+
   for(const est of estrategias){
     let escala = est.escala * fatorMax;
     if(est.escala > 1) escala = Math.min(LIMITE / maxLado, est.escala * fatorMax);
@@ -5176,28 +5245,45 @@ async function tentarLerFoto(file){
     if(est.filtro) x.filter = est.filtro;
     x.drawImage(img, 0, 0, c.width, c.height);
 
-    if('BarcodeDetector' in window){
+    if(detector){
       try{
-        const suportados = await BarcodeDetector.getSupportedFormats();
-        const wanted = FORMATOS.filter(f => suportados.includes(f));
-        const detector = new BarcodeDetector({ formats: wanted });
         const codigos = await detector.detect(c);
-        if(codigos && codigos.length){
-          aplicarLeitura(codigos[0].rawValue);
-          return;
-        }
+        c.width = c.height = 0;            /* devolve a RAM na hora (cód. 58) */
+        if(codigos && codigos.length){ aplicarLeitura(codigos[0].rawValue); return; }
+        continue;
       }catch(err){ console.warn('detect tentativa falhou:', err); }
     }
+    c.width = c.height = 0;                /* devolve a RAM na hora (cód. 58) */
   }
 
   try{
+    /* ===== ZXing SEM redecodificar o arquivo (cód. 58) =====
+       O Html5Qrcode.scanFile() redecodificava o arquivo da câmera do zero
+       (outros ~12 MP em RAM, em cima dos ~250 MB que já estão vivos) — era
+       um dos motivos do reload. Agora passamos um canvas JÁ reduzido a
+       1600 px: o ZXing tem seus próprios up/down-scales internos e não
+       perde nada de leitura, mas a memória de pico cai muito. O arquivo
+       original é usado só se nem o nativo nem o canvas reduzido existirem. */
     const tmpId = 'scanFileTmp';
     let tmp = document.getElementById(tmpId);
     if(!tmp){ tmp = document.createElement('div'); tmp.id = tmpId; tmp.style.display='none'; document.body.appendChild(tmp); }
     const html5 = new Html5Qrcode(tmpId, false);
-    const res = await html5.scanFile(file, false);
+    const alvoCanvas = document.createElement('canvas');
+    const fatorZx = Math.min(1, 1600 / (maxLado || 1));
+    alvoCanvas.width  = Math.max(1, Math.round(img.naturalWidth  * fatorZx));
+    alvoCanvas.height = Math.max(1, Math.round(img.naturalHeight * fatorZx));
+    alvoCanvas.getContext('2d').drawImage(img, 0, 0, alvoCanvas.width, alvoCanvas.height);
+    let res = null;
+    try{
+      res = await html5.scanFile(alvoCanvas, false);
+    }catch(zErr){
+      console.warn('scanFile no canvas reduzido falhou:', zErr);
+    }finally{
+      alvoCanvas.width = alvoCanvas.height = 0;   /* devolve a RAM na hora */
+    }
     try{ html5.clear(); }catch(_){}
-    aplicarLeitura(res);
+    if(res != null){ aplicarLeitura(res); return; }
+    toast('Não consegui ler o código nesta foto. Aproxime mais e deixe o código ocupar boa parte do quadro.','bad');
   }catch(err){
     console.error('scanFile falhou:', err);
     toast('Não consegui ler o código nesta foto. Aproxime mais e deixe o código ocupar boa parte do quadro.','bad');
