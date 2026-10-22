@@ -650,6 +650,34 @@
         passa a mostrar o tamanho REAL da foto auxiliar (Foto: WxH) —
         diagnóstico de plantão pro próximo relato.
 
+    55. 📷🔁 VOLTA DA CÂMERA NÃO PODE PARECER DESLOGAR (código 55):
+        o dono corrigiu o diagnóstico do 54 — o celular tem 250 GB
+        livres; a mensagem "não salva por falta de espaço" é do app
+        da CÂMERA (estado de erro/bug, não falta de disco). E o
+        "deslogar" na volta da câmera não era signOut nenhum (auditado:
+        inatividade zera o relógio com scanAtivo; nenhum caminho do
+        fluxo chama sair): era o FORM DE LOGIN FRIo de toda recarga —
+        na volta da câmera com 5+ min escondido o check de versão
+        recarrega a página, ou o Chrome descarta a aba; até o Auth
+        restaurar a sessão (rede lenta: segundos) o form ficava à
+        mostra e o dono lia como "deslogou". O que mudou: (1) VÉU DE
+        RESTAURAÇÃO — aparelho com sessão anterior e sem pedido de
+        saída vê "Restaurando sua sessão…" cobrindo o form até o Auth
+        responder (auto-desamarra em 12 s se o boot morrer; some com
+        a sessão ou com a ausência CONFIRMADA dela); (2)
+        aplicarConfere NÃO recarrega com o scanner/foto em uso
+        (atualização espera a próxima volta); (3) DIAGNÓSTICO
+        PERMANENTE — a perda grava {em, caso, versão, navegação} em
+        localStorage e pinta "Última sessão perdida: …" embaixo do
+        form (o toast some, a linha fica; print já entrega a causa),
+        e a linha é apagada quando a sessão volta; (4) 📸 Usar foto
+        agora tenta PRIMEIRO a foto interna (takePhoto full-res do
+        auxílio, sem trocar de app — mesma leitura que o dono provou
+        que lê); a câmera do celular só abre se a interna não ler,
+        com aviso no meio; (5) aviso de foto que não chega explica a
+        mensagem enganosa e sugere forçar a parada do app Câmera;
+        toast do 'avisar' sem a teoria do espaço (250 GB livres).
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -657,7 +685,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261022-075815">
+<meta name="nii-build" content="20261022-084225">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -2558,8 +2586,29 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
       <div id="loginErro"></div>
     </form>
     <div id="loginVer" style="margin-top:14px;font-size:11px;opacity:.5"></div>
+    <div id="loginDiag" style="margin-top:6px;font-size:11px;opacity:.55"></div>
   </div>
 </div>
+
+<!-- VÉU DE RESTAURAÇÃO (código 55): o form de login é o estado FRIo de
+     toda recarga — na volta da câmera (check de versão após 5 min
+     escondido) ou com a aba descartada pelo Chrome, ele ficava visível
+     vários segundos em rede lenta e o dono lia como "deslogou" (relato
+     22/10). Este aparelho já teve sessão e não pediu saída? O véu
+     cobre o form até o Auth responder — só a ausência CONFIRMADA de
+     sessão mostra o form de novo. -->
+<div id="niiRestaurando" style="position:fixed;inset:0;z-index:10000;display:none;align-items:center;justify-content:center;background:linear-gradient(180deg,var(--side) 0%,#0a1620 100%);color:#cbd5e1;font:600 14px system-ui;text-align:center;padding:24px">
+  <div><div style="font-size:34px;letter-spacing:6px;font-weight:800;color:#7dd3fc;margin-bottom:12px">NII</div>Restaurando sua sessão…</div>
+</div>
+<script>
+try{
+  if(localStorage.getItem('foiLogado')==='1' && !localStorage.getItem('motivoSaida')){
+    var v=document.getElementById('niiRestaurando');
+    if(v){ v.style.display='flex'; try{sessionStorage.setItem('veuMostradoEm',String(Date.now()));}catch(_){} }
+    setTimeout(function(){ if(v) v.style.display='none'; },12000); /* boot morto: desamarra sozinho */
+  }
+}catch(_){}
+</script>
 
 <!-- CÃO DE GUARDA DA SESSÃO: se a página morrer antes de armar o login
      (CDN do Firebase fora, script travado, rede ruim no retorno da
@@ -3295,6 +3344,7 @@ function mensagemErroLogin(err){
    automática). Não é mais preciso gravar sessão em localStorage/cookies. */
 function mostrarApp(u){
   usuarioAtual=u;
+  try{const v=$('#niiRestaurando');if(v)v.style.display='none';}catch(_){}  /* sessão chegou: véu fora */
   $('#loginOverlay').innerHTML=`<div class="login-box" style="text-align:center">
     <div class="mark">NII</div><h2>Patrimonios</h2>
     <p class="sub">Sincronizando dados com o servidor…</p>
@@ -3304,6 +3354,7 @@ function mostrarApp(u){
   iniciarBackupMeta();
 }
 function revelarApp(){
+  try{const v=$('#niiRestaurando');if(v)v.style.display='none';}catch(_){}
   $('#loginOverlay').classList.add('hidden');
   document.body.classList.add('logado');
   document.body.classList.toggle('admin',souAdmin());
@@ -3516,8 +3567,22 @@ function pintarVersaoLogin(){
 }
 pintarVersaoLogin();
 setInterval(pintarVersaoLogin,5000);   /* o "aberto há Ns" acompanha quem espera na tela */
+/* Linha permanente da última perda de sessão (código 55): o toast some;
+   esta fica — print dela já entrega quando/qual versão/causa. */
+function pintarDiagSessao(){
+  try{
+    const el=$('#loginDiag');if(!el)return;
+    const d=JSON.parse(localStorage.getItem('sessaoDiag')||'null');
+    el.textContent=(d&&d.em)?('Última sessão perdida: '+new Date(d.em).toLocaleString('pt-BR')+' · '+(d.versao||'?')+(d.caso?(' · '+d.caso):'')):'';
+  }catch(_){}
+}
+pintarDiagSessao();
 function aplicarConfere(a){
   if(a!=='atualizando')return;
+  /* Scanner/foto em andamento: NÃO recarrega agora — matar a leitura no
+     meio (volta da câmera, foto em curso) e o dono lia como "deslogou"
+     (código 55). A atualização espera a próxima volta natural. */
+  try{ if(scanAtivo || Date.now() < scanFotoAte){ console.log('[NII] atualização disponível, mas o scanner está em uso — aplico depois.'); return; } }catch(_){}
   try{ /* aviso à prova de erro: o reload acontece de qualquer jeito */
     const c=document.createElement('div');
     c.style.cssText='position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#f5f7fa;color:#4b5563;font:600 14px system-ui;z-index:99999';
@@ -3541,6 +3606,12 @@ auth.onAuthStateChanged(async fbUser=>{
        novo, avisa em tela com diagnóstico (só acontece uma vez —
        authRetry é apagado quando a sessão volta). */
     const caso=decidirSemSessao();
+    /* Diagnóstico PERMANENTE (código 55): grava quando/qual versão
+       perdeu a sessão — o toast some, a linha debaixo do login fica (e
+       o print do dono já entrega a causa sem depurar de longe). */
+    if(caso!=='tentar-novamente'){
+      try{ localStorage.setItem('sessaoDiag', JSON.stringify({em:Date.now(),caso:caso,versao:(versaoAberta()||'?'),nav:(typeof diagNavegacao==='function'?diagNavegacao():'')})); pintarDiagSessao(); }catch(_){}
+    }
     if(caso==='tentar-novamente'){
       try{localStorage.setItem('authRetry','1');}catch(_){}
       console.warn('[NII] sessão sumiu sem aviso ('+versaoAberta()+' · '+diagNavegacao()+') — recarregando para restaurar.');
@@ -3563,8 +3634,9 @@ auth.onAuthStateChanged(async fbUser=>{
     /* Sem sessão: garante que o overlay de login está visível */
     document.body.classList.remove('logado','admin');
     $('#loginOverlay').classList.remove('hidden');
+    try{const v=$('#niiRestaurando');if(v)v.style.display='none';}catch(_){}  /* sessão CONFIRMADA ausente: forma à mostra */
     if(caso==='avisar'){
-      toast('⚠ <b>Sessão encerrada sem aviso</b> ('+(versaoAberta()||'?')+' · '+diagNavegacao()+'). Entre de novo — e se aparecer esta linha de novo, me mande o texto dela. Se o aparelho estiver <b>sem espaço</b>, o navegador não consegue guardar a sessão: libere espaço e entre de novo.','bad');
+      toast('⚠ <b>Sessão encerrada sem aviso</b> ('+(versaoAberta()||'?')+' · '+diagNavegacao()+'). Entre de novo — e se aparecer esta linha de novo, me mande o print desta tela: a linha embaixo do login já guarda o diagnóstico (quando, qual versão).','bad');
     }
     return;
   }
@@ -3573,7 +3645,7 @@ auth.onAuthStateChanged(async fbUser=>{
   /* Sessão (re)ativa: limpa os bilhetes da saída anterior e marca que este
      aparelho já teve sessão — é a condição para o auto-restauramento acima
      só agir em quem realmente estava logado. */
-  try{ localStorage.removeItem('motivoSaida'); localStorage.removeItem('authRetry'); localStorage.setItem('foiLogado','1'); }catch(_){}
+  try{ localStorage.removeItem('motivoSaida'); localStorage.removeItem('authRetry'); localStorage.removeItem('sessaoDiag'); localStorage.setItem('foiLogado','1'); }catch(_){}
   /* Monta a sessão a partir do usuário autenticado; tenta achar o cadastro
      do técnico para exibir o nome completo. */
   let t=null;
@@ -4475,6 +4547,30 @@ async function obterDetectorAssist(){
   }catch(_){ return null; }
 }
 
+/* FOTO INTERNA ANTES DA CÂMERA DO CELULAR (código 55): a câmera do
+   S23+ relata "não foi salva por falta de espaço" SEM ter o aparelho
+   cheio (relato 22/10: 250 GB livres) e a foto nem chega ao
+   navegador. O app já tem a MESMA leitura full-res na mão (takePhoto
+   do auxílio, a mesma 📸 que o dono provou que lê) — tenta ela na
+   hora, sem trocar de app; só se não ler que a câmera do celular abre
+   como sempre abriu. */
+async function tentarFotoInterna(){
+  try{
+    if(!scanAtivo || !scanImageCapture) return false;
+    if(scanAssistOcupada) return false;          /* foto em voo: o automático segue */
+    const det = await obterDetectorAssist();
+    if(!det) return false;
+    scanAssistProx = 0;                          /* pressionou: sem folga de cooldown */
+    toast('Tirando a foto interna (full-res)…');
+    let lido = false;
+    await assistenciaPorFoto(det, (codigos)=>{
+      const pronto = confirmarLeitura(codigos[0].rawValue);
+      if(pronto){ lido = true; aplicarLeitura(pronto); }
+    });
+    return lido;
+  }catch(_){ return false; }
+}
+
 /* ===== VARREDURA DE FOCO (código 52) ====================================
    O S23+ (e outros) expõe ao Chrome APENAS focusMode 'manual': o
    continuous/single-shot é rejeitado, o foco fica PRESO no ponto em que
@@ -4810,7 +4906,7 @@ function avisoFotoNaoChegou(){
   const agora = Date.now();
   if(agora < _fotoNaoChegouAte) return;
   _fotoNaoChegouAte = agora + 3000;
-  toast('A foto <b>não chegou</b> ao sistema — se o celular avisou "sem espaço", libere o espaço do aparelho e tente de novo. O scanner continua aberto.','warn');
+  toast('A foto <b>não chegou</b> ao sistema — o app da câmera cancelou ou falhou (às vezes avisa "falta de espaço" mesmo com o aparelho com espaço livre: force a parada do app <b>Câmera</b> e tente de novo). O scanner continua aberto.','warn');
 }
 document.addEventListener('cancel',e=>{
   if(e.target && e.target.id==='fileScanFoto') avisoFotoNaoChegou();
@@ -4836,9 +4932,17 @@ document.addEventListener('click',e=>{
        3 min do 52 ficava curta; se ele desistir, o relógio comum volta a
        correr sozinho, sem furar a saída por inatividade. */
     scanFotoAte = Date.now() + 600000;
+    /* Código 55: 1º a foto interna (takePhoto full-res, sem trocar de
+       app); a câmera do celular é o plano B — ela às vezes nem devolve
+       o arquivo (mensagem "sem espaço" enganosa, aparelho com 250 GB
+       livres). */
     const inp = $('#fileScanFoto');
-    inp.value = '';
-    inp.click();
+    tentarFotoInterna().then(lido=>{
+      if(lido){ if(!scanContinuo) pararScanner(); return; }
+      toast('Não li pela foto interna — abrindo a câmera do celular…','warn');
+      inp.value = '';
+      inp.click();
+    }).catch(()=>{ inp.value = ''; inp.click(); });
   }
 });
 document.addEventListener('click',e=>{
