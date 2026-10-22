@@ -860,6 +860,21 @@
         empréstimo e no cadastro o Enter avança de campo — além do
         campo de colar do 62 e de todos os dados.
 
+    64. 🗑 APAGAR INVENTÁRIO (pedido do dono) — código 64 (22/10).
+        Botão "🗑 Apagar" (só-administrador) na barra de ações do
+        inventário escolhido, ao lado de Encerrar/Reabrir. Apaga o
+        ESTADO INTEIRO: o cabeçalho (seção inventarios — a
+        sincronização leva a remoção para o Firestore), o espelho
+        local das conferências (db.invConfs, que ia ao
+        localStorage/backup) e TODOS os documentos invC_* no
+        Firestore — a busca é pelo campo inv, então alcança também
+        setores já excluídos, apagados em lote único. DUAS
+        confirmações (mesma política do zerar numeração do código 41);
+        equipamentos, setores e empréstimos ficam intactos.
+        invNuvemCarregar ganhou trava: um "Atualizar da nuvem" em
+        andamento não ressuscita o espelho de um inventário apagado.
+        Fluxo: escolher o inventário → 🗑 Apagar → Continuar → Apagar.
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -867,7 +882,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261022-160647">
+<meta name="nii-build" content="20261022-171730">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -2397,6 +2412,7 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
               <button class="btn btn-ghost btn-sm" id="btnInvAtualizar">🔄 Atualizar da nuvem</button>
               <button class="btn btn-ghost btn-sm apenas-admin" id="btnInvEncerrar">🔒 Encerrar inventário</button>
               <button class="btn btn-ghost btn-sm apenas-admin" id="btnInvReabrirInv" style="display:none">🔓 Reabrir inventário</button>
+              <button class="btn btn-danger btn-sm apenas-admin" id="btnInvApagar" title="Apaga o inventário e todas as conferências (nuvem e local)">🗑 Apagar</button>
             </div>
           </div>
         </div>
@@ -6890,7 +6906,7 @@ async function invNuvemCarregar(invId){
   /* lê em paralelo o documento de cada setor e funde com o local mantendo a
      conferência de maior horário. Silenciosa: a tela já funciona com o
      espelho local — a nuvem só completa o que falta. */
-  if(!invId)return;
+  if(!invId||!invDe(invId))return;   /* código 64: inventário apagado não ressuscita */
   try{
     const respostas=await Promise.all(db.setores.map(s=>
       fsdb.collection('sistema').doc(invDocNome(invId,s.id)).get()
@@ -6905,6 +6921,7 @@ async function invNuvemCarregar(invId){
       }
     }
     if(mudou){
+      if(!invDe(invId))return;   /* código 64: apagado no meio da leitura — não grava */
       try{localStorage.setItem(LS,JSON.stringify(db));}catch(_){}
       if(invSelId===invId){invRender();if(invSetorAtual)invRenderSetor();}
     }
@@ -7228,6 +7245,54 @@ $('#btnInvReabrirInv').addEventListener('click',()=>{
     inv.status='aberto'; inv.encerradoEm=null;
     persistir(); invRender();
   },'Reabrir');
+});
+/* ===== CÓDIGO 64 — APAGAR INVENTÁRIO (pedido do dono, 22/10) =====
+   Apaga o ESTADO INTEIRO do inventário escolhido: o cabeçalho (seção
+   inventarios — a sincronização leva a remoção para o Firestore), o
+   espelho local das conferências (db.invConfs — localStorage/backup) e
+   os documentos invC_* de cada setor NO FIRESTORE (busca pelo campo
+   inv, então alcança também setores já excluídos). Duas confirmações —
+   mesma política do zerar numeração — e só-administrador. Equipamentos,
+   setores e empréstimos não são tocados. */
+async function apagarInventario(inv){
+  try{
+    const i=invs().findIndex(x=>x.id===inv.id);
+    if(i>=0)invs().splice(i,1);
+    const m=invConfs(),pref=inv.id+'|';
+    Object.keys(m).forEach(k=>{if(k.indexOf(pref)===0)delete m[k];});
+    if(invSelId===inv.id){invSelId=null;invSetorAtual=null;invDivPendente=null;invTela(null);}
+    persistir();   /* local + marca a seção suja + sincroniza a remoção */
+    invRender();
+    toast('🗑 Inventário <b>'+esc(inv.nome)+'</b> apagado (cabeçalho e conferências locais).','ok');
+    /* conferências da nuvem: acha TODOS os invC_ deste inventário e
+       apaga em um lote só */
+    try{
+      const snap=await fsdb.collection('sistema').where('inv','==',inv.id).get();
+      if(!snap.empty){
+        const lote=fsdb.batch();
+        snap.forEach(d=>lote.delete(d.ref));
+        await lote.commit();
+        toast('Nuvem: '+snap.size+' documento(s) de conferência apagado(s).','ok');
+      }
+    }catch(nuvErr){console.warn('Apagar inventário: conferências da nuvem não apagaram agora:',nuvErr);}
+  }catch(err){
+    console.error('Apagar inventário falhou:',err);
+    toast('Não consegui apagar agora: '+esc(String(err&&err.message||err)),'bad');
+  }
+}
+$('#btnInvApagar').addEventListener('click',()=>{
+  if(!souAdmin())return toast('Somente administrador.','bad');
+  const inv=invDe(invSelId);
+  if(!inv)return toast('Escolha um inventário primeiro.','warn');
+  confirmar('Apagar '+inv.nome+'?',
+    'Apaga o inventário e TODAS as conferências dos setores (nuvem e local). '+
+    '<b>Equipamentos, setores e empréstimos não são afetados.</b> '+
+    'Se quiser guardar o histórico, faça antes um 💾 backup.',
+    ()=>{
+      confirmar('Tem certeza? '+inv.nome,
+        'Última chance: esta apagagem não pode ser desfeita aqui (só um backup antigo restauraria).',
+        ()=>apagarInventario(inv),'Apagar');
+    },'Continuar');
 });
 $('#btnInvRelatorio').addEventListener('click',()=>{invTela('relat');invRenderRelatorio();});
 $('#btnInvRelVoltar').addEventListener('click',()=>{invTela('painel');invRender();});
