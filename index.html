@@ -887,6 +887,23 @@
         ano). A lista continua ordenada por ano, desempate por data de
         criação.
 
+    66. 🪦 INVENTÁRIO NÃO VOLTAVA MAIS (bug do dono) — código 66
+        (23/10). "Deleto o inventário, sai e entrou de novo, ele
+        volta." Causa: o apagar do código 64 tirava o item só da lista
+        local, SEM registrar a exclusão na memória de lápides
+        (marcarRemovido) que o motor de sincronização usa — sem a
+        lápide, a fusão tratava o cabeçalho que ainda estava na nuvem
+        como "novidade de outro usuário" e o devolvia no login.
+        Correção em duas camadas: (1) marcarRemovido('inventarios',…)
+        antes do splice — a lápide bloqueia a ressurreição nos DOIS
+        ramos da fusão e sobrevive ao logout; (2) nova
+        invNuvemApagarInventario() grava a seção direto na nuvem
+        (transação, formato {items:[…]}), sem depender dos portões
+        sujo/secaoRecebida — se a leitura do servidor ainda não tinha
+        chegado, o empurrão normal ficaria para depois e o login
+        seguinte devolveria o item. Teste-regrressão: aplicarSecao com
+        o item "voltando" da nuvem não o ressuscita.
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -894,7 +911,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261023-091635">
+<meta name="nii-build" content="20261023-095853">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -7273,14 +7290,40 @@ $('#btnInvReabrirInv').addEventListener('click',()=>{
    inv, então alcança também setores já excluídos). Duas confirmações —
    mesma política do zerar numeração — e só-administrador. Equipamentos,
    setores e empréstimos não são tocados. */
+/* Código 66: leva a exclusão do cabeçalho direto para a nuvem, sem
+   depender dos portões da sincronização (sujo/secaoRecebida) — se a
+   seção ainda não tinha lido o servidor, o empurrão normal fica para
+   depois e o próximo login devolve o item. Gravação pontual da seção
+   `inventarios`, no mesmo formato do motor ({items:[…]}). */
+async function invNuvemApagarInventario(invId){
+  try{
+    const ref=docRefSecao('inventarios');
+    await fsdb.runTransaction(async tx=>{
+      const snap=await tx.get(ref);
+      if(!snap.exists)return;
+      const dados=snap.data()||{};
+      if(!Array.isArray(dados.items))return;
+      const itens=dados.items.filter(x=>x&&x.id!==invId);
+      if(itens.length===dados.items.length)return;   /* não tinha lá */
+      tx.set(ref,{items:itens},{merge:true});
+    });
+  }catch(err){console.warn('Inventário: cabeçalho não foi para a nuvem agora:',err);}
+}
 async function apagarInventario(inv){
   try{
+    /* Código 66 (bug do dono, 23/10): a exclusão entra na memória de
+       lápides ANTES de sumir da lista. Sem marcarRemovido, a fusão da
+       sincronização tratava o item que ainda estava na nuvem como
+       "novidade de outro usuário" e o inventário voltava no próximo
+       login — mesmo apagado no aparelho. */
+    marcarRemovido('inventarios',inv.id);
     const i=invs().findIndex(x=>x.id===inv.id);
     if(i>=0)invs().splice(i,1);
     const m=invConfs(),pref=inv.id+'|';
     Object.keys(m).forEach(k=>{if(k.indexOf(pref)===0)delete m[k];});
     if(invSelId===inv.id){invSelId=null;invSetorAtual=null;invDivPendente=null;invTela(null);}
     persistir();   /* local + marca a seção suja + sincroniza a remoção */
+    invNuvemApagarInventario(inv.id);   /* código 66: nuvem limpa sem depender do portão */
     invRender();
     toast('🗑 Inventário <b>'+esc(inv.nome)+'</b> apagado (cabeçalho e conferências locais).','ok');
     /* conferências da nuvem: acha TODOS os invC_ deste inventário e
