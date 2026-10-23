@@ -904,6 +904,24 @@
         seguinte devolveria o item. Teste-regrressão: aplicarSecao com
         o item "voltando" da nuvem não o ressuscita.
 
+    67. 📖 GUIA DO INVENTÁRIO NA TELA — código 67 (23/10)
+        Pedido do dono: "crie um passo a passo para o usuário poder
+        consultar quando for usar a função do inventário, igual ao
+        que foi feito no Backup e Restauração". Mesmo modelo do guia
+        de backup (código 44): cartão inline na própria tela de
+        Inventário (id guiaInvCard / guiaInvTexto), com 6 seções em
+        <details> — 🅰️ criar (data da coleta, nome pt-BR, mais de um
+        por ano), 🅱️ conferir (filtro de setor, busca por patrimônio,
+        Enter/leitor USB, toque desfaz, sem câmera), 🅲 divergência
+        (Cancelar / Só registrar / Registrar e atualizar o setor),
+        🅳 concluir setor + relatório (xlsx/impressão), 🅴 atualizar,
+        encerrar e apagar (2 confirmações, não volta), 🅵 dicas
+        (nuvem a cada toque, sem setor, ⛔ indisponível, badge). O
+        botão "⬇ Baixar este guia (TXT)" repete o padrão do backup —
+        e o varredor virou função compartilhada baixarGuiaTxt(raiz,
+        título, arquivo), atendendo os DOIS guias sem duplicar
+        código. O guia é para qualquer usuário (não é só-admin).
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -911,7 +929,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261023-095853">
+<meta name="nii-build" content="20261023-113805">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -2493,6 +2511,78 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
             <div class="inv-kpis" id="invRelKpis"></div>
             <div style="overflow-x:auto"><table id="invRelSetores"></table></div>
             <div id="invRelListas" style="margin-top:14px"></div>
+          </div>
+        </div>
+
+        <!-- CÓDIGO 67 — GUIA DO INVENTÁRIO (pedido do dono, 23/10):
+             mesmo modelo do guia de backup — passo a passo consultável
+             dentro da própria tela, para o usuário que for fazer a
+             coleta. O cartão é a FONTE ÚNICA: o botão TXT varre este
+             HTML e escreve o texto, sem duplicar conteúdo. -->
+        <div class="card" style="margin-top:14px" id="guiaInvCard">
+          <div class="card-h">
+            <h3>📖 Guia do inventário</h3>
+            <span class="sub">passo a passo para criar, conferir e fechar — clique nos títulos para abrir</span>
+          </div>
+          <div class="card-b" id="guiaInvTexto">
+            <details open>
+              <summary>🅰️ Criar o inventário (só administrador)</summary>
+              <ol>
+                <li>Abra o menu <b>📋 Inventário</b> e clique em <b>➕ Novo inventário</b>.</li>
+                <li>O campo <b>Data da coleta</b> já abre com <b>hoje</b> — troque se a coleta for em outro dia.</li>
+                <li>Clique em <b>Criar</b>. O inventário sai com o nome <b>"Inventário dd/mm/aaaa"</b>.</li>
+                <li>Dá para criar <b>mais de um no mesmo ano</b> (1º e 2º semestre, por exemplo); a <b>mesma data</b> é bloqueada.</li>
+              </ol>
+            </details>
+            <details>
+              <summary>🅱️ Conferir os bens (o dia a dia da coleta)</summary>
+              <ol>
+                <li>Escolha o inventário no quadro de cima — o painel mostra <b>bens, conferidos, a conferir e setores concluídos</b>.</li>
+                <li>Filtre o setor pelo nome em <b>🔍 Filtre o setor pelo nome</b> (ignora caixa e acentos) e <b>toque na linha</b> para abrir o setor.</li>
+                <li>Dentro do setor, <b>digite ou cole a parte do patrimônio</b> (ou tipo/marca) e confirme: <b>Enter</b> confirma o primeiro da lista, ou <b>toque direto na linha</b>.</li>
+                <li>O bem fica <b>✓ conferido com a hora</b>. <b>Toque de novo na linha para desfazer</b> um toque errado.</li>
+                <li>Com <b>leitor de código de barras USB</b>: aponte, dispare, e o patrimônio cai no campo — o Enter do próprio leitor confirma.</li>
+              </ol>
+              <p>⚠ <b>Atenção:</b> o sistema não tem câmera — digite, cole ou use o leitor USB.</p>
+            </details>
+            <details>
+              <summary>🅲 Bem encontrado fora do setor (divergência)</summary>
+              <p>Se um patrimônio lotado em <b>outro setor</b> for conferido aqui, abre o aviso <b>⚠ Bem fora do setor</b> com três caminhos:</p>
+              <ul>
+                <li><b>Cancelar</b> — não faz nada.</li>
+                <li><b>Só registrar divergência</b> — anota no relatório, <b>sem mudar</b> o cadastro do bem.</li>
+                <li><b>Registrar e atualizar o setor</b> — anota E <b>muda o bem para o setor onde ele foi encontrado</b> (correção do cadastro no meio da coleta).</li>
+              </ul>
+            </details>
+            <details>
+              <summary>🅳 Concluir o setor e ver o relatório</summary>
+              <ol>
+                <li>Terminou o setor? Clique em <b>✔ Concluir setor</b> e confirme: o que faltar entra como <b>não localizado</b> no relatório. Dá para <b>↩ Reabrir</b> depois.</li>
+                <li>No painel, clique em <b>📊 Ver relatório</b>: conferidos, divergências, <b>🚫 não localizados</b> (dos setores concluídos) e pendentes, por setor.</li>
+                <li>Leve para o papel com <b>⬇ Planilha (xlsx)</b> ou <b>🖨 Imprimir</b>.</li>
+              </ol>
+            </details>
+            <details>
+              <summary>🅴 Atualizar, encerrar e apagar (administrador)</summary>
+              <ul>
+                <li><b>🔄 Atualizar da nuvem</b> — traz as conferências feitas em outros aparelhos (celular × PC).</li>
+                <li><b>🔒 Encerrar inventário</b> — ninguém confirma mais e o relatório vira somente leitura (dá para 🔓 reabrir).</li>
+                <li><b>🗑 Apagar</b> — apaga o inventário e <b>todas</b> as conferências (nuvem e local), com <b>duas confirmações</b>. Depois de apagado ele <b>não volta</b> mais — nem saindo e entrando de novo.</li>
+              </ul>
+            </details>
+            <details>
+              <summary>🅵 Dicas que evitam dor de cabeça</summary>
+              <ul>
+                <li>As conferências ficam <b>salvas na nuvem a cada toque</b> — pode parar no meio e continuar em outro aparelho.</li>
+                <li>Bens <b>sem setor cadastrado</b> não entram em nenhum setor — o painel avisa com ⚠ "sem setor"; corrija o cadastro em Equipamentos.</li>
+                <li>O <b>⛔ indisponível</b> na linha é um aviso do cadastro do bem — não impede a conferência.</li>
+                <li>Um inventário <b>encerrado</b> sai do badge do menu; 🔓 reabrir devolve a conferência.</li>
+              </ul>
+            </details>
+            <div class="row" style="margin-top:12px;gap:8px;flex-wrap:wrap;align-items:center">
+              <button class="btn btn-ghost btn-sm" id="btnGuiaInvTxt">⬇ Baixar este guia (TXT)</button>
+              <span class="subtle">O mesmo texto, para guardar ou imprimir fora do sistema.</span>
+            </div>
           </div>
         </div>
 
@@ -6877,8 +6967,9 @@ $('#fileImport').addEventListener('change',e=>{
 /* --- 📖 Guia em TXT: o cartão do guia é a fonte única — este varredor
    escreve um texto legível (listas numeradas com recuo, títulos dos
    <details> como seções) e baixa como arquivo .txt para guardar ou
-   imprimir fora do sistema. */
-$('#btnGuiaBkpTxt').addEventListener('click',()=>{
+   imprimir fora do sistema. CÓDIGO 67: virou função compartilhada —
+   o mesmo varredor atende o guia de backup e o guia do inventário. */
+function baixarGuiaTxt(raizId,titulo,arquivo){
   const limpo=s=>s.replace(/\s+/g,' ').trim();
   const linhas=[];
   const andar=no=>{
@@ -6891,17 +6982,23 @@ $('#btnGuiaBkpTxt').addEventListener('click',()=>{
       else andar(f);
     }
   };
-  andar(document.getElementById('guiaBackupTexto'));
-  const txt='GUIA DE BACKUP E RESTAURAÇÃO — SEDEF / Núcleo de Informática\r\n'+
+  andar(document.getElementById(raizId));
+  const txt=titulo+'\r\n'+
             'Gerado em '+new Date().toLocaleString('pt-BR')+'\r\n\r\n'+
             linhas.join('\r\n')+'\r\n';
   const blob=new Blob([txt],{type:'text/plain;charset=utf-8'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
-  a.download='guia-backup-restauracao.txt';
+  a.download=arquivo;
   a.click();
   URL.revokeObjectURL(a.href);
   toast('Guia baixado (TXT).');
+}
+$('#btnGuiaBkpTxt').addEventListener('click',()=>{
+  baixarGuiaTxt('guiaBackupTexto','GUIA DE BACKUP E RESTAURAÇÃO — SEDEF / Núcleo de Informática','guia-backup-restauracao.txt');
+});
+$('#btnGuiaInvTxt').addEventListener('click',()=>{
+  baixarGuiaTxt('guiaInvTexto','GUIA DO INVENTÁRIO PATRIMONIAL — SEDEF / Núcleo de Informática','guia-inventario.txt');
 });
 
 /* ============== INVENTÁRIO PATRIMONIAL (código 45) ============== */
