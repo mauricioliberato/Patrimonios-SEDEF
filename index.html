@@ -875,6 +875,18 @@
         andamento não ressuscita o espelho de um inventário apagado.
         Fluxo: escolher o inventário → 🗑 Apagar → Continuar → Apagar.
 
+    65. 📅 INVENTÁRIO COM DATA DA COLETA (pedido do dono) — código 65
+        (23/10). "Pode ocorrer mais de uma vez no ano": o form de
+        criação passou de "Ano" para "Data da coleta" (input type=date,
+        já abre com hoje). O nome sai em pt-BR ("Inventário
+        23/10/2026") e o objeto guarda data+ano — inventários antigos
+        (só ano) continuam válidos. A trava de duplicidade vira POR
+        DIA: dois inventários no mesmo ano agora convivem (ex.: 1º e
+        2º semestre); mesma data continua bloqueada. O nome do
+        arquivo/aba do XLSX do relatório segue a data (fallback: o
+        ano). A lista continua ordenada por ano, desempate por data de
+        criação.
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -882,7 +894,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261022-171730">
+<meta name="nii-build" content="20261023-091635">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -2401,8 +2413,8 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
               <span class="subtle" id="invSelVazio" style="display:none">Nenhum inventário ainda — o administrador cria o primeiro.</span>
             </div>
             <div id="invFormCriar" style="display:none;margin-top:10px;gap:8px;align-items:center">
-              <label style="display:flex;gap:6px;align-items:center;font-size:13px">Ano
-                <input id="invAno" type="number" min="2020" max="2100" style="width:100px" value="2026">
+              <label style="display:flex;gap:6px;align-items:center;font-size:13px">Data da coleta
+                <input id="invData" type="date" min="2020-01-01" style="width:160px">
               </label>
               <button class="btn btn-dark btn-sm" id="btnInvCriarOk">Criar</button>
               <button class="btn btn-ghost btn-sm" id="btnInvCriarCancelar">Cancelar</button>
@@ -7205,16 +7217,23 @@ $('#invSel').addEventListener('change',()=>{
 $('#btnInvNovo').addEventListener('click',()=>{
   if(!souAdmin())return toast('Somente administrador pode criar inventário.','bad');
   $('#invFormCriar').style.display='flex';
-  $('#invAno').value=new Date().getFullYear();
-  $('#invAno').focus();
+  $('#invData').value=hojeISO();   /* código 65: data da coleta — pode haver mais de um por ano */
+  $('#invData').focus();
 });
 $('#btnInvCriarCancelar').addEventListener('click',()=>{$('#invFormCriar').style.display='none';});
 $('#btnInvCriarOk').addEventListener('click',()=>{
   if(!souAdmin())return toast('Somente administrador pode criar inventário.','bad');
-  const ano=parseInt($('#invAno').value,10);
-  if(!ano||ano<2020||ano>2100)return toast('Ano inválido.','bad');
-  if(invs().some(x=>x.ano===ano))return toast('Já existe um <b>Inventário '+ano+'</b>.','warn');
-  const novo={id:uid(),nome:'Inventário '+ano,ano:ano,criadoEm:Date.now(),criadoPor:(usuarioAtual&&usuarioAtual.nome)||'',status:'aberto',setores:{}};
+  /* código 65: a coleta tem DATA (dia/mês/ano) — pode haver mais de um
+     inventário por ano (ex.: 1º e 2º semestre). A trava de duplicidade
+     passa a ser por dia e o nome sai no formato brasileiro. */
+  const data=String($('#invData').value||'');
+  const mDt=data.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(!mDt)return toast('Data inválida.','bad');
+  const ano=parseInt(mDt[1],10);
+  if(ano<2020||ano>2100)return toast('Data fora do intervalo (2020–2100).','bad');
+  const nome='Inventário '+mDt[3]+'/'+mDt[2]+'/'+mDt[1];
+  if(invs().some(x=>x.data===data))return toast('Já existe um <b>'+esc(nome)+'</b>.','warn');
+  const novo={id:uid(),nome:nome,ano:ano,data:data,criadoEm:Date.now(),criadoPor:(usuarioAtual&&usuarioAtual.nome)||'',status:'aberto',setores:{}};
   invs().push(novo);
   invSelId=novo.id;
   persistir();
@@ -7379,8 +7398,9 @@ $('#btnInvPlanilha').addEventListener('click',()=>{
   const ws=XLSX.utils.aoa_to_sheet(aoa);
   ws['!cols']=cab.map(()=>({wch:24}));
   const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,ws,('Inventario '+inv.ano).slice(0,31));
-  XLSX.writeFile(wb,nomeArquivoPlanilha('Inventario_'+inv.ano,'Relatorio'));
+  const sufInv=inv.data||inv.ano||'';   /* código 65: arquivo segue a data da coleta */
+  XLSX.utils.book_append_sheet(wb,ws,('Inventario '+sufInv).slice(0,31));
+  XLSX.writeFile(wb,nomeArquivoPlanilha('Inventario_'+sufInv,'Relatorio'));
   toast(r.linhas.length+' linha(s) de <b>'+esc(inv.nome)+'</b> exportada(s).');
 });
 $('#btnInvImprimir').addEventListener('click',()=>{
