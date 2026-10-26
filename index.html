@@ -984,11 +984,35 @@
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
--->
+
+   68. 🔎 INVENTÁRIO: BEM FORA DO SETOR E BEM NÃO CADASTRADO (código 68,
+       26/10). Relato do dono: ao conferir um setor e digitar um patrimônio
+       que não estava na lista dele, o sistema só dizia que não achou.
+       Causa: a busca do setor só enxergava os bens JÁ lotados nele, então
+       o aviso de divergência (que existia em invConferir) nunca era
+       alcançado. Agora, com a lista do setor vazia e um nº numérico
+       digitado, o Enter procura no CADASTRO INTEIRO: (a) achou o bem em
+       OUTRO setor — abre o aviso de divergência que já existia (só
+       registrar, ou registrar e atualizar o setor); (b) não existe no
+       cadastro — abre novo aviso com duas saídas: "Só registrar no
+       inventário" (guarda como NÃO CADASTRADO, sem mexer em equipamentos)
+       ou "Registrar e cadastrar equipamento" (abre o cadastro já com o
+       patrimônio e o setor preenchidos; ao salvar o inventário volta
+       sozinho e o bem já entra como conferido). Nº com menos de 12
+       dígitos sem achado exato: se UM só bem contém o número, usa esse;
+       vários, pede o número completo. Os não cadastrados ficam na tela do
+       setor (lista própria, com Cadastrar e desfazer) e entram no
+       relatório, na planilha e na impressão (situação "Não cadastrado",
+       coluna e total próprios). Armazenamento: no MESMO documento
+       invC_inv_setor, na chave nc:patrimonio com s:"nc" — nada novo em
+       equipamentos (que passa de 1 MiB). Junto, conserto: "Registrar e
+       atualizar o setor" mudava o setor do bem sem carimbar atualizadoEm
+       (regra do código 29); agora carimba.
+  -->
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261026-100356">
+<meta name="nii-build" content="20261026-190918">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -1246,6 +1270,8 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
 .inv-marc{font-size:12px;font-weight:700;white-space:nowrap}
 .inv-marc.ok{color:#1a7f3c}
 .inv-marc.div{color:#b06d00}
+.inv-linha.nc{background:#eef4ff;border-color:#b9cdf2;cursor:default;flex-wrap:wrap}
+.inv-marc.nc{color:#2a56a6}
 .inv-barra{display:inline-block;vertical-align:middle;width:110px;height:8px;border-radius:6px;background:#e8edf2;overflow:hidden;margin-right:6px}
 .inv-barra i{display:block;height:100%;background:#2f855a;border-radius:6px}
 .inv-kpis{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
@@ -2567,6 +2593,7 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
             </div>
             <div class="subtle" style="margin:8px 0;font-size:12px">Toque na linha (ou Enter) para confirmar — toque de novo para desfazer. Bem de outro setor abre o aviso de divergência.</div>
             <div id="invLista"></div>
+            <div id="invNcLista"></div>
           </div>
         </div>
 
@@ -2617,12 +2644,19 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
             </details>
             <details>
               <summary>🅲 Bem encontrado fora do setor (divergência)</summary>
-              <p>Se um patrimônio lotado em <b>outro setor</b> for conferido aqui, abre o aviso <b>⚠ Bem fora do setor</b> com três caminhos:</p>
+              <p>Digitou um patrimônio que <b>não está na lista do setor</b>? Pressione <b>Enter</b>: o sistema procura no cadastro inteiro. Se o bem estiver lotado em <b>outro setor</b>, abre o aviso <b>⚠ Bem fora do setor</b> com três caminhos:</p>
               <ul>
                 <li><b>Cancelar</b> — não faz nada.</li>
                 <li><b>Só registrar divergência</b> — anota no relatório, <b>sem mudar</b> o cadastro do bem.</li>
                 <li><b>Registrar e atualizar o setor</b> — anota E <b>muda o bem para o setor onde ele foi encontrado</b> (correção do cadastro no meio da coleta).</li>
               </ul>
+              <p>Se o número <b>não existe no cadastro</b>, abre o aviso <b>❓ Patrimônio não cadastrado</b>:</p>
+              <ul>
+                <li><b>Só registrar no inventário</b> — guarda o número como <b>não cadastrado</b> neste setor (aparece embaixo da lista e no relatório); o cadastro de equipamentos não muda.</li>
+                <li><b>Registrar e cadastrar equipamento</b> — registra e abre o cadastro já com o patrimônio e o setor preenchidos. Ao salvar, o sistema volta ao setor e o bem já entra como conferido.</li>
+              </ul>
+              <p>Número com menos de 12 dígitos aparece com um alerta — confira a digitação antes de registrar.</p>
+            </ul>
             </details>
             <details>
               <summary>🅳 Concluir o setor e ver o relatório</summary>
@@ -2664,6 +2698,17 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
               <button class="btn btn-ghost" data-close>Cancelar</button>
               <button class="btn btn-ghost" id="btnInvDivSo">Só registrar divergência</button>
               <button class="btn btn-dark" id="btnInvDivMover">Registrar e atualizar o setor</button>
+            </div>
+          </div>
+        </div>
+        <div class="modal-overlay" id="modalInvNC">
+          <div class="modal" style="width:min(500px,100%)">
+            <div class="modal-h"><h3>❓ Patrimônio não cadastrado</h3><button class="x-close" data-close>&times;</button></div>
+            <div class="modal-b"><p id="invNcMsg" style="font-size:14px;line-height:1.6;color:var(--ink-soft)"></p></div>
+            <div class="modal-f">
+              <button class="btn btn-ghost" data-close>Cancelar</button>
+              <button class="btn btn-ghost" id="btnInvNcSo">Só registrar no inventário</button>
+              <button class="btn btn-dark" id="btnInvNcCad">Registrar e cadastrar equipamento</button>
             </div>
           </div>
         </div>
@@ -4686,6 +4731,7 @@ $('#formEquip').addEventListener('submit',ev=>{
   }else{
     const novo={id:uid(),patrimonio:pat,serie,modeloId,tipo:mod?mod.tipo:'',marca:mod?mod.marca:'',setorId:setor,tecnicoId:tec,data,obs,indisponivel:false,emprestavel,criadoEm:Date.now()};
     db.equipamentos.push(novo);salvoId=novo.id;
+    try{invAposCadastro(novo);}catch(err){console.warn('Inventário pós-cadastro:',err);}   /* código 68 */
     toast('Unidade <b class="mono">'+esc(pat)+'</b> cadastrada'+(mod?' ('+esc(mod.tipo)+' '+esc(mod.marca)+')':'')+'.');
   }
   persistir();resetFormEquip();eqFocoId=salvoId;atualizarTudo();destacarLinha('#eqTbody',salvoId);
@@ -4694,6 +4740,7 @@ $('#formEquip').addEventListener('submit',ev=>{
 let lastResetEq=0;
 $('#formEquip').addEventListener('reset',e=>{const n=Date.now();if(n-lastResetEq<400)return;lastResetEq=n;setTimeout(resetFormEquip,0);});
 function resetFormEquip(){
+  invRetornoCad=null;   /* código 68: cancelou/limpou — não volta ao inventário */
   $('#eqId').value='';
   $('#eqPatrimonio').value='';$('#eqSerie').value='';$('#eqObs').value='';
   $('#eqModelo').value='';$('#eqSetor').value='';$('#eqTecnico').value='';
@@ -7284,7 +7331,7 @@ function invRenderSetor(){
   const contados=todos.filter(e=>cs[e.id]&&(cs[e.id].s==='ok'||cs[e.id].s==='div')).length;
   const fechado=!!(inv.setores&&inv.setores[invSetorAtual]);
   $('#invSetorTitulo').textContent=setNome(invSetorAtual);
-  $('#invSetorSub').textContent=contados+' de '+todos.length+' conferidos'+(fechado?' · setor concluído — reabra para mexer':'');
+  $('#invSetorSub').textContent=contados+' de '+todos.length+' conferidos'+(invNcLista(invSelId,invSetorAtual).length?' · '+invNcLista(invSelId,invSetorAtual).length+' não cadastrado(s)':'')+(fechado?' · setor concluído — reabra para mexer':'');
   $('#btnInvConcluir').style.display=fechado?'none':'';
   $('#btnInvReabrirSetor').style.display=fechado?'':'none';
   const CAP=800;
@@ -7302,7 +7349,8 @@ function invRenderSetor(){
   }).join('');
   $('#invLista').innerHTML=lista.length
     ? html+(lista.length>CAP?'<div class="subtle" style="padding:8px;font-size:12px">…mais '+(lista.length-CAP)+' bem(ns) — refine a busca para alcançar os outros.</div>':'')
-    :'<div class="subtle" style="padding:14px">Nenhum bem deste setor bate com a busca.</div>';
+    :'<div class="subtle" style="padding:14px">Nenhum bem deste setor bate com a busca.'+((()=>{const t=($('#invBusca').value||'').trim();return /^[\d\s.\-]+$/.test(t)&&soDigitos(t);})()?' <b>Pressione Enter</b> para procurar no cadastro inteiro (bem de outro setor ou ainda não cadastrado).':'')+'</div>';
+  invRenderNc();
 }
 function invConferir(eqId,opts){
   opts=opts||{};
@@ -7342,6 +7390,7 @@ $('#btnInvDivMover').addEventListener('click',()=>{
   if(!eq||!invSelId||!invSetorAtual)return;
   const de=eq.setorId;
   eq.setorId=invSetorAtual;
+  eq.atualizadoEm=Date.now();        /* código 68: carimbo da edição (regra do código 29) */
   invConfsSetor(invSelId,invSetorAtual)[eq.id]={t:Date.now(),s:'div',de:de};
   persistir();                       /* mudança no cadastro do bem, como qualquer edição */
   invDepoisDeMudar(invSelId,invSetorAtual);
@@ -7356,6 +7405,133 @@ $('#btnInvDivSo').addEventListener('click',()=>{
   invDepoisDeMudar(invSelId,invSetorAtual);
   toast('Divergência registrada — o cadastro do bem não foi alterado.');
 });
+/* ===== CÓDIGO 68 — BEM FORA DO SETOR / NÃO CADASTRADO =====
+   A busca do setor só lista bens já lotados nele; o Enter com a lista vazia
+   agora procura no cadastro inteiro. Achou em outro setor → aviso de
+   divergência (invConferir). Não existe → aviso "não cadastrado". O registro
+   vai no MESMO documento do setor (invC_inv_setor), chave "nc:<patrimônio>"
+   com s:"nc" — o merge por horário e o backup JSON já cobrem, e nada é
+   gravado em equipamentos. */
+var invRetornoCad=null;     /* {invId,sid,pat}: cadastro aberto a partir do inventário */
+var invNcPendente=null;     /* {pat} esperando resposta no modal */
+function invNcLista(invId,sid){
+  if(!invId||!sid)return [];
+  const cs=invConfsSetor(invId,sid);
+  return Object.keys(cs).filter(k=>k.indexOf('nc:')===0&&cs[k]&&cs[k].s==='nc')
+    .map(k=>({chave:k,pat:cs[k].pat||k.slice(3),x:cs[k]}));
+}
+function invRenderNc(){
+  const box=$('#invNcLista');
+  if(!box)return;
+  const ncs=(invSelId&&invSetorAtual)?invNcLista(invSelId,invSetorAtual):[];
+  if(!ncs.length){box.innerHTML='';return;}
+  ncs.sort((a,b)=>(a.x.t||0)-(b.x.t||0));
+  box.innerHTML='<h4 style="margin:14px 0 6px;font-size:13px">❓ Encontrados e não cadastrados ('+ncs.length+')</h4>'+
+    ncs.map(n=>{
+      const hora=n.x.t?new Date(n.x.t).toLocaleTimeString('pt-BR').slice(0,5):'';
+      const ja=db.equipamentos.find(e=>soDigitos(e.patrimonio)===n.pat);
+      const info=ja?'✓ já cadastrado depois ('+esc(ja.tipo||'')+' '+esc(ja.marca||'')+' · '+esc(setNome(ja.setorId))+')'
+                   :'Não consta no cadastro de equipamentos';
+      return '<div class="inv-linha nc" data-nc="'+esc(n.chave)+'">'+
+        '<span class="mono inv-pat">'+esc(n.pat)+'</span>'+
+        '<span class="inv-info">'+info+(n.x.por?' · '+esc(n.x.por):'')+'</span>'+
+        '<span class="inv-marc nc">❓ '+hora+'</span>'+
+        (ja?'':'<button class="btn btn-ghost btn-sm" data-ncacao="cad">➕ Cadastrar</button>')+
+        '<button class="btn btn-ghost btn-sm" data-ncacao="rem" title="Desfazer este registro">✕</button></div>';
+    }).join('');
+}
+function invProcurarForaDoSetor(){
+  const inv=invDe(invSelId);
+  if(!inv||!invSetorAtual)return;
+  if(inv.status!=='aberto'){toast('Inventário encerrado — reabra para conferir.','warn');return;}
+  const termo=($('#invBusca').value||'').trim();
+  if(!termo){toast('Digite o nº do patrimônio para conferir.','warn');return;}
+  if(!/^[\d\s.\-]+$/.test(termo)){toast('Nenhum bem deste setor bate com a busca. Para procurar fora do setor, digite o <b>nº do patrimônio</b> (só números).','warn');return;}
+  const dig=soDigitos(termo);
+  if(!dig){toast('Digite o nº do patrimônio para conferir.','warn');return;}
+  const exatos=db.equipamentos.filter(e=>soDigitos(e.patrimonio)===dig);
+  if(exatos.length>1){toast('Há <b>'+exatos.length+'</b> cadastros com o patrimônio <b class="mono">'+esc(dig)+'</b> — corrija a duplicidade em Equipamentos.','bad');return;}
+  if(exatos.length===1){invConferir(exatos[0].id,{});return;}   /* outro setor → modal de divergência */
+  if(dig.length<12){
+    /* número curto: tenta achar UM bem que contenha o número, no cadastro todo */
+    const parc=db.equipamentos.filter(e=>soDigitos(e.patrimonio).includes(dig));
+    if(parc.length===1){invConferir(parc[0].id,{});return;}
+    if(parc.length>1){toast('<b>'+parc.length+'</b> bens de outros setores contêm esse número — digite o patrimônio completo.','warn');return;}
+  }
+  invAbrirNaoCadastrado(dig);
+}
+function invAbrirNaoCadastrado(dig){
+  const cs=invConfsSetor(invSelId,invSetorAtual);
+  const ja=cs['nc:'+dig];
+  if(ja&&ja.s==='nc'){toast('<b class="mono">'+esc(dig)+'</b> já está registrado como não cadastrado neste setor.','ok');return;}
+  invNcPendente={pat:dig};
+  $('#invNcMsg').innerHTML='O patrimônio <b class="mono">'+esc(dig)+'</b> <b>não está no cadastro</b> de equipamentos, e você está conferindo <b>'+esc(setNome(invSetorAtual))+'</b>.'+
+    (dig.length!==12?'<br><span style="color:#a33">Atenção: o número tem '+dig.length+' dígito(s) e o padrão é 12 — confira a digitação.</span>':'')+
+    '<br><br>O que fazer?';
+  $('#modalInvNC').classList.add('show');
+}
+function invFecharNaoCadastrado(){invNcPendente=null;$('#modalInvNC').classList.remove('show');}
+function invGravarNaoCad(dig){
+  const inv=invDe(invSelId);
+  if(!inv||!invSetorAtual)return false;
+  if(inv.status!=='aberto'){toast('Inventário encerrado — reabra para conferir.','warn');return false;}
+  invConfsSetor(invSelId,invSetorAtual)['nc:'+dig]={t:Date.now(),s:'nc',pat:dig,por:(usuarioAtual&&usuarioAtual.nome)||''};
+  $('#invBusca').value='';
+  invDepoisDeMudar(invSelId,invSetorAtual);
+  return true;
+}
+function invCadastrarNC(pat){
+  if(!invSelId||!invSetorAtual)return;
+  if(db.equipamentos.some(e=>soDigitos(e.patrimonio)===pat)){toast('Esse patrimônio já está cadastrado.','warn');return;}
+  const sid=invSetorAtual;
+  showView('equipamentos');setEqTab('cadastro');resetFormEquip();
+  $('#eqPatrimonio').value=pat;
+  $('#eqSetor').value=sid;
+  invRetornoCad={invId:invSelId,sid:sid,pat:pat};
+  toast('Complete o cadastro de <b class="mono">'+esc(pat)+'</b> e salve — o inventário volta sozinho.');
+  setTimeout(()=>{const f=$('#eqSerie');if(f)f.focus();},150);
+}
+/* chamada pelo submit do cadastro de unidade (só criação) */
+function invAposCadastro(novo){
+  const r=invRetornoCad;invRetornoCad=null;
+  if(!r||!novo||soDigitos(novo.patrimonio)!==r.pat)return;
+  const inv=invDe(r.invId);
+  if(!inv||inv.status!=='aberto'||novo.setorId!==r.sid)return;   /* outro setor: o relatório mostra "cadastrado depois" */
+  const cs=invConfsSetor(r.invId,r.sid);
+  cs[novo.id]={t:Date.now(),s:'ok'};
+  cs['nc:'+r.pat]={t:Date.now(),s:'off',pat:r.pat};
+  invDepoisDeMudar(r.invId,r.sid);
+  setTimeout(()=>{
+    invSelId=r.invId;invSetorAtual=r.sid;
+    showView('inventario');invRender();invRenderSetor();
+    const b=$('#invBusca');if(b)b.focus();
+    toast('<b class="mono">'+esc(r.pat)+'</b> cadastrado e conferido em <b>'+esc(setNome(r.sid))+'</b>.');
+  },350);
+}
+$('#btnInvNcSo').addEventListener('click',()=>{
+  if(!invNcPendente)return;
+  const pat=invNcPendente.pat;
+  invFecharNaoCadastrado();
+  if(invGravarNaoCad(pat))toast('Registrado como <b>não cadastrado</b> neste setor — o cadastro não foi alterado.');
+});
+$('#btnInvNcCad').addEventListener('click',()=>{
+  if(!invNcPendente)return;
+  const pat=invNcPendente.pat;
+  invFecharNaoCadastrado();
+  if(invGravarNaoCad(pat))invCadastrarNC(pat);
+});
+$('#invNcLista').addEventListener('click',ev=>{
+  const b=ev.target.closest('[data-ncacao]');
+  if(!b)return;
+  const row=b.closest('[data-nc]');
+  if(!row)return;
+  const chave=row.dataset.nc,pat=chave.slice(3);
+  if(b.dataset.ncacao==='cad'){invCadastrarNC(pat);return;}
+  const inv=invDe(invSelId);
+  if(!inv||inv.status!=='aberto'){toast('Inventário encerrado — reabra para mexer.','warn');return;}
+  invConfsSetor(invSelId,invSetorAtual)[chave]={t:Date.now(),s:'off',pat:pat};
+  invDepoisDeMudar(invSelId,invSetorAtual);
+});
 $('#invLista').addEventListener('click',e=>{
   const row=e.target.closest('.inv-linha');
   if(!row)return;
@@ -7365,7 +7541,7 @@ $('#invBusca').addEventListener('keydown',e=>{
   if(e.key!=='Enter')return;
   e.preventDefault();
   const primeira=$('#invLista .inv-linha');
-  if(!primeira){toast('Nenhum bem na lista para confirmar.','warn');return;}
+  if(!primeira){invProcurarForaDoSetor();return;}   /* código 68: lista vazia → procura no cadastro inteiro */
   invConferir(primeira.dataset.id,{});
 });
 $('#invBusca').addEventListener('input',()=>invRenderSetor());
@@ -7536,7 +7712,7 @@ $('#btnInvRelatorio').addEventListener('click',()=>{invTela('relat');invRenderRe
 $('#btnInvRelVoltar').addEventListener('click',()=>{invTela('painel');invRender();});
 function invMontarRelatorio(inv){
   const porSetor=[],linhas=[];
-  const totais={total:0,conf:0,naoLoc:0,pend:0,divs:0,concluidos:0,qtdSetores:db.setores.length};
+  const totais={total:0,conf:0,naoLoc:0,pend:0,divs:0,nc:0,concluidos:0,qtdSetores:db.setores.length};
   for(const s of db.setores){
     const nome=setNome(s.id);
     const cs=invConfsSetor(inv.id,s.id);
@@ -7544,7 +7720,7 @@ function invMontarRelatorio(inv){
     if(fechado)totais.concluidos++;
     const regs=db.equipamentos.filter(e=>e.setorId===s.id);
     const usados=new Set(regs.map(e=>e.id));
-    const ps={nome:nome,fechado:fechado,total:regs.length,conf:0,nao:0,pend:0,div:0,linhas:[]};
+    const ps={nome:nome,fechado:fechado,total:regs.length,conf:0,nao:0,pend:0,div:0,nc:0,linhas:[]};
     for(const e of regs){
       const x=cs[e.id];
       let sit,obs='';
@@ -7559,6 +7735,16 @@ function invMontarRelatorio(inv){
        de setor ou excluído do cadastro depois da coleta */
     for(const k of Object.keys(cs)){
       const x=cs[k];
+      if(k.indexOf('nc:')===0){   /* código 68: patrimônio achado no setor e ausente do cadastro */
+      if(!x||x.s!=='nc')continue;
+      const pat=x.pat||k.slice(3);
+      const ja=db.equipamentos.find(e=>soDigitos(e.patrimonio)===pat);
+      ps.nc++;
+      const l={setor:nome,patrimonio:pat,tipo:ja?(ja.tipo||''):'',marca:ja?(ja.marca||''):'',serie:ja?(ja.serie||''):'',situacao:'Não cadastrado',quando:x.t||0,
+        obs:ja?'Não constava no cadastro na coleta; cadastrado depois (setor '+setNome(ja.setorId)+')':'Encontrado no setor, mas não consta no cadastro de equipamentos'};
+      ps.linhas.push(l); linhas.push(l);
+      continue;
+      }
       if(!x||x.s==='off'||usados.has(k))continue;
       const eq=eqById(k);
       if(!eq){
@@ -7571,7 +7757,7 @@ function invMontarRelatorio(inv){
       const l={setor:nome,patrimonio:eq.patrimonio,tipo:eq.tipo||'',marca:eq.marca||'',serie:eq.serie||'',situacao:'Divergente',quando:x.t||0,obs:'Conferido em '+nome+'; lotado em '+setNome(eq.setorId)};
       ps.linhas.push(l); linhas.push(l);
     }
-    totais.total+=ps.total; totais.conf+=ps.conf; totais.naoLoc+=ps.nao; totais.pend+=ps.pend; totais.divs+=ps.div;
+    totais.total+=ps.total; totais.conf+=ps.conf; totais.naoLoc+=ps.nao; totais.pend+=ps.pend; totais.divs+=ps.div; totais.nc+=ps.nc;
     porSetor.push(ps);
   }
   return {porSetor:porSetor,linhas:linhas,totais:totais};
@@ -7589,10 +7775,11 @@ function invRenderRelatorio(){
     '<div class="inv-kpi"><b>'+t.conf+'</b><span>conferidos ('+pct+'%)</span></div>'+
     '<div class="inv-kpi"><b>'+t.naoLoc+'</b><span>não localizados</span></div>'+
     '<div class="inv-kpi"><b>'+t.divs+'</b><span>divergências</span></div>'+
+    '<div class="inv-kpi"><b>'+t.nc+'</b><span>não cadastrados</span></div>'+
     '<div class="inv-kpi"><b>'+t.pend+'</b><span>pendentes (setores abertos)</span></div>';
   $('#invRelSetores').innerHTML=
-    '<thead><tr><th>Setor</th><th>Bens</th><th>Conferidos</th><th>Não localizados</th><th>Divergências</th><th>Pendentes</th><th>Situação</th></tr></thead><tbody>'+
-    r.porSetor.map(ps=>'<tr><td>'+esc(ps.nome)+'</td><td class="mono">'+ps.total+'</td><td class="mono">'+ps.conf+'</td><td class="mono">'+ps.nao+'</td><td class="mono">'+ps.div+'</td><td class="mono">'+ps.pend+'</td><td>'+(ps.fechado?'✅ concluído':'⏳ em andamento')+'</td></tr>').join('')+
+    '<thead><tr><th>Setor</th><th>Bens</th><th>Conferidos</th><th>Não localizados</th><th>Divergências</th><th>Não cadastrados</th><th>Pendentes</th><th>Situação</th></tr></thead><tbody>'+
+    r.porSetor.map(ps=>'<tr><td>'+esc(ps.nome)+'</td><td class="mono">'+ps.total+'</td><td class="mono">'+ps.conf+'</td><td class="mono">'+ps.nao+'</td><td class="mono">'+ps.div+'</td><td class="mono">'+ps.nc+'</td><td class="mono">'+ps.pend+'</td><td>'+(ps.fechado?'✅ concluído':'⏳ em andamento')+'</td></tr>').join('')+
     '</tbody>';
   const listaDet=(titular,itens,linha)=>{
     if(!itens.length)return '';
@@ -7602,7 +7789,7 @@ function invRenderRelatorio(){
       (itens.length>cap?'<p class="subtle" style="font-size:12px;margin:0 0 6px">Mostrando os primeiros '+cap+' — a planilha traz todos.</p>':'')+
       itens.slice(0,cap).map(linha).join('')+'</div>';
   };
-  const diverg=r.linhas.filter(l=>l.situacao==='Divergente'||l.situacao==='Registro excluído');
+  const diverg=r.linhas.filter(l=>l.situacao==='Divergente'||l.situacao==='Registro excluído'||l.situacao==='Não cadastrado');
   const faltantes=r.linhas.filter(l=>l.situacao==='Não localizado');
   $('#invRelListas').innerHTML=
     listaDet('⚠ Divergências',diverg,l=>'<div style="padding:4px 0;border-bottom:1px solid var(--line);font-size:13px"><b class="mono">'+esc(l.patrimonio)+'</b> — '+esc(l.setor)+' — <b>'+esc(l.situacao)+'</b>'+(l.obs?' · '+esc(l.obs):'')+'</div>')+
@@ -7633,7 +7820,7 @@ $('#btnInvImprimir').addEventListener('click',()=>{
     (ps.linhas.length?ps.linhas.map(l=>'<tr><td class="mono" style="font-weight:600">'+esc(l.patrimonio)+'</td><td>'+esc(l.tipo)+' '+esc(l.marca)+'</td><td class="mono">'+esc(l.serie||'—')+'</td><td>'+esc(l.situacao)+(l.obs?' — '+esc(l.obs):'')+'</td></tr>').join('')
       :'<tr><td colspan="4" style="color:#666">Nenhum bem lotado neste setor</td></tr>')+
     '</tbody></table>'+
-    '<div style="font-size:11px;color:#555;margin-top:6px">Conferidos '+ps.conf+' · Não localizados '+ps.nao+' · Pendentes '+ps.pend+' · Divergências '+ps.div+'</div></div>').join('');
+    '<div style="font-size:11px;color:#555;margin-top:6px">Conferidos '+ps.conf+' · Não localizados '+ps.nao+' · Pendentes '+ps.pend+' · Divergências '+ps.div+' · Não cadastrados '+ps.nc+'</div></div>').join('');
   const t=r.totais;
   $('#printArea').innerHTML='<div class="recibo">'+
     '<div class="rec-head">'+
@@ -7646,6 +7833,7 @@ $('#btnInvImprimir').addEventListener('click',()=>{
       item('Conferidos',t.conf+' de '+t.total)+
       item('Não localizados',t.naoLoc)+
       item('Divergências',t.divs)+
+      item('Não cadastrados',t.nc)+
       item('Setores concluídos',t.concluidos+' de '+t.qtdSetores)+
       item('Emitido em',new Date().toLocaleString('pt-BR'))+
       item('Responsável',esc((usuarioAtual&&usuarioAtual.nome)||'—'))+
