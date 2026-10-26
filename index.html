@@ -1008,11 +1008,21 @@
        equipamentos (que passa de 1 MiB). Junto, conserto: "Registrar e
        atualizar o setor" mudava o setor do bem sem carimbar atualizadoEm
        (regra do código 29); agora carimba.
+  
+
+   69. 🔗 RELATÓRIO DO INVENTÁRIO: CARTÕES CLICÁVEIS (código 69, 26/10).
+       Pedido do dono: clicar em "não localizados", "divergências" ou
+       "não cadastrados" no topo do relatório e ir direto para a lista
+       correspondente. Os três cartões viram atalhos (mouse, toque ou
+       Enter/Espaço): rolam a página até a lista e piscam a borda para
+       mostrar onde ela está; categoria zerada avisa que não há itens.
+       Os não cadastrados ganharam lista PRÓPRIA (antes entravam junto
+       das divergências), então cada cartão leva a uma lista só.
   -->
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261026-190918">
+<meta name="nii-build" content="20261026-193707">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -1272,6 +1282,10 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
 .inv-marc.div{color:#b06d00}
 .inv-linha.nc{background:#eef4ff;border-color:#b9cdf2;cursor:default;flex-wrap:wrap}
 .inv-marc.nc{color:#2a56a6}
+.inv-kpi-link{cursor:pointer;transition:border-color .15s,box-shadow .15s}
+.inv-kpi-link:hover,.inv-kpi-link:focus-visible{border-color:#9db4c6;box-shadow:0 2px 8px rgba(30,60,90,.12);outline:none}
+.inv-flash{animation:invFlash 1.6s ease}
+@keyframes invFlash{0%{box-shadow:0 0 0 4px #f4b860}100%{box-shadow:0 0 0 0 rgba(244,184,96,0)}}
 .inv-barra{display:inline-block;vertical-align:middle;width:110px;height:8px;border-radius:6px;background:#e8edf2;overflow:hidden;margin-right:6px}
 .inv-barra i{display:block;height:100%;background:#2f855a;border-radius:6px}
 .inv-kpis{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
@@ -2662,7 +2676,7 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
               <summary>🅳 Concluir o setor e ver o relatório</summary>
               <ol>
                 <li>Terminou o setor? Clique em <b>✔ Concluir setor</b> e confirme: o que faltar entra como <b>não localizado</b> no relatório. Dá para <b>↩ Reabrir</b> depois.</li>
-                <li>No painel, clique em <b>📊 Ver relatório</b>: conferidos, divergências, <b>🚫 não localizados</b> (dos setores concluídos) e pendentes, por setor.</li>
+                <li>No painel, clique em <b>📊 Ver relatório</b>: conferidos, divergências, <b>🚫 não localizados</b> (dos setores concluídos), <b>❓ não cadastrados</b> e pendentes, por setor. Clique nos cartões de <b>não localizados</b>, <b>divergências</b> e <b>não cadastrados</b> para ir direto à lista deles.</li>
                 <li>Leve para o papel com <b>⬇ Planilha (xlsx)</b> ou <b>🖨 Imprimir</b>.</li>
               </ol>
             </details>
@@ -7773,28 +7787,47 @@ function invRenderRelatorio(){
   $('#invRelKpis').innerHTML=
     '<div class="inv-kpi"><b>'+t.total+'</b><span>bens</span></div>'+
     '<div class="inv-kpi"><b>'+t.conf+'</b><span>conferidos ('+pct+'%)</span></div>'+
-    '<div class="inv-kpi"><b>'+t.naoLoc+'</b><span>não localizados</span></div>'+
-    '<div class="inv-kpi"><b>'+t.divs+'</b><span>divergências</span></div>'+
-    '<div class="inv-kpi"><b>'+t.nc+'</b><span>não cadastrados</span></div>'+
+    '<div class="inv-kpi inv-kpi-link" data-alvo="invRelNaoLoc" role="button" tabindex="0" title="Clique para ir à lista"><b>'+t.naoLoc+'</b><span>não localizados ↓</span></div>'+
+    '<div class="inv-kpi inv-kpi-link" data-alvo="invRelDiv" role="button" tabindex="0" title="Clique para ir à lista"><b>'+t.divs+'</b><span>divergências ↓</span></div>'+
+    '<div class="inv-kpi inv-kpi-link" data-alvo="invRelNC" role="button" tabindex="0" title="Clique para ir à lista"><b>'+t.nc+'</b><span>não cadastrados ↓</span></div>'+
     '<div class="inv-kpi"><b>'+t.pend+'</b><span>pendentes (setores abertos)</span></div>';
   $('#invRelSetores').innerHTML=
     '<thead><tr><th>Setor</th><th>Bens</th><th>Conferidos</th><th>Não localizados</th><th>Divergências</th><th>Não cadastrados</th><th>Pendentes</th><th>Situação</th></tr></thead><tbody>'+
     r.porSetor.map(ps=>'<tr><td>'+esc(ps.nome)+'</td><td class="mono">'+ps.total+'</td><td class="mono">'+ps.conf+'</td><td class="mono">'+ps.nao+'</td><td class="mono">'+ps.div+'</td><td class="mono">'+ps.nc+'</td><td class="mono">'+ps.pend+'</td><td>'+(ps.fechado?'✅ concluído':'⏳ em andamento')+'</td></tr>').join('')+
     '</tbody>';
-  const listaDet=(titular,itens,linha)=>{
+  const listaDet=(id,titular,itens,linha)=>{
     if(!itens.length)return '';
     const cap=300;
-    return '<div style="border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:12px">'+
+    return '<div id="'+id+'" style="border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:12px;scroll-margin-top:16px">'+
       '<h4 style="margin:0 0 8px;font-size:14px">'+titular+' ('+itens.length+')</h4>'+
       (itens.length>cap?'<p class="subtle" style="font-size:12px;margin:0 0 6px">Mostrando os primeiros '+cap+' — a planilha traz todos.</p>':'')+
       itens.slice(0,cap).map(linha).join('')+'</div>';
   };
-  const diverg=r.linhas.filter(l=>l.situacao==='Divergente'||l.situacao==='Registro excluído'||l.situacao==='Não cadastrado');
+  const diverg=r.linhas.filter(l=>l.situacao==='Divergente'||l.situacao==='Registro excluído');
+  const naoCad=r.linhas.filter(l=>l.situacao==='Não cadastrado');
   const faltantes=r.linhas.filter(l=>l.situacao==='Não localizado');
   $('#invRelListas').innerHTML=
-    listaDet('⚠ Divergências',diverg,l=>'<div style="padding:4px 0;border-bottom:1px solid var(--line);font-size:13px"><b class="mono">'+esc(l.patrimonio)+'</b> — '+esc(l.setor)+' — <b>'+esc(l.situacao)+'</b>'+(l.obs?' · '+esc(l.obs):'')+'</div>')+
-    listaDet('🚫 Não localizados (setores concluídos)',faltantes,l=>'<div style="padding:4px 0;border-bottom:1px solid var(--line);font-size:13px"><b class="mono">'+esc(l.patrimonio)+'</b> — '+esc(l.tipo)+' '+esc(l.marca)+' · '+esc(l.setor)+'</div>');
+    listaDet('invRelDiv','⚠ Divergências',diverg,l=>'<div style="padding:4px 0;border-bottom:1px solid var(--line);font-size:13px"><b class="mono">'+esc(l.patrimonio)+'</b> — '+esc(l.setor)+' — <b>'+esc(l.situacao)+'</b>'+(l.obs?' · '+esc(l.obs):'')+'</div>')+
+    listaDet('invRelNaoLoc','🚫 Não localizados (setores concluídos)',faltantes,l=>'<div style="padding:4px 0;border-bottom:1px solid var(--line);font-size:13px"><b class="mono">'+esc(l.patrimonio)+'</b> — '+esc(l.tipo)+' '+esc(l.marca)+' · '+esc(l.setor)+'</div>')+
+    listaDet('invRelNC','❓ Não cadastrados (achados no setor, fora do cadastro)',naoCad,l=>'<div style="padding:4px 0;border-bottom:1px solid var(--line);font-size:13px"><b class="mono">'+esc(l.patrimonio)+'</b> — '+esc(l.setor)+(l.obs?' · '+esc(l.obs):'')+'</div>');
 }
+/* código 69: cartões do relatório levam à lista correspondente */
+function invIrParaLista(alvo){
+  const el=document.getElementById(alvo);
+  if(!el){toast('Nenhum item nesta categoria.','ok');return;}
+  el.scrollIntoView({behavior:'smooth',block:'start'});
+  el.classList.remove('inv-flash');void el.offsetWidth;el.classList.add('inv-flash');
+}
+$('#invRelKpis').addEventListener('click',ev=>{
+  const k=ev.target.closest('[data-alvo]');
+  if(k)invIrParaLista(k.dataset.alvo);
+});
+$('#invRelKpis').addEventListener('keydown',ev=>{
+  if(ev.key!=='Enter'&&ev.key!==' ')return;
+  const k=ev.target.closest('[data-alvo]');
+  if(!k)return;
+  ev.preventDefault();invIrParaLista(k.dataset.alvo);
+});
 $('#btnInvPlanilha').addEventListener('click',()=>{
   const inv=invDe(invSelId);
   if(!inv)return;
