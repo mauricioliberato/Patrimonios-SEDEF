@@ -961,6 +961,26 @@
         afetado. Grafia unificada em "Núcleo" com maiúscula e hífen,
         igual à que o app já imprimia.
 
+    70. 🖨️ BORDAS COMPLETAS NAS TABELAS IMPRESSAS — código 70 (26/10)
+        Relato do dono: "na parte de Bens Transferidos as bordas internas
+        estão incompletas". A causa NÃO estava no CSS de impressão, e sim
+        em duas regras GLOBAIS da tela que vazavam para dentro do
+        @media print: (1) thead th{position:sticky;top:0;z-index:2} — o
+        cabeçalho grudava no topo e, pelo z-index, se sobrepunha às
+        células, e nas guias impressas as paredes verticais da tabela
+        paravam exatamente na linha do cabeçalho; (2) tbody tr:last-child
+        td{border-bottom:none} — a última linha ficava sem borda de baixo,
+        deixando a tabela "solta", sem fechar dentro do bloco. Conserto:
+        dentro do @media print, antes das regras de impressão, anular as
+        duas SÓ para .r-table (.r-table thead th{position:static;
+        z-index:auto} e .r-table tbody tr:last-child td{border-bottom:
+        1px solid #bbb}). As tabelas da tela continuam com sticky na
+        rolagem e sem a borda da última linha, como sempre. Vale para a
+        guia de transferência, o comprovante de empréstimo e o relatório
+        do inventário — todos usam .r-table. Conferido com prova em PDF
+        gerada pelo Chrome headless (o mesmo motor da impressão real): as
+        quatro paredes descem e a última linha fecha.
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -968,7 +988,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261026-091942">
+<meta name="nii-build" content="20261026-100356">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -1322,6 +1342,17 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
   .rec-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
   .rec-brasao{width:46px;height:auto}
   .rec-head h2{font:700 20px var(--disp);text-transform:uppercase}
+  /* A tabela impressa NÃO herda o comportamento da tabela da tela. O
+     thead{position:sticky;z-index:2} (regra global da linha ~161) gruda o
+     cabeçalho no topo e o sobrepoem às células — nas guias/comprovantes
+     impressos isso cortava as paredes verticais da tabela, parando-as
+     exatamente na linha do cabeçalho (borda interna incompleta). Sem
+     scroll na impressão, o sticky não faz falta. */
+  .r-table thead th{position:static;z-index:auto}
+  /* E a última linha precisa FECHAR a caixa: a regra global
+     tbody tr:last-child td{border-bottom:none} deixava a tabela sem
+     rodapé, solta dentro do bloco. Devolve a borda só nos impressos. */
+  .r-table tbody tr:last-child td{border-bottom:1px solid #bbb}
   .r-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 28px;margin-bottom:20px}
   .r-item .rl{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#666}
   .r-item .rv{font-size:14px;font-weight:500;margin-top:2px}
