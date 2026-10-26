@@ -940,6 +940,27 @@
         pelo dono, logado: 17 bens movidos para "5D - NRHS" e o
         duplicado "DIDES - CAAS" vazio apagado.)
 
+    69. 🏷️ IDENTIDADE NA TELA: SEDEF — código 69 (26/10)
+        Pedido do dono: "tirar da tela de login a palavra PATRIMONIOS
+        e colocar no lugar SEDEF - Núcleo de Informática e Informações.
+        E na tela principal retirar a palavra Patrimônios e deixar o
+        SEDEF - Núcleo de Informática e Informações". Três pontos de
+        texto trocados, SEM mexer em layout nem em relatório:
+        (1) tela de login — <h2> vira "SEDEF" e, num parágrafo novo
+        .org por baixo, "Núcleo de Informática e Informações" (a caixa
+        tem só 360px, então o nome longo vai como texto de 12,5px e não
+        como título de 18px em CAIXA ALTA, que cortaria/estouraria);
+        (2) barra lateral da tela principal — onde dizia
+        <b>Patrimonios</b> + <span>SEDEF · Núcleo…</span>, agora é
+        <b>SEDEF</b> + <span>Núcleo de Informática e Informações</span>
+        (o quadradinho laranja "NII" continua); (3) tela de transição
+        "Sincronizando dados com o servidor…" recebe o mesmo tratamento
+        do login. Mantidos: <title> da aba e os relatórios/comprovantes
+        impressos (usam a constante ORG, que já trazia "SEDEF · Núcleo
+        de Informática e Informações") — nada de documentação foi
+        afetado. Grafia unificada em "Núcleo" com maiúscula e hífen,
+        igual à que o app já imprimia.
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -947,7 +968,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261026-080656">
+<meta name="nii-build" content="20261026-091942">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -1386,7 +1407,7 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
   <aside class="sidebar">
     <div class="brand">
       <div class="mark">NII</div>
-      <div><b>Patrimonios</b><span>SEDEF · Núcleo de Informática e Informações</span></div>
+      <div><b>SEDEF</b><span>Núcleo de Informática e Informações</span></div>
     </div>
 
     <button class="mobile-menu-toggle" id="btnMenuMobile" aria-label="Abrir menu" aria-expanded="false">
@@ -2858,6 +2879,7 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
   .login-box .mark{width:46px;height:46px;background:var(--accent);border-radius:8px;display:grid;place-items:center;
     font:700 14px var(--disp);color:#201302;box-shadow:0 3px 0 var(--accent-dk);margin:0 auto 14px}
   .login-box h2{font:700 18px var(--disp);text-align:center;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+  .login-box .org{font-size:12.5px;line-height:1.45;text-align:center;color:#5a6b78;letter-spacing:.02em;margin:0 0 14px}
   .login-box p.sub{font-size:12px;color:var(--muted);text-align:center;margin-bottom:18px}
   .login-box .field{margin-bottom:12px}
   .login-box .field label{font:600 10.5px var(--body);letter-spacing:.09em;text-transform:uppercase;color:var(--muted);
@@ -2870,7 +2892,8 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
 <div id="loginOverlay">
   <div class="login-box">
     <div class="mark">NII</div>
-    <h2>Patrimonios</h2>
+    <h2>SEDEF</h2>
+    <p class="org">Núcleo de Informática e Informações</p>
     <p class="sub">Entre com seu usuário para acessar o sistema</p>
     <form id="formLogin">
       <div class="field"><label>Usuário</label><input type="text" id="loginUser" autocomplete="username" required></div>
@@ -3638,7 +3661,8 @@ function mostrarApp(u){
   usuarioAtual=u;
   try{const v=$('#niiRestaurando');if(v)v.style.display='none';}catch(_){}  /* sessão chegou: véu fora */
   $('#loginOverlay').innerHTML=`<div class="login-box" style="text-align:center">
-    <div class="mark">NII</div><h2>Patrimonios</h2>
+    <div class="mark">NII</div><h2>SEDEF</h2>
+    <p class="org">Núcleo de Informática e Informações</p>
     <p class="sub">Sincronizando dados com o servidor…</p>
   </div>`;
   iniciarSincronizacao();
