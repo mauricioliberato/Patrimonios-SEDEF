@@ -922,6 +922,24 @@
         título, arquivo), atendendo os DOIS guias sem duplicar
         código. O guia é para qualquer usuário (não é só-admin).
 
+    68. 🔒 TRAVA DE SETOR VAZIO NO FILTRO — código 68 (26/10)
+        Relato do dono: "quando escolho por exemplo o 5D - NRHS ele
+        aparece zerado". A comparação do filtro estava certa (mesmo
+        eq.setorId === id de todo o sistema); a causa era DUAS camadas:
+        (1) DADO — o setor "5D - NRHS" existia mas estava com 0 bens
+        (os 17 estavam lotados em "NRHS" e "Corredor 5D"), e o filtro
+        de setores só lista bens; (2) UI — um setor sem bens aparece
+        com o checkbox cinza/travado, mas o clique no NOME ainda o
+        selecionava (o handler do label ignorava o disabled), então o
+        dono conseguia escolher um setor vazio e a lista saía zerada.
+        Correção do defeito de UI: no handler de clique do multi-select
+        de setores, se o checkbox da opção estiver disabled o clique
+        no nome não alterna mais (if(cb&&cb.disabled) return). Um
+        setor sem bens no filtro atual não pode ser escolhido — nem
+        pelo checkbox nem pelo nome. (O dado foi corrigido em produção
+        pelo dono, logado: 17 bens movidos para "5D - NRHS" e o
+        duplicado "DIDES - CAAS" vazio apagado.)
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -929,7 +947,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261023-113805">
+<meta name="nii-build" content="20261026-080656">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -4948,6 +4966,12 @@ $('#eqFiltroSetorOpts').addEventListener('click',e=>{
   /* Clique no label/texto: previne o clique duplo e alterna manualmente. */
   e.preventDefault();
   const cb = opt.querySelector('input[type=checkbox]');
+  /* Checkbox travado = setor sem bens no filtro atual. O navegador já não
+     deixa marcar pelo checkbox, mas por aqui o clique no NOME ainda passava
+     e o setor vazio era escolhido — a lista saía zerada e parecia que o
+     filtro não funcionava (foi assim que o 5D - NRHS, ainda sem bens,
+     apareceu vazio para o dono). */
+  if(cb&&cb.disabled) return;
   const vaiMarcar = !eqSetoresSelecionados.has(id);
   if(vaiMarcar) eqSetoresSelecionados.add(id);
   else eqSetoresSelecionados.delete(id);
