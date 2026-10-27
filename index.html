@@ -1006,6 +1006,21 @@
         apóstrofo). Resultado: "01 NII - 6B SALA 48 para 7 Almoxarifado".
         Acento dos setores é mantido como está cadastrado.
 
+    72. 🚫 RODAPÉ "DOCUMENTO GERADO PELO…" FORA DOS PDFs — código 72 (27/10)
+        Pedido do dono: "tem como remover a frase do pdf que fica no final
+        do documento, Documento gerado pelo NII Patrimonios em 27/10/2026,
+        08:21:15". Escopo confirmado: OS QUATRO documentos impressos, já
+        que a frase era idêntica em todos — guia de transferência
+        (imprimirGuia), comprovante de empréstimo (imprimirOS), lista de
+        equipamentos (imprimirListaEquipamentos) e relatório do
+        inventário (invRenderRelatorio, que monta por concatenação de
+        string). Removido o <div class="r-foot"> das quatro montagens e,
+        como a classe ficou sem uso em todo o arquivo, também a regra
+        .r-foot{margin-top:34px;…} do @media print — nada de CSS morto
+        sobrando. Nada mais mudou: assinaturas, blocos e o window.print()
+        das quatro rotinas seguem intactos (checado por contagem: 0
+        "Documento gerado", 0 "r-foot", 4 window.print()).
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -1013,7 +1028,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261027-080726">
+<meta name="nii-build" content="20261027-082733">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -1391,7 +1406,6 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
   .r-sig{text-align:center}
   .r-sig img{height:64px;max-width:100%;object-fit:contain;display:block;margin:0 auto}
   .r-sig .line{border-top:1px solid #111;margin-top:6px;padding-top:6px;font-size:11px;line-height:1.5}
-  .r-foot{margin-top:34px;font-size:10.5px;color:#666;text-align:center}
 }
 
 @media(max-width:1120px){.kpis{grid-template-columns:repeat(3,1fr)}.dash-grid{grid-template-columns:1fr}}
@@ -4997,7 +5011,6 @@ function imprimirListaEquipamentos(){
       <tbody>${linhas}</tbody>
     </table>
 
-    <div class="r-foot">Documento gerado pelo ${NOME_SISTEMA} em ${new Date().toLocaleString('pt-BR')}</div>
   </div>`;
   setTimeout(()=>window.print(),60);
 }
@@ -6908,7 +6921,6 @@ function imprimirOS(emp){
       ${sig(emp.assinaturaRetirada,emp.retirou,'Assinatura de quem RETIROU')}
       ${sig(emp.devolucao?.assinatura,emp.devolucao?.quem,'Assinatura de quem DEVOLVEU')}
     </div>
-    <div class="r-foot">Documento gerado pelo ${NOME_SISTEMA} em ${new Date().toLocaleString('pt-BR')}</div>
   </div>`;
   setTimeout(()=>window.print(),60);
 }
@@ -6955,7 +6967,6 @@ function imprimirGuia(g){
       <div class="r-sig">${rec&&rec.assinatura?`<img src="${rec.assinatura}">`:'<div style="height:64px"></div>'}
         <div class="line"><b>(DESTINO)</b> Responsável pelo recebimento<br>Nome: ${esc(rec&&rec.respNome?rec.respNome:'')}</div></div>
     </div>
-    <div class="r-foot">Documento gerado pelo ${NOME_SISTEMA} em ${new Date().toLocaleString('pt-BR')}</div>
   </div>`;
   /* Nome do arquivo PDF quando o usuário escolhe "Salvar como PDF": o
      navegador usa o <title> da aba. Padrão decidido pelo dono (26/10):
@@ -7695,7 +7706,6 @@ $('#btnInvImprimir').addEventListener('click',()=>{
       '<div class="r-sig"><div style="height:64px"></div><div class="line"><b>___________________________</b><br>Responsável pelo inventário</div></div>'+
       '<div class="r-sig"><div style="height:64px"></div><div class="line"><b>___________________________</b><br>Responsável pelo patrimônio</div></div>'+
     '</div>'+
-    '<div class="r-foot">Documento gerado pelo '+NOME_SISTEMA+' em '+new Date().toLocaleString('pt-BR')+'</div>'+
   '</div>';
   setTimeout(()=>window.print(),60);
 });
