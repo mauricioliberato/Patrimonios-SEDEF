@@ -1021,6 +1021,34 @@
         das quatro rotinas seguem intactos (checado por contagem: 0
         "Documento gerado", 0 "r-foot", 4 window.print()).
 
+    73. 🔑 TROCA DE SENHA AGORA VALE NO LOGIN — código 73 (28/10)
+        Relato do dono: "alterei a senha do tecnico fernandoquintana e não
+        está deixando entrar no sistema". CAUSA confirmada no código: o
+        login tem DOIS depósitos — o Firebase Auth (quem valida de verdade)
+        e o hash SHA-256 no cadastro do técnico (Firestore) — e o
+        formulário do técnico só gravava o hash. Quem já entrou 1 vez tem
+        conta no Auth com a senha ANTIGA: o signIn rejeita a nova; a ponte
+        de migração compara com o hash (bate, pois a nova está lá), tenta
+        criar a conta e leva auth/email-already-in-use — que antes virava
+        return null e o genérico "usuário ou senha inválidos", fazendo o
+        técnico insistir sem entender. O app NÃO corrige sozinho
+        (updatePassword só vale para o próprio usuário logado; trocar a
+        senha de terceiro exige conta de serviço do Firebase no Worker —
+        fora de escopo por enquanto). Três peças entregues: (1) a ponte
+        agora LANÇA o erro marcado niiSenhaNaoSincronizada em vez de
+        retornar null, e a tela de login mostra o diagnóstico ("a senha
+        digitada é a que está no cadastro, mas o Auth ainda está com a
+        senha antiga") com botão "✉ enviar link para definir a senha";
+        (2) helper compartilhado enviarLinkSenha(email) chama
+        auth.sendPasswordResetEmail — é o próprio técnico, pelo e-mail
+        dele, quem define a senha no Auth; TESTE REAL no projeto mostrou
+        proteção contra enumeração LIGADA (e-mail existente e inexistente
+        devolvem []), então o ok também vem para login inexistente e a
+        mensagem fala em "link solicitado"; (3) ao salvar senha de técnico
+        existente, o cadastro abre confirmação oferecendo o link para o
+        e-mail do técnico, orientando a usar EXATAMENTE a senha recém-
+        cadastrada. Nada mudou nas regras do Firestore nem no Worker.
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -1028,7 +1056,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261027-082733">
+<meta name="nii-build" content="20261028-081319">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -2955,6 +2983,8 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
   .login-box .field label{font:600 10.5px var(--body);letter-spacing:.09em;text-transform:uppercase;color:var(--muted);
     display:block;margin-bottom:6px}
   #loginErro{color:var(--bad);font-size:12px;margin-top:8px;text-align:center;min-height:14px}
+  #loginErro .lnk{background:none;border:none;color:var(--accent-dk);font:inherit;text-decoration:underline;cursor:pointer;padding:0}
+  #loginErro .lnk[disabled]{opacity:.6;cursor:default}
   #btnLoginEntrar{width:100%;justify-content:center;margin-top:6px}
   #btnLoginEntrar[disabled]{opacity:.6;cursor:default}
 </style>
@@ -3587,7 +3617,15 @@ async function tentarLogin(usuario,senha){
       cred=await auth.createUserWithEmailAndPassword(email,senha);
       toast('Conta migrada para o Firebase Auth. Da próxima em diante, use o mesmo usuário e senha.','ok');
     }catch(errCreate){
-      if(errCreate&&errCreate.code==='auth/email-already-in-use')return null;
+      if(errCreate&&errCreate.code==='auth/email-already-in-use'){
+        /* A conta JÁ existe no Auth com OUTRA senha — e a digitada confere
+           com o cadastro (só por isso o fluxo chegou até aqui). Retornar
+           null aqui mostraria o genérico "usuário ou senha inválidos" e o
+           técnico ficaria insistindo sem entender o motivo. */
+        const e=new Error('senha não sincronizada com o Firebase Auth');
+        e.niiSenhaNaoSincronizada=true;
+        throw e;
+      }
       throw errCreate;
     }
   }
@@ -3706,6 +3744,7 @@ async function gravarAdmins(silencioso){
 /* Traduz os códigos do Firebase Auth em orientação objetiva */
 function mensagemErroLogin(err){
   if(err&&err.niiInativo)return err.message;
+  if(err&&err.niiSenhaNaoSincronizada)return 'A senha digitada é a que está no cadastro, mas o Firebase Auth (que valida o acesso) ainda tem a senha antiga. Entre com a senha antiga ou peça o link de redefinição.';
   const c=(err&&err.code)?String(err.code):'';
   if(c.includes('operation-not-allowed')||c.includes('configuration-not-found'))
     return 'Login por e-mail/senha ainda não foi ligado no Firebase Console (Authentication → Get started → provedor E-mail/senha → Ativar).';
@@ -3723,6 +3762,53 @@ function mensagemErroLogin(err){
     return 'A senha é muito fraca (mínimo de 6 caracteres).';
   console.error('Erro de login não mapeado:',err);
   return 'Não foi possível entrar. Detalhes no console (F12).';
+}
+
+/* A senha digitada bate com o hash do cadastro, mas o FIREBASE AUTH (que é
+   quem valida o login de verdade) ainda tem outra: acontece quando um
+   administrador altera a senha pelo cadastro de técnicos — o app grava só o
+   hash no Firestore e NÃO tem permissão para trocar a senha de OUTRO usuário
+   no Auth (updatePassword só vale para quem está logado). Em vez do genérico
+   "usuário ou senha inválidos" — que faria o técnico insistir sem entender —,
+   mostra o diagnóstico e oferece o link de redefinição, que é o único caminho
+   de sincronizar sem uma conta de serviço do Firebase. */
+function mostrarAvisoSenhaNaoSincronizada(usuario){
+  const email=emailDoLogin(usuario);
+  const box=$('#loginErro');
+  box.innerHTML='A senha digitada é a que está no cadastro, mas o <b>Firebase Auth</b> (que valida o acesso) ainda está com a senha antiga. '
+    +'Entre com a senha <b>antiga</b>, ou receba o link: '
+    +'<button type="button" class="lnk" id="btnLinkSenhaLogin">✉ enviar link para definir a senha</button> '
+    +'<span id="statusLinkSenha" style="color:#333"></span>';
+  const b=$('#btnLinkSenhaLogin');
+  b.addEventListener('click',async()=>{
+    b.disabled=true;
+    const r=await enviarLinkSenha(email);
+    if(r.ok){
+      b.remove();
+      $('#statusLinkSenha').innerHTML=r.mensagem+' Abra o e-mail de <b>'+esc(email)+'</b> e defina a senha — depois é só entrar.';
+    }else{
+      b.disabled=false;
+      $('#statusLinkSenha').textContent=r.mensagem;
+    }
+  });
+}
+/* Envia o link do Firebase para a PRÓPRIA PESSOA definir a senha no Auth.
+   Com a proteção contra enumeração ligada (testada neste projeto: e-mail
+   existente e inexistente devolvem a mesma resposta), a resposta "ok" também
+   vem para login inexistente — por isso a mensagem fala em "solicitado" e
+   cada chamador explica o contexto. */
+async function enviarLinkSenha(email){
+  try{
+    await auth.sendPasswordResetEmail(email);
+    return {ok:true,mensagem:'✉ <b>Link solicitado para '+esc(email)+'.</b>'};
+  }catch(err){
+    const c=(err&&err.code)?String(err.code):'';
+    if(c.includes('too-many-requests'))return {ok:false,mensagem:'Muitas solicitações de e-mail. Aguarde alguns minutos e tente de novo.'};
+    if(c.includes('invalid-email'))return {ok:false,mensagem:'E-mail de login inválido: <b>'+esc(email)+'</b>.'};
+    if(c.includes('network-request-failed'))return {ok:false,mensagem:'Sem conexão com o Firebase. Verifique a internet.'};
+    console.warn('[NII] falha ao enviar link de redefinição:',c||err);
+    return {ok:false,mensagem:'Não foi possível enviar o e-mail ('+(c||'erro desconhecido')+'). Procure o administrador.'};
+  }
 }
 
 /* Sessão agora é gerenciada pelo próprio Firebase Auth (persistência local
@@ -3802,7 +3888,8 @@ $('#formLogin').addEventListener('submit',async ev=>{
     if(!u){$('#loginErro').textContent='Usuário ou senha inválidos.';btn.disabled=false;btn.textContent='Entrar';return;}
     /* O Firebase Auth cuida da persistência; mostrarApp é chamado no listener abaixo. */
   }catch(err){
-    $('#loginErro').textContent=mensagemErroLogin(err);
+    if(err&&err.niiSenhaNaoSincronizada)mostrarAvisoSenhaNaoSincronizada(usuario);
+    else $('#loginErro').textContent=mensagemErroLogin(err);
     btn.disabled=false;btn.textContent='Entrar';
   }
 });
@@ -5144,6 +5231,18 @@ $('#formTecnico').addEventListener('submit',async ev=>{
     toast('Técnico <b>'+esc(nome)+'</b> cadastrado.');
   }
   persistir();gravarAdmins();resetTec();atualizarTudo();
+  /* Senha alterada em técnico que JÁ pode ter conta no Firebase Auth: o
+     cadastro recebeu o hash, mas o Auth continua com a senha antiga (o app
+     não pode trocar a senha de outro usuário). Oferece o link de redefinição
+     AGORA — senão o técnico só descobre o problema na hora de entrar. */
+  if(id&&senha)confirmar('Senha gravada — falta 1 passo',
+    'A senha nova entrou no cadastro, mas o <b>Firebase Auth</b> (que valida o login) continua com a antiga. '
+    +'Enviar o link de redefinição para <b>'+esc(emailDoLogin(usuario))+'</b>? '
+    +'Peça para o técnico abrir o e-mail e definir <b>exatamente a mesma senha</b> que você acabou de cadastrar.',
+    async()=>{
+      const r=await enviarLinkSenha(emailDoLogin(usuario));
+      toast(r.ok?r.mensagem+' Se houver conta com este login, o e-mail chega em instantes.':r.mensagem,r.ok?'ok':'bad');
+    },'✉ Enviar link');
 });
 function proximaMatricula(){
   let max=0;
