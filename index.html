@@ -1157,6 +1157,23 @@
         do Firestore como estão, código 74 (troca de senha de quem já tem
         conta), aviso condicional do 73 e o uid do 75.
 
+    78. 🛡️ SENHA CURTA BARRADA ANTES DE SALVAR — código 78 (28/10)
+        Relato do dono: ao criar o acesso do Fernando pelo Editar, veio
+        "A senha ficou no cadastro, mas o acesso não pôde ser criado
+        (auth/weak-password)". Causa: o Firebase exige senha com pelo
+        menos 6 CARACTERES para criar conta (única regra de força que ele
+        aplica — aceita letras, números, símbolos e espaços); o cadastro
+        aceitava qualquer tamanho, então o admin só descobria DEPOIS de
+        salvar. Correção: validação em formTecnico, ANTES de gravar
+        qualquer coisa — senha com menos de 6 caracteres é recusada com
+        aviso claro ("A senha precisa ter pelo menos 6 caracteres — é
+        exigência do Firebase para criar o acesso") e nada é salvo.
+        Vale para cadastro novo e para edição (o mesmo campo alimenta os
+        dois). Observação: senhas com ESPAÇO passam pelo Firebase
+        (válido), mas o endpoint do código 74 as recusa — evite espaços
+        nas senhas novas para a troca automática funcionar quando a conta
+        de serviço for configurada.
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -1164,7 +1181,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261028-161621">
+<meta name="nii-build" content="20261028-164044">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -5417,6 +5434,12 @@ $('#formTecnico').addEventListener('submit',async ev=>{
         usuario=$('#tecUsuario').value.trim(),senha=$('#tecSenha').value;
   if(!nome)return toast('Informe o nome do técnico.','bad');
   if((usuario&&!senha)||(!usuario&&senha))return toast('Preencha <b>usuário e senha</b> juntos, ou deixe ambos em branco.','bad');
+  /* Código 78 (28/10): o Firebase exige senha com pelo menos 6 CARACTERES
+     para criar o acesso (auth/weak-password — aconteceu na hora de criar o
+     acesso do Fernando). Validar AQUI evita gravar um cadastro cuja senha
+     não vira conta: sem isto o admin só descobria pelo aviso de "acesso
+     não pôde ser criado", depois de já ter salvo. */
+  if(senha&&senha.length<6)return toast('A senha precisa ter <b>pelo menos 6 caracteres</b> — é exigência do Firebase para criar o acesso.','bad');
   if(usuario&&db.tecnicos.some(t=>t.id!==id&&String(t.usuario||'').toLowerCase()===usuario.toLowerCase()))return toast('Já existe um técnico com este <b>usuário de login</b>.','bad');
   let senhaHash=undefined;
   if(senha)senhaHash=await sha256(senha);
