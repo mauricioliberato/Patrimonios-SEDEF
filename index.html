@@ -1105,6 +1105,29 @@
         firestore.rules do repo — vale conferir se as regras aplicadas no
         Console são as mesmas); nada foi alterado nas regras.
 
+    76. 🚫 OPÇÃO "ESQUECI MINHA SENHA" RETIRADA DA TELA DE LOGIN —
+        código 76 (28/10)
+        Pedido direto do dono: "volte o sistema para o ponto onde o sistema
+        não tinha a opção esqueci a senha". MOTIVO apurado no mesmo dia:
+        teste controlado (o dono pediu o link com o PRÓPRIO usuário e o
+        e-mail CHEGOU) + confirmação dele de que o técnico Fernando NÃO
+        tem caixa em sedef.pr.gov.br — o link nunca chega para quem não
+        tem caixa, logo a opção era enganosa na tela de login. Retiradas
+        as 3 peças: botão #btnEsqueciSenha + caixa #esqueciStatus do HTML,
+        as 4 regras de CSS (#btnEsqueciSenha, :disabled, #esqueciStatus e
+        :empty) e a função esqueciMinhaSenha() com o seu addEventListener.
+        Sobrou um comentário no lugar (história da remoção + os 2 caminhos
+        que restaram: Console Delete+Add user e conta de serviço do 74).
+        MANTIDO de propósito: (a) o aviso CONDICIONAL do código 73 (só
+        aparece quando a senha digitada bate com o cadastro e não com o
+        Auth — orienta usar a senha antiga ou pedir o link); (b) o diálogo
+        de link ao salvar senha de técnico (código 74 → fallback) e o
+        helper enviarLinkSenha, que agora serve só a esse diálogo; (c) a
+        correção de UID do código 75, invisível e necessária para o
+        Delete+Add user do Console (sem ela o cadastro ficaria apontando
+        para a conta morta). Escopo: SÓ a opção da tela de login — se
+        quiser o rollback integral do 75, é uma palavra.
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -1112,7 +1135,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261028-134014">
+<meta name="nii-build" content="20261028-151301">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -3041,10 +3064,6 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
   #loginErro{color:var(--bad);font-size:12px;margin-top:8px;text-align:center;min-height:14px}
   #loginErro .lnk{background:none;border:none;color:var(--accent-dk);font:inherit;text-decoration:underline;cursor:pointer;padding:0}
   #loginErro .lnk[disabled]{opacity:.6;cursor:default}
-  #btnEsqueciSenha{display:block;width:100%;background:none;border:none;color:var(--accent-dk);font-size:11.5px;margin-top:8px;cursor:pointer;text-decoration:underline;padding:0}
-  #btnEsqueciSenha[disabled]{opacity:.6;cursor:default}
-  #esqueciStatus{font-size:11px;line-height:1.5;color:var(--ink-soft);margin-top:6px;text-align:center}
-  #esqueciStatus:empty{display:none}
   #btnLoginEntrar{width:100%;justify-content:center;margin-top:6px}
   #btnLoginEntrar[disabled]{opacity:.6;cursor:default}
 </style>
@@ -3060,10 +3079,6 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
       <div class="field"><label>Senha</label><input type="password" id="loginPass" autocomplete="current-password" required></div>
       <button type="submit" class="btn btn-accent" id="btnLoginEntrar">Entrar</button>
       <div id="loginErro"></div>
-      <!-- código 75: autoatendimento — o link de redefinição sem passar
-           pelo cadastro de técnicos -->
-      <button type="button" id="btnEsqueciSenha">Esqueci minha senha</button>
-      <div id="esqueciStatus"></div>
     </form>
     <div id="loginVer" style="margin-top:14px;font-size:11px;opacity:.5"></div>
     <div id="loginDiag" style="margin-top:6px;font-size:11px;opacity:.55"></div>
@@ -3993,25 +4008,16 @@ $('#formLogin').addEventListener('submit',async ev=>{
     btn.disabled=false;btn.textContent='Entrar';
   }
 });
-/* Código 75 — autoatendimento na tela de login: o técnico (ou o admin, com
-   o usuário dele) pede o link de redefinição a qualquer momento, sem passar
-   pelo cadastro. Depois que a pessoa escolhe a senha no link, o FIREBASE
-   AUTH passa a valer primeiro no login — o hash antigo guardado no cadastro
-   é ignorado. Com a proteção contra enumeração ligada (testada no projeto),
-   o pedido responde "ok" também para login inexistente: por isso a mensagem
-   fala em "link solicitado" e deixa claro que o e-mail só chega se houver
-   conta. */
-async function esqueciMinhaSenha(){
-  const caixa=$('#esqueciStatus'),btn=$('#btnEsqueciSenha'),usuario=$('#loginUser').value.trim();
-  if(!usuario){caixa.textContent='Digite o seu usuário no campo acima — é ele que aponta o e-mail.';$('#loginUser').focus();return;}
-  if(btn.disabled)return;
-  btn.disabled=true;caixa.textContent='Enviando pedido…';
-  const r=await enviarLinkSenha(emailDoLogin(usuario));
-  btn.disabled=false;
-  if(r.ok)caixa.innerHTML=r.mensagem+' Se houver conta com este login, o e-mail chega em instantes: abra o link e <b>escolha a senha nova</b>.';
-  else caixa.textContent=r.mensagem;
-}
-$('#btnEsqueciSenha').addEventListener('click',esqueciMinhaSenha);
+/* Código 76 (28/10) — a opção "Esqueci minha senha" que existia abaixo do
+   botão Entrar foi REMOVIDA: o teste do dia mostrou que técnicos de campo
+   NÃO têm caixa em sedef.pr.gov.br, então o link nunca chega para eles
+   (chegou normalmente para o dono, que tem caixa) — opção enganosa na
+   tela de login. O que restou para trocar senha SEM e-mail: Console do
+   Firebase (Authentication → Users → Delete + Add user) e a conta de
+   serviço do código 74 (troca instantânea pelo admin). O aviso
+   CONDICIONAL do código 73 continua no login — ele só aparece quando a
+   senha digitada bate com o cadastro mas não com o Auth, e orienta a usar
+   a senha antiga ou pedir o link. */
 
 async function sair(motivo){
   /* Bilhete para o próximo carregamento saber que a saída foi de propósito
