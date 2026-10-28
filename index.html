@@ -1049,6 +1049,35 @@
         e-mail do técnico, orientando a usar EXATAMENTE a senha recém-
         cadastrada. Nada mudou nas regras do Firestore nem no Worker.
 
+    74. 🔑 ADMIN TROCA A SENHA E O ACESSO RECEBE NA HORA — código 74 (28/10)
+        Pergunta do dono: "tem como o adm poder realizar essa troca de
+        senha?". FATO: pelo navegador não — updatePassword só vale para o
+        usuário logado (nenhum app client troca a senha de terceiro).
+        Quem pode é o backend autenticado como CONTA DE SERVIÇO do
+        Firebase (permissão firebaseauth.users.update, papel Firebase
+        Authentication Admin). Entregue em duas pontas, com FALLBACK: (1)
+        WORKER — novo POST /api/trocar-senha, portões na ordem: segredo →
+        sessão (usuarioDoToken) → admin (ehAdminFirestore) → corpo. Usa
+        tokenServico() (JWT RS256 assinado pela chave privada via Web
+        Crypto → https://oauth2.googleapis.com/token) e chama a API
+        identitytoolkit accounts:update {localId, password} do projeto
+        patrimonio-395c5; a senha nunca vai para log nem mensagem. Respostas
+        declarativas: aplicada / conta:false (USER_NOT_FOUND → o 1º login
+        cria) / sem-segredo 501 / sem-uid 400 / sessao 401 / admin 403 /
+        firebase 502. SEM o segredo FIREBASE_SERVICE_ACCOUNT o endpoint
+        responde 501 e NADA trava; (2) APP — aplicarSenhaNoAcesso() chama o
+        endpoint com o idToken do admin e aplicarSenhaOuLink() decide:
+        "aplicada" → toast de senha já valendo no acesso, "primeiro-login"
+        → toast de conta nova, QUALQUER OUTRA resposta → o MESMO
+        confirmar() do código 73 (link por e-mail). O formTecnico passou a
+        capturar o uid do técnico editado antes do resetTec(). Escopo: senha
+        de técnico EXISTENTE (id); cadastro novo segue pela ponte do
+        primeiro login. Pendência humana: subir a chave .json da conta de
+        serviço como segredo FIREBASE_SERVICE_ACCOUNT no Cloudflare (não
+        vai para o repositório). Testado até aqui: rota respondendo 501
+        sem-segredo e 204 em OPTIONS na produção, e os 3 caminhos da
+        decisão com fetch falsificado.
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -1056,7 +1085,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261028-081319">
+<meta name="nii-build" content="20261028-084408">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -3811,6 +3840,42 @@ async function enviarLinkSenha(email){
   }
 }
 
+/* Código 74 — o admin troca a senha e o FIREBASE AUTH recebe na hora.
+   Tenta primeiro o endpoint /api/trocar-senha do Worker (só-admin, usa a
+   conta de serviço). Se o segredo ainda não estiver no Worker, se o
+   técnico não tiver uid ou se o Firebase recusar, a resposta não vem
+   "aplicada" e o fluxo cai exatamente no link do código 73 — que é o que
+   já estava valendo. Devolve 'aplicada' | 'primeiro-login' | 'link'. */
+async function aplicarSenhaNoAcesso(uid,senha){
+  try{
+    const r=await fetch('/api/trocar-senha',{method:'POST',
+      headers:{'Authorization':'Bearer '+(await auth.currentUser.getIdToken()),'Content-Type':'application/json'},
+      body:JSON.stringify({uid:uid||'',senha:senha})});
+    return await r.json();   /* servidor antigo devolve HTML/404 → cai no catch */
+  }catch(e){return null;}
+}
+async function aplicarSenhaOuLink(uid,usuario,senha){
+  const ap=await aplicarSenhaNoAcesso(uid,senha);
+  if(ap&&ap.ok&&ap.aplicada){
+    toast('Senha gravada <b>também no acesso</b> — o técnico entra direto, sem link.','ok');
+    return 'aplicada';
+  }
+  if(ap&&ap.ok&&ap.conta===false){
+    toast('Sem conta de acesso ainda — a senha já vale no <b>primeiro login</b>.','ok');
+    return 'primeiro-login';
+  }
+  /* qualquer outra resposta (sem-segredo, sem-uid, erro, rede) → o link */
+  confirmar('Senha gravada — falta 1 passo',
+    'A senha nova entrou no cadastro, mas o <b>Firebase Auth</b> (que valida o login) continua com a antiga. '
+    +'Enviar o link de redefinição para <b>'+esc(emailDoLogin(usuario))+'</b>? '
+    +'Peça para o técnico abrir o e-mail e definir <b>exatamente a mesma senha</b> que você acabou de cadastrar.',
+    async()=>{
+      const r=await enviarLinkSenha(emailDoLogin(usuario));
+      toast(r.ok?r.mensagem+' Se houver conta com este login, o e-mail chega em instantes.':r.mensagem,r.ok?'ok':'bad');
+    },'✉ Enviar link');
+  return 'link';
+}
+
 /* Sessão agora é gerenciada pelo próprio Firebase Auth (persistência local
    automática). Não é mais preciso gravar sessão em localStorage/cookies. */
 function mostrarApp(u){
@@ -5210,8 +5275,10 @@ $('#formTecnico').addEventListener('submit',async ev=>{
   if(usuario&&db.tecnicos.some(t=>t.id!==id&&String(t.usuario||'').toLowerCase()===usuario.toLowerCase()))return toast('Já existe um técnico com este <b>usuário de login</b>.','bad');
   let senhaHash=undefined;
   if(senha)senhaHash=await sha256(senha);
+  let uidTec='';   /* uid do Auth do técnico editado (código 74) */
   if(id){
     const t=tecById(id);
+    uidTec=t.uid||'';
     const upd={nome,matricula:mat,usuario,senhaHash,atualizadoEm:Date.now()};
     if(!senha){delete upd.senhaHash;delete upd.senha;}
     Object.assign(t,upd);
@@ -5231,18 +5298,10 @@ $('#formTecnico').addEventListener('submit',async ev=>{
     toast('Técnico <b>'+esc(nome)+'</b> cadastrado.');
   }
   persistir();gravarAdmins();resetTec();atualizarTudo();
-  /* Senha alterada em técnico que JÁ pode ter conta no Firebase Auth: o
-     cadastro recebeu o hash, mas o Auth continua com a senha antiga (o app
-     não pode trocar a senha de outro usuário). Oferece o link de redefinição
-     AGORA — senão o técnico só descobre o problema na hora de entrar. */
-  if(id&&senha)confirmar('Senha gravada — falta 1 passo',
-    'A senha nova entrou no cadastro, mas o <b>Firebase Auth</b> (que valida o login) continua com a antiga. '
-    +'Enviar o link de redefinição para <b>'+esc(emailDoLogin(usuario))+'</b>? '
-    +'Peça para o técnico abrir o e-mail e definir <b>exatamente a mesma senha</b> que você acabou de cadastrar.',
-    async()=>{
-      const r=await enviarLinkSenha(emailDoLogin(usuario));
-      toast(r.ok?r.mensagem+' Se houver conta com este login, o e-mail chega em instantes.':r.mensagem,r.ok?'ok':'bad');
-    },'✉ Enviar link');
+  /* Código 74: com o Worker configurado, a senha entra NO MESMO TEMPO no
+     cadastro e no Firebase Auth (o técnico entra direto). Sem o segredo,
+     sem uid ou com erro do Firebase, o helper cai no link do código 73. */
+  if(id&&senha)await aplicarSenhaOuLink(uidTec,usuario,senha);
 });
 function proximaMatricula(){
   let max=0;
