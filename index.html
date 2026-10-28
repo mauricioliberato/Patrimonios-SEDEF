@@ -1078,6 +1078,33 @@
         sem-segredo e 204 em OPTIONS na produção, e os 3 caminhos da
         decisão com fetch falsificado.
 
+    75. 🔑 "ESQUECI MINHA SENHA" NA TELA DE LOGIN + UID QUE SE ATUALIZA —
+        código 75 (28/10)
+        Pergunta do dono: "não tem outra forma de alterar a senha do
+        técnico?". Conferido na documentação: o Console do Firebase
+        permite criar usuário com senha (Add user), redefinir POR E-MAIL,
+        desativar e excluir — NÃO há edição direta da senha de conta
+        existente; só o Admin SDK (o caminho do código 74). Duas entregas
+        sem conta de serviço: (1) BOTÃO "Esqueci minha senha" fixo na tela
+        de login — pega o usuário digitado, monta o e-mail e chama o
+        enviarLinkSenha() do código 73 (helper reaproveitado, sem
+        duplicação); serve ao técnico e ao admin que tem o usuário em mãos,
+        e resolve também senhas esquecidas sem chamar ninguém. Mensagem
+        herda a prudência do código 73 ("link solicitado", porque a
+        proteção contra enumeração responde ok até para login inexistente);
+        sem usuário digitado, orienta a preencher o campo. (2) UID QUE SE
+        ATUALIZA: o preenchimento de uid no cadastro só agia quando o campo
+        estava VAZIO (if(!alvo.uid)); agora também regrava quando o uid não
+        bate mais com o Firebase Auth — caso da conta excluída e recriada
+        no Console (o passo a passo sem conta de serviço troca o uid e
+        deixaria o cadastro apontando para conta morta; o uid é o que
+        gravarAdmins() e o /api/trocar-senha usam). Só grava quando difere
+        ou quando falta o flag admin, então não vira escrita a cada
+        entrada. Observação levantada na leitura das regras:
+        sistema/{secao} aceita escrita de QUALQUER autenticado (arquivo
+        firestore.rules do repo — vale conferir se as regras aplicadas no
+        Console são as mesmas); nada foi alterado nas regras.
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -1085,7 +1112,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261028-084408">
+<meta name="nii-build" content="20261028-134014">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -3014,6 +3041,10 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
   #loginErro{color:var(--bad);font-size:12px;margin-top:8px;text-align:center;min-height:14px}
   #loginErro .lnk{background:none;border:none;color:var(--accent-dk);font:inherit;text-decoration:underline;cursor:pointer;padding:0}
   #loginErro .lnk[disabled]{opacity:.6;cursor:default}
+  #btnEsqueciSenha{display:block;width:100%;background:none;border:none;color:var(--accent-dk);font-size:11.5px;margin-top:8px;cursor:pointer;text-decoration:underline;padding:0}
+  #btnEsqueciSenha[disabled]{opacity:.6;cursor:default}
+  #esqueciStatus{font-size:11px;line-height:1.5;color:var(--ink-soft);margin-top:6px;text-align:center}
+  #esqueciStatus:empty{display:none}
   #btnLoginEntrar{width:100%;justify-content:center;margin-top:6px}
   #btnLoginEntrar[disabled]{opacity:.6;cursor:default}
 </style>
@@ -3029,6 +3060,10 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
       <div class="field"><label>Senha</label><input type="password" id="loginPass" autocomplete="current-password" required></div>
       <button type="submit" class="btn btn-accent" id="btnLoginEntrar">Entrar</button>
       <div id="loginErro"></div>
+      <!-- código 75: autoatendimento — o link de redefinição sem passar
+           pelo cadastro de técnicos -->
+      <button type="button" id="btnEsqueciSenha">Esqueci minha senha</button>
+      <div id="esqueciStatus"></div>
     </form>
     <div id="loginVer" style="margin-top:14px;font-size:11px;opacity:.5"></div>
     <div id="loginDiag" style="margin-top:6px;font-size:11px;opacity:.55"></div>
@@ -3958,6 +3993,26 @@ $('#formLogin').addEventListener('submit',async ev=>{
     btn.disabled=false;btn.textContent='Entrar';
   }
 });
+/* Código 75 — autoatendimento na tela de login: o técnico (ou o admin, com
+   o usuário dele) pede o link de redefinição a qualquer momento, sem passar
+   pelo cadastro. Depois que a pessoa escolhe a senha no link, o FIREBASE
+   AUTH passa a valer primeiro no login — o hash antigo guardado no cadastro
+   é ignorado. Com a proteção contra enumeração ligada (testada no projeto),
+   o pedido responde "ok" também para login inexistente: por isso a mensagem
+   fala em "link solicitado" e deixa claro que o e-mail só chega se houver
+   conta. */
+async function esqueciMinhaSenha(){
+  const caixa=$('#esqueciStatus'),btn=$('#btnEsqueciSenha'),usuario=$('#loginUser').value.trim();
+  if(!usuario){caixa.textContent='Digite o seu usuário no campo acima — é ele que aponta o e-mail.';$('#loginUser').focus();return;}
+  if(btn.disabled)return;
+  btn.disabled=true;caixa.textContent='Enviando pedido…';
+  const r=await enviarLinkSenha(emailDoLogin(usuario));
+  btn.disabled=false;
+  if(r.ok)caixa.innerHTML=r.mensagem+' Se houver conta com este login, o e-mail chega em instantes: abra o link e <b>escolha a senha nova</b>.';
+  else caixa.textContent=r.mensagem;
+}
+$('#btnEsqueciSenha').addEventListener('click',esqueciMinhaSenha);
+
 async function sair(motivo){
   /* Bilhete para o próximo carregamento saber que a saída foi de propósito
      (o listener do click manda o EVENTO como argumento — só string vale):
@@ -4230,16 +4285,20 @@ auth.onAuthStateChanged(async fbUser=>{
      conforto, não mais exigência das regras — elas passaram a decidir quem
      é admin por sistema/admins e não tocam mais no array de cadastros.
      Completa assim mesmo porque é o uid que gravarAdmins() usa para levar
-     a pessoa à lista de administradores.
-     Só passa para quem já é admin; para os outros falha silenciosa (catch
-     abaixo) e o cadastro segue com uid vazio, sem efeito colateral. */
-  if(t&&(!t.uid||!('admin' in t))){
+     a pessoa à lista de administradores, e é o uid que o /api/trocar-senha
+     (código 74) usa para localizar a conta no Auth.
+     Código 75: além de preencher o vazio, REGRAVA quando o uid não bate
+     mais com o Firebase Auth — acontece quando a conta foi excluída e
+     recriada no Console (passo a passo sem conta de serviço). Só grava
+     quando difere ou quando falta o flag, então não vira escrita a cada
+     entrada. */
+  if(t&&(t.uid!==fbUser.uid||!('admin' in t))){
     try{
       const snapT=await docRefSecao('tecnicos').get();
       const itens=(snapT.exists&&Array.isArray(snapT.data().items))?snapT.data().items:[];
       const alvo=itens.find(x=>x.id===t.id);
-      if(alvo&&(!alvo.uid||!('admin' in alvo))){
-        if(!alvo.uid)alvo.uid=fbUser.uid;
+      if(alvo&&(alvo.uid!==fbUser.uid||!('admin' in alvo))){
+        if(alvo.uid!==fbUser.uid)alvo.uid=fbUser.uid;
         if(!('admin' in alvo))alvo.admin=false;
         await docRefSecao('tecnicos').set({items:itens});
         t.uid=alvo.uid;
