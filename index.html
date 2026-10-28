@@ -1174,6 +1174,35 @@
         nas senhas novas para a troca automática funcionar quando a conta
         de serviço for configurada.
 
+    79. 🔐 CRIAÇÃO DE ACESSO PELO SERVIDOR — sign-up continua fechado —
+        código 79 (28/10)
+        Relato do dono: nova tentativa de criar o acesso do Fernando veio
+        "auth/admin-restricted-operation". Causa confirmada na DOCS
+        oficial do Firebase: o projeto tem "Enable create (sign-up)"
+        DESLIGADO (Authentication → Settings → User Actions) — só
+        administrador cria conta. Essa é a postura CERTA e foi
+        mantida: com o firestore.rules atual, qualquer conta autenticada
+        LÊ e ESCREVE em sistema/{secao} — abrir o sign-up liberaria
+        qualquer pessoa com a chave pública do app a criar conta e
+        apagar/alterar o banco inteiro. Correção: Worker ganha POST
+        /api/criar-acesso (rotaCriarAcesso) — cria a conta pelo Admin SDK
+        REST (identitytoolkit accounts:create) com a conta de serviço,
+        MESMAS travas do código 74 (segredo → sessão → admin → corpo;
+        e-mail válido e senha de 6+ sem espaço); responde ok+uid |
+        email-existe | sem-segredo 501 | sessao 401 | admin 403 | email
+        400 | senha 400 | firebase 502. No app: criarAcessoNoServidor()
+        chama a rota com o token da sessão; criarAcessoComDecisao()
+        tenta Worker → cliente (código 77, só funciona se um dia o
+        sign-up for ligado) → guia do Console; o UID devolvido pelo
+        Worker já entra no cadastro do técnico na hora; e o aviso de
+        falha agora TRADUZ o admin-restricted-operation ("a criação de
+        contas está restrita no projeto (User Actions)") em vez de
+        mostrar o código cru. Com o segredo configurado (mesmo passo a
+        passo do código 74), cadastro novo e reparo de órfão passam a
+        criar acesso sozinhos — sem Console, sem e-mail. Sem o segredo,
+        tudo cai no guia do Console (501 → decisão → aviso) — nada
+        quebra. Sign-up DESLIGADO por decisão de segurança (registrada).
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -1181,7 +1210,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261028-164044">
+<meta name="nii-build" content="20261028-165519">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -5427,6 +5456,47 @@ async function criarAcessoAuth(email,senha){
     if(app2){try{await app2.delete();}catch(_){}}
   }
 }
+/* Código 79 — tenta criar a conta pelo WORKER (conta de serviço), que
+   funciona mesmo com o "Enable create (sign-up)" desligado — e é ele que
+   está desligado, de propósito: com as regras atuais, qualquer conta
+   autenticada escreve em sistema/*, então o sign-up aberto liberaria
+   qualquer pessoa com a chave pública a criar conta e mexer no banco.
+   Sem o segredo no Worker (501 sem-segredo), a resposta volta tal qual e
+   o chamador tenta o caminho do cliente (código 77) ou manda para o
+   Console. */
+async function criarAcessoNoServidor(email,senha){
+  try{
+    const u=auth.currentUser;
+    if(!u)return {ok:false,motivo:'sessao'};
+    const r=await fetch('/api/criar-acesso',{method:'POST',
+      headers:{'Authorization':'Bearer '+(await u.getIdToken()),'Content-Type':'application/json'},
+      body:JSON.stringify({email:email,senha:senha})});
+    return await r.json();   /* worker antigo devolve HTML/404 → cai no catch */
+  }catch(e){return {ok:false,motivo:'rede'};}
+}
+/* Código 79 — ordem de criação do acesso: (1) Worker com conta de serviço
+   (admin-only, vale com o sign-up desligado); (2) cliente (só funciona se
+   o projeto tiver o sign-up ligado — hoje não tem, de propósito); (3) o
+   chamador mostra o guia do Console. Devolve {ok,uid} | {existe:true} |
+   {ok:false,codigo}. */
+async function criarAcessoComDecisao(email,senha){
+  const srv=await criarAcessoNoServidor(email,senha);
+  if(srv&&srv.ok)return {ok:true,uid:String(srv.uid||''),via:'servidor'};
+  if(srv&&srv.motivo==='email-existe')return {ok:false,existe:true};
+  const cli=await criarAcessoAuth(email,senha);
+  if(cli.ok)return {ok:true,uid:'',via:'cliente'};
+  if(cli.existe)return {ok:false,existe:true};
+  return {ok:false,existe:false,codigo:String(cli.codigo||'')};
+}
+/* Código 79 — traduz o admin-restricted-operation para linguagem de gente:
+   a criação de contas próprias está desligada no projeto (User Actions) e
+   só o administrador cria conta — por isso o aviso aponta o Console ou a
+   conta de serviço, nunca "tente de novo". */
+function avisoAcessoRestrito(codigo){
+  return String(codigo||'').includes('admin-restricted-operation')
+    ? ' — a criação de contas está <b>restrita no projeto</b> (User Actions)'
+    : ' ('+esc(codigo||'erro')+')';
+}
 $('#formTecnico').addEventListener('submit',async ev=>{
   ev.preventDefault();
   if(!souAdmin())return toast('Só um administrador pode cadastrar ou alterar técnicos.','bad');
@@ -5444,9 +5514,12 @@ $('#formTecnico').addEventListener('submit',async ev=>{
   let senhaHash=undefined;
   if(senha)senhaHash=await sha256(senha);
   let uidTec='';   /* uid do Auth do técnico editado (código 74) */
+  let tecGravado=null;  /* registro acabado de gravar — o código 79 grava
+                           aqui o uid devolvido pelo Worker */
   if(id){
     const t=tecById(id);
     uidTec=t.uid||'';
+    tecGravado=t;
     const upd={nome,matricula:mat,usuario,senhaHash,atualizadoEm:Date.now()};
     if(!senha){delete upd.senhaHash;delete upd.senha;}
     Object.assign(t,upd);
@@ -5463,25 +5536,34 @@ $('#formTecnico').addEventListener('submit',async ev=>{
     const novo={id:uid(),nome,matricula:mat,usuario,uid:'',admin:false,criadoEm:Date.now()};
     if(senhaHash)novo.senhaHash=senhaHash;
     db.tecnicos.push(novo);
+    tecGravado=novo;
     toast('Técnico <b>'+esc(nome)+'</b> cadastrado.');
   }
   persistir();gravarAdmins();resetTec();atualizarTudo();
-  /* Código 77: CADASTRO NOVO com senha → a conta de acesso é criada AGORA
-     (era o caso que travava o primeiro login). Se já existir conta para
-     este e-mail, o cadastro vale e o aviso manda usar Editar. */
+  /* Código 79: a conta de acesso é criada junto — na ordem Worker (conta
+     de serviço, funciona com o sign-up desligado) → cliente (só com o
+     sign-up ligado, hoje desligado de propósito) → guia do Console. O
+     uid devolvido pelo Worker entra no cadastro na hora. */
+  const emailTec=emailDoLogin(usuario);
   if(!id&&senha){
-    const r=await criarAcessoAuth(emailDoLogin(usuario),senha);
-    if(r.ok)toast('Conta de acesso de <b>'+esc(nome)+'</b> criada — ele já pode entrar com o usuário e a senha definidos.','ok');
-    else if(r.existe)toast('Cadastro gravado, mas já existe conta de acesso para <b>'+esc(emailDoLogin(usuario))+'</b>. Para ajustar a senha, use <b>Editar</b>.','warn');
-    else toast('Cadastro gravado, mas o acesso não pôde ser criado ('+esc(r.codigo)+'). Crie a conta no <b>Console → Authentication → Add user</b> com este e-mail e a mesma senha.','bad');
+    const r=await criarAcessoComDecisao(emailTec,senha);
+    if(r.ok){
+      if(r.uid&&tecGravado&&tecGravado.uid!==r.uid){tecGravado.uid=r.uid;persistir();}
+      toast('Conta de acesso de <b>'+esc(nome)+'</b> criada — ele já pode entrar com o usuário e a senha definidos.','ok');
+    }
+    else if(r.existe)toast('Cadastro gravado, mas já existe conta de acesso para <b>'+esc(emailTec)+'</b>. Para ajustar a senha, use <b>Editar</b>.','warn');
+    else toast('Cadastro gravado, mas o acesso não pôde ser criado'+avisoAcessoRestrito(r.codigo)+'. Crie a conta no <b>Console → Authentication → Add user</b> com este e-mail e a mesma senha.','bad');
   }else if(id&&senha){
     /* Código 74: com o Worker configurado, a senha entra NO MESMO TEMPO no
-       cadastro e no Firebase Auth. Código 77: se este técnico editado ainda
-       NÃO tem conta (cadastro antigo que nunca logou — o caso do dia), a
-       conta é criada aqui: era beco sem saída para quem não tem e-mail. */
-    const r=await criarAcessoAuth(emailDoLogin(usuario),senha);
-    if(r.ok)toast('Senha gravada também no acesso — <b>'+esc(nome)+'</b> já pode entrar.','ok');
-    else if(!r.existe)toast('A senha ficou no cadastro, mas o acesso não pôde ser criado ('+esc(r.codigo)+'). Crie a conta no <b>Console → Authentication → Add user</b> com <b>'+esc(emailDoLogin(usuario))+'</b>.','bad');
+       cadastro e no Firebase Auth. Código 79: se este técnico editado ainda
+       NÃO tem conta (cadastro antigo que nunca logou), a conta é criada
+       aqui — era beco sem saída para quem não tem e-mail. */
+    const r=await criarAcessoComDecisao(emailTec,senha);
+    if(r.ok){
+      if(r.uid&&tecGravado&&tecGravado.uid!==r.uid){tecGravado.uid=r.uid;persistir();}
+      toast('Senha gravada também no acesso — <b>'+esc(nome)+'</b> já pode entrar.','ok');
+    }
+    else if(!r.existe)toast('A senha ficou no cadastro, mas o acesso não pôde ser criado'+avisoAcessoRestrito(r.codigo)+'. Crie a conta no <b>Console → Authentication → Add user</b> com <b>'+esc(emailTec)+'</b>.','bad');
     else await aplicarSenhaOuLink(uidTec,usuario,senha);
   }
 });
