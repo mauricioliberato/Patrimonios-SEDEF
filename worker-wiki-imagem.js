@@ -485,6 +485,119 @@ async function rotaExcluirArquivo(request, env) {
   }), { headers: headers });
 }
 
+/* ============== POST /api/trocar-senha — admin troca a senha de outro ==============
+   O navegador NÃO pode: updatePassword só vale para o usuário que está
+   logado. Quem pode é o backend autenticado como CONTA DE SERVIÇO do
+   Firebase (permissão firebaseauth.users.update, papel Firebase
+   Authentication Admin). A chave JSON entra como segredo
+   FIREBASE_SERVICE_ACCOUNT no Worker (Cloudflare → Settings → Variables
+   and Secrets) e NUNCA vai para o repositório.
+   Sem o segredo, respondemos 501 sem-segredo e o app cai no link de
+   redefinição (fluxo do código 73) — nada trava, só não troca sozinho.
+   Ordem dos portões: segredo → sessão → admin → corpo → Firebase. A senha
+   viaja só nesta chamada HTTPS e não é escrita em log nem em mensagem. */
+function b64urlTexto(txt) {
+  const enc = new TextEncoder().encode(txt);
+  let s = '';
+  for (let i = 0; i < enc.length; i++) s += String.fromCharCode(enc[i]);
+  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function b64urlBytes(bytes) {
+  let s = '';
+  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function pemPkcs8(pem) {
+  /* chave de conta de serviço vem em PEM ("BEGIN PRIVATE KEY") → DER cru */
+  const corpo = String(pem).replace(/-----[^-]+-----/g, '').replace(/\s+/g, '');
+  const bin = atob(corpo);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+async function tokenServico(conta) {
+  /* JWT assinado RS256 com a chave privada da conta → troca por um
+     access_token de 1 h no https://oauth2.googleapis.com/token
+     (grant urn:ietf:params:oauth:grant-type:jwt-bearer). */
+  const agora = Math.floor(Date.now() / 1000);
+  const base = b64urlTexto(JSON.stringify({ alg: 'RS256', typ: 'JWT' })) + '.' +
+    b64urlTexto(JSON.stringify({
+      iss: conta.client_email,
+      scope: 'https://www.googleapis.com/auth/cloud-platform',
+      aud: 'https://oauth2.googleapis.com/token',
+      iat: agora, exp: agora + 3600
+    }));
+  const chave = await crypto.subtle.importKey('pkcs8', pemPkcs8(conta.private_key).buffer,
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']);
+  const sig = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', chave,
+    new TextEncoder().encode(base));
+  const assertion = base + '.' + b64urlBytes(new Uint8Array(sig));
+  const r = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'grant_type=' + encodeURIComponent('urn:ietf:params:oauth:grant-type:jwt-bearer') +
+      '&assertion=' + assertion
+  });
+  if (!r.ok) throw new Error('oauth ' + r.status);
+  const j = await r.json();
+  if (!j.access_token) throw new Error('oauth sem access_token');
+  return j.access_token;
+}
+async function rotaTrocarSenha(request, env) {
+  const origem = request.headers.get('Origin') || '';
+  const headers = {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Access-Control-Allow-Origin': origem || '*',
+    'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS'
+  };
+  const json = function (obj, status) {
+    return new Response(JSON.stringify(obj), { status: status || 200, headers: headers });
+  };
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: headers });
+  if (request.method !== 'POST') return json({ ok: false, motivo: 'metodo' }, 405);
+  const bruto = env && env.FIREBASE_SERVICE_ACCOUNT ? String(env.FIREBASE_SERVICE_ACCOUNT) : '';
+  if (!bruto) return json({ ok: false, motivo: 'sem-segredo' }, 501);
+  let conta = null;
+  try { conta = JSON.parse(bruto); } catch (e) { conta = null; }
+  if (!conta || !conta.client_email || !conta.private_key)
+    return json({ ok: false, motivo: 'segredo-invalido' }, 501);
+  const autoriza = request.headers.get('Authorization') || '';
+  let usuario = null;
+  try { usuario = await usuarioDoToken(request); } catch (e) { usuario = null; }
+  if (!usuario) return json({ ok: false, motivo: 'sessao' }, 401);
+  if (!(await ehAdminFirestore(autoriza.slice(7), usuario)))
+    return json({ ok: false, motivo: 'admin' }, 403);
+  let uid = '', senha = '';
+  try {
+    const corpo = await request.json();
+    uid = String((corpo && corpo.uid) || '');
+    senha = String((corpo && corpo.senha) || '');
+  } catch (e) { }
+  /* sem uid gravado no cadastro não dá para localizar a conta no Auth:
+     o app cai no link de redefinição (resposta honesta, não erro) */
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(uid)) return json({ ok: false, motivo: 'sem-uid' }, 400);
+  if (!/^[^\s]{6,128}$/.test(senha)) return json({ ok: false, motivo: 'senha' }, 400);
+  try {
+    const tok = await tokenServico(conta);
+    const r = await fetch('https://identitytoolkit.googleapis.com/v1/projects/' +
+      PROJETO_FIREBASE + '/accounts:update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
+        body: JSON.stringify({ localId: uid, password: senha })
+      });
+    if (r.ok) return json({ ok: true, aplicada: true });
+    const resp = await r.json().catch(function () { return null; });
+    const msg = String((resp && resp.error && resp.error.message) || '');
+    /* conta ainda não existe: o primeiro login cria com a senha do
+       cadastro (ponte de migração) — avisa que já vale, sem link */
+    if (msg.indexOf('USER_NOT_FOUND') >= 0) return json({ ok: true, aplicada: false, conta: false });
+    return json({ ok: false, motivo: 'firebase', status: r.status, detalhe: msg.slice(0, 160) }, 502);
+  } catch (e) {
+    return json({ ok: false, motivo: 'firebase', detalhe: String((e && e.message) || e).slice(0, 160) }, 502);
+  }
+}
+
 /* GET /api/backup-wiki — ZIP com TODOS os prints e documentos guardados.
    É o irmão do "⬇ Exportar backup" do menu: o JSON leva as seções do
    Firestore, este ZIP leva os BINÁRIOS da KV (que o JSON nunca alcança).
@@ -867,6 +980,9 @@ export default {
       }
       if (url.pathname === '/api/backup-wiki') {
         return await rotaBackupWiki(request, env);
+      }
+      if (url.pathname === '/api/trocar-senha') {
+        return await rotaTrocarSenha(request, env);
       }
       /* qualquer outro endereço volta para os arquivos estáticos do projeto */
       return await env.ASSETS.fetch(request);
