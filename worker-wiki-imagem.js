@@ -598,6 +598,72 @@ async function rotaTrocarSenha(request, env) {
   }
 }
 
+/* Código 79 — POST /api/criar-acesso: a CONTA de acesso nasce pelo
+   servidor, com a conta de serviço. Motivo: o projeto tem "Enable
+   create (sign-up)" DESLIGADO — o cliente recebe
+   auth/admin-restricted-operation ao criar conta, e essa é a postura
+   CORRETA (com as regras atuais, qualquer conta autenticada escreve em
+   sistema/*, então abrir o sign-up liberaria qualquer pessoa com a chave
+   pública a criar conta e mexer no banco). Aqui a criação passa pelo
+   Admin SDK REST (accounts:create), que o sign-up não alcança. Mesmas
+   travas do código 74: segredo → sessão → admin → corpo. Respostas:
+   ok+uid | email-existe | sem-segredo 501 | sessao 401 | admin 403 |
+   email 400 | senha 400 | firebase 502. */
+async function rotaCriarAcesso(request, env) {
+  const origem = request.headers.get('Origin') || '';
+  const headers = {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Access-Control-Allow-Origin': origem || '*',
+    'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS'
+  };
+  const json = function (obj, status) {
+    return new Response(JSON.stringify(obj), { status: status || 200, headers: headers });
+  };
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: headers });
+  if (request.method !== 'POST') return json({ ok: false, motivo: 'metodo' }, 405);
+  const bruto = env && env.FIREBASE_SERVICE_ACCOUNT ? String(env.FIREBASE_SERVICE_ACCOUNT) : '';
+  if (!bruto) return json({ ok: false, motivo: 'sem-segredo' }, 501);
+  let conta = null;
+  try { conta = JSON.parse(bruto); } catch (e) { conta = null; }
+  if (!conta || !conta.client_email || !conta.private_key)
+    return json({ ok: false, motivo: 'segredo-invalido' }, 501);
+  const autoriza = request.headers.get('Authorization') || '';
+  let usuario = null;
+  try { usuario = await usuarioDoToken(request); } catch (e) { usuario = null; }
+  if (!usuario) return json({ ok: false, motivo: 'sessao' }, 401);
+  if (!(await ehAdminFirestore(autoriza.slice(7), usuario)))
+    return json({ ok: false, motivo: 'admin' }, 403);
+  let email = '', senha = '';
+  try {
+    const corpo = await request.json();
+    email = String((corpo && corpo.email) || '').trim().toLowerCase();
+    senha = String((corpo && corpo.senha) || '');
+  } catch (e) { }
+  /* e-mail sintético do app (login@sedef.pr.gov.br) e senha de 6+ sem
+     espaço — o mínimo que o Firebase aceita para criar conta */
+  if (!/^[^\s@]+@[^\s@]+$/.test(email)) return json({ ok: false, motivo: 'email' }, 400);
+  if (!/^[^\s]{6,128}$/.test(senha)) return json({ ok: false, motivo: 'senha' }, 400);
+  try {
+    const tok = await tokenServico(conta);
+    const r = await fetch('https://identitytoolkit.googleapis.com/v1/projects/' +
+      PROJETO_FIREBASE + '/accounts:create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
+        body: JSON.stringify({ email: email, password: senha })
+      });
+    const resp = await r.json().catch(function () { return null; });
+    if (r.ok) return json({ ok: true, uid: String((resp && resp.localId) || '') });
+    const msg = String((resp && resp.error && resp.error.message) || '');
+    /* já existe conta para este e-mail: o app decide o próximo passo
+       (senha via código 74, ou aviso para usar Editar) — não é erro */
+    if (msg.indexOf('EMAIL_EXISTS') >= 0) return json({ ok: false, motivo: 'email-existe' });
+    return json({ ok: false, motivo: 'firebase', status: r.status, detalhe: msg.slice(0, 160) }, 502);
+  } catch (e) {
+    return json({ ok: false, motivo: 'firebase', detalhe: String((e && e.message) || e).slice(0, 160) }, 502);
+  }
+}
+
 /* GET /api/backup-wiki — ZIP com TODOS os prints e documentos guardados.
    É o irmão do "⬇ Exportar backup" do menu: o JSON leva as seções do
    Firestore, este ZIP leva os BINÁRIOS da KV (que o JSON nunca alcança).
@@ -983,6 +1049,9 @@ export default {
       }
       if (url.pathname === '/api/trocar-senha') {
         return await rotaTrocarSenha(request, env);
+      }
+      if (url.pathname === '/api/criar-acesso') {
+        return await rotaCriarAcesso(request, env);
       }
       /* qualquer outro endereço volta para os arquivos estáticos do projeto */
       return await env.ASSETS.fetch(request);
