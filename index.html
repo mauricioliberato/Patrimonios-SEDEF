@@ -1128,6 +1128,35 @@
         para a conta morta). Escopo: SÓ a opção da tela de login — se
         quiser o rollback integral do 75, é uma palavra.
 
+    77. ✅ ACESSO CRIADO JUNTO COM O CADASTRO — o "usuário ou senha
+        inválidos" do técnico novo resolvido — código 77 (28/10)
+        Relato do dono: cadastrou um técnico NOVO e não conseguia logar
+        (mensagem genérica de usuário/senha). Diagnóstico COM EVIDÊNCIA:
+        a ponte de migração lia sistema/tecnicos ANTES de autenticar, mas
+        as regras atuais exigem sessão para ler sistema/* — leitura sem
+        sessão direto no Firestore respondeu HTTP 403 PERMISSION_DENIED.
+        Resultado: o primeiro login de qualquer técnico novo FALHAVA sempre,
+        mesmo com a senha correta (quem já tem conta no Auth não era
+        afetado — o cadastro é lido depois de autenticar). Correções:
+        (a) criarAcessoAuth(): cria a conta no Auth NO MESMO atO do
+        cadastro, em instância SECUNDÁRIA do Firebase (criar usuário faz
+        sign-in no app novo; a secundária preserva a sessão do admin);
+        (b) a mesma função REPARA técnico órfão: ao Editar um cadastro que
+        nunca logou e digitar a senha, a conta é criada na hora (antes era
+        beco sem saída sem e-mail); se a conta já existir (email-already-
+        in-use), segue o caminho de sempre (código 74 → link/Console);
+        (c) mensagem HONESTA no login: bandeiira leituraCadastroBloqueada
+        detecta permission-denied e o login diz "usuário ainda não tem
+        conta de acesso — procure o administrador" em vez do genérico;
+        (d) erros de criação mostram o código e orientam Console →
+        Authentication → Add user. NÃO se abriu regra do Firestore: leitura
+        pública de sistema/tecnicos exporia o senhaHash (SHA-256 sem sal,
+        fraco) de todos — rejeitado por segurança. Se a criação responder
+        operation-not-allowed, ligar "Enable create (sign-up)" no Console
+        (Authentication → Sign-in method → Email/Password). Mantidos: regras
+        do Firestore como estão, código 74 (troca de senha de quem já tem
+        conta), aviso condicional do 73 e o uid do 75.
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -1135,7 +1164,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261028-151301">
+<meta name="nii-build" content="20261028-161621">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -3656,12 +3685,23 @@ async function iniciarSincronizacao(){
      caminho da migração, que roda enquanto as regras ainda estão abertas).
      Isso é o que mantém o login funcionando depois que as regras passarem
      a exigir request.auth != null. */
+/* Código 77 — bandeiira para o login distinguir "não achei o cadastro" de
+   "não PUDI ler o cadastro". Com as regras atuais (sistema/* exige sessão),
+   esta leitura pré-login responde 403 PERMISSION_DENIED — confirmado em
+   28/10 por leitura sem sessão direto no Firestore (HTTP 403). Sem a
+   bandeiira, o login mostrava o genérico "Usuário ou senha inválidos" para
+   um técnico novo, cujo problema real é outro: ainda não existe conta no
+   Firebase Auth (o cadastro sozinho não libera entrada). */
+let leituraCadastroBloqueada=false;
 async function lerTecnicoPorLogin(usuario){
+  leituraCadastroBloqueada=false;
   try{
     const snap=await docRefSecao('tecnicos').get();
     const lista=(snap.exists&&Array.isArray(snap.data().items))?snap.data().items:[];
     return lista.find(x=>String(x.usuario||'').trim().toLowerCase()===String(usuario||'').trim().toLowerCase())||null;
   }catch(err){
+    const codigo=(err&&err.code)?String(err.code):'';
+    leituraCadastroBloqueada=codigo.includes('permission-denied');
     console.warn('Não foi possível ler o cadastro do técnico:',err);
     return null;
   }
@@ -3686,7 +3726,17 @@ async function tentarLogin(usuario,senha){
     /* A conta ainda não existe → este é o único ponto que consulta o
        cadastro antes de autenticar, e ele só é usado durante a migração. */
     t=await lerTecnicoPorLogin(usuario);
-    if(!t)return null;
+    if(!t){
+      if(leituraCadastroBloqueada){
+        /* Código 77: não é senha errada — a conta não existe e o cadastro
+           nem pôde ser consultado (regras fechadas). Dizer a verdade
+           economiza a insistência do técnico e aponta o caminho. */
+        const e=new Error('usuário ainda sem conta de acesso');
+        e.niiPrimeiroAcessoBloqueado=true;
+        throw e;
+      }
+      return null;
+    }
     if(t.ativo===false)throw erroLoginInativo(); /* nem cria a conta no Auth */
     const hash=await sha256(senha);
     const senhaAntigaOk=hash?(String(t.senhaHash||'')===hash||String(t.senha||'')===senha)
@@ -4004,6 +4054,7 @@ $('#formLogin').addEventListener('submit',async ev=>{
     /* O Firebase Auth cuida da persistência; mostrarApp é chamado no listener abaixo. */
   }catch(err){
     if(err&&err.niiSenhaNaoSincronizada)mostrarAvisoSenhaNaoSincronizada(usuario);
+    else if(err&&err.niiPrimeiroAcessoBloqueado)$('#loginErro').textContent='Este usuário ainda não tem conta de acesso no sistema. Procure um administrador — a conta é criada ao gravar a senha dele (tela Técnicos) ou no Console do Firebase (Authentication → Add user).';
     else $('#loginErro').textContent=mensagemErroLogin(err);
     btn.disabled=false;btn.textContent='Entrar';
   }
@@ -5330,6 +5381,35 @@ $('#eqTbody').addEventListener('click',e=>{
 });
 
 /* ============== TÉCNICOS ============== */
+/* Código 77 (28/10) — o ACESSO nasce junto com o cadastro. O diagnóstico do
+   dia mostrou o buraco: a ponte antiga lia sistema/tecnicos ANTES de
+   autenticar para criar a conta no primeiro login, mas as regras atuais
+   exigem sessão para ler sistema/* (testado: leitura sem sessão → HTTP 403
+   PERMISSION_DENIED) — o técnico novo recebia "Usuário ou senha inválidos"
+   mesmo com a senha correta. Aqui a conta é criada no MESMO ato do
+   cadastro, numa instância SECUNDÁRIA do Firebase: criar um usuário faz
+   sign-in no app novo, e a instância secundária é o que preserva a sessão
+   do administrador. Quem JÁ tem conta não é afetado — o create responde
+   email-already-in-use e a chamada decide o próximo passo (senha via
+   conta de serviço / link / Console). Se responder operation-not-allowed,
+   é sinal de que o "Enable create (sign-up)" está desligado no Console
+   (Authentication → Sign-in method → Email/Password). */
+async function criarAcessoAuth(email,senha){
+  let app2=null;
+  try{
+    app2=firebase.initializeApp(firebase.apps[0].options,'criar-acesso-'+Date.now());
+    await app2.auth().createUserWithEmailAndPassword(email,senha);
+    try{await app2.auth().signOut();}catch(_){}
+    return {ok:true};
+  }catch(err){
+    const codigo=(err&&err.code)?String(err.code):'';
+    if(codigo.includes('email-already-in-use'))return {ok:false,existe:true};
+    console.warn('[código 77] acesso não criado no Auth:',codigo||err);
+    return {ok:false,existe:false,codigo:codigo||'erro'};
+  }finally{
+    if(app2){try{await app2.delete();}catch(_){}}
+  }
+}
 $('#formTecnico').addEventListener('submit',async ev=>{
   ev.preventDefault();
   if(!souAdmin())return toast('Só um administrador pode cadastrar ou alterar técnicos.','bad');
@@ -5363,10 +5443,24 @@ $('#formTecnico').addEventListener('submit',async ev=>{
     toast('Técnico <b>'+esc(nome)+'</b> cadastrado.');
   }
   persistir();gravarAdmins();resetTec();atualizarTudo();
-  /* Código 74: com o Worker configurado, a senha entra NO MESMO TEMPO no
-     cadastro e no Firebase Auth (o técnico entra direto). Sem o segredo,
-     sem uid ou com erro do Firebase, o helper cai no link do código 73. */
-  if(id&&senha)await aplicarSenhaOuLink(uidTec,usuario,senha);
+  /* Código 77: CADASTRO NOVO com senha → a conta de acesso é criada AGORA
+     (era o caso que travava o primeiro login). Se já existir conta para
+     este e-mail, o cadastro vale e o aviso manda usar Editar. */
+  if(!id&&senha){
+    const r=await criarAcessoAuth(emailDoLogin(usuario),senha);
+    if(r.ok)toast('Conta de acesso de <b>'+esc(nome)+'</b> criada — ele já pode entrar com o usuário e a senha definidos.','ok');
+    else if(r.existe)toast('Cadastro gravado, mas já existe conta de acesso para <b>'+esc(emailDoLogin(usuario))+'</b>. Para ajustar a senha, use <b>Editar</b>.','warn');
+    else toast('Cadastro gravado, mas o acesso não pôde ser criado ('+esc(r.codigo)+'). Crie a conta no <b>Console → Authentication → Add user</b> com este e-mail e a mesma senha.','bad');
+  }else if(id&&senha){
+    /* Código 74: com o Worker configurado, a senha entra NO MESMO TEMPO no
+       cadastro e no Firebase Auth. Código 77: se este técnico editado ainda
+       NÃO tem conta (cadastro antigo que nunca logou — o caso do dia), a
+       conta é criada aqui: era beco sem saída para quem não tem e-mail. */
+    const r=await criarAcessoAuth(emailDoLogin(usuario),senha);
+    if(r.ok)toast('Senha gravada também no acesso — <b>'+esc(nome)+'</b> já pode entrar.','ok');
+    else if(!r.existe)toast('A senha ficou no cadastro, mas o acesso não pôde ser criado ('+esc(r.codigo)+'). Crie a conta no <b>Console → Authentication → Add user</b> com <b>'+esc(emailDoLogin(usuario))+'</b>.','bad');
+    else await aplicarSenhaOuLink(uidTec,usuario,senha);
+  }
 });
 function proximaMatricula(){
   let max=0;
