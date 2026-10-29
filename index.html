@@ -1203,6 +1203,44 @@
         tudo cai no guia do Console (501 → decisão → aviso) — nada
         quebra. Sign-up DESLIGADO por decisão de segurança (registrada).
 
+
+    80. 🔑 SENHAS: TROCA PELO PRÓPRIO TÉCNICO, REDEFINIÇÃO PELO ADMIN E
+        "ESQUECI MINHA SENHA" — código 80 (29/10)
+        Pedido do dono: (a) o administrador poder resetar a senha dos
+        técnicos, (b) o técnico poder trocar a própria senha, (c) opção de
+        esqueci a senha na tela de login. ENTREGUE EM TRÊS PEÇAS.
+        (b) TROCAR MINHA SENHA — 100% no navegador, não depende do Worker:
+        botão 🔑 no rodapé do menu (e item no menu do celular) abre um
+        formulário com senha atual, nova e confirmação. Reautentica com a
+        senha atual (reauthenticateWithCredential) e só então troca
+        (updatePassword) — por isso a senha atual é obrigatória. Regras:
+        mínimo 6 caracteres (exigência do Firebase), sem espaços (o
+        endpoint do código 74 os recusa) e diferente da atual.
+        (a) REDEFINIR SENHA (admin): botão 🔁 Senha em cada técnico (não
+        aparece na própria linha nem para quem não tem usuário). Gera uma
+        senha temporária aleatória de 10 caracteres (sem 0/O/1/l/I),
+        aplica no Firebase Auth pelo Worker (/api/trocar-senha do código
+        74; se a conta ainda não existe, cria pelo /api/criar-acesso do
+        código 79), marca o cadastro com trocarSenha:true e mostra a
+        senha UMA vez para o admin copiar. No próximo acesso o técnico é
+        OBRIGADO a criar senha nova (o formulário não fecha nem com Esc;
+        só dá para trocar ou sair); ao trocar, o marcador é limpo por
+        gravação direta na seção, com atualizadoEm novo, no mesmo molde de
+        limparSenhaLegada. A senha temporária NÃO é gravada em lugar
+        nenhum (nem hash). PRÉ-REQUISITO: o segredo
+        FIREBASE_SERVICE_ACCOUNT no Worker (passo a passo do código 74).
+        Sem ele o app não finge: mostra a senha e o passo a passo do
+        Console (Authentication, Users, apagar a conta e Add user com
+        aquele e-mail e aquela senha) e um botão "Já fiz no Console" que
+        só então marca a troca obrigatória.
+        (c) ESQUECI MINHA SENHA voltou à tela de login — o código 76
+        tinha tirado porque o link não chega para quem não tem caixa em
+        sedef.pr.gov.br. Voltou com o texto corrigido: pede o usuário,
+        solicita o link do Firebase, diz PARA QUAL e-mail ele vai e orienta
+        quem não recebe e-mail ali a pedir ao administrador a senha
+        temporária (peça a). Botão trava por 60 s contra repetição.
+        Nada mudou nas regras do Firestore nem no Worker.
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -1210,7 +1248,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261028-165519">
+<meta name="nii-build" content="20261029-105925">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -1756,6 +1794,7 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3"/></svg>
         Backup e Restauração
       </button>
+      <button class="nav-item sair-mobile" id="btnTrocarSenhaMobile" type="button" style="color:#cfe0ec">🔑 Trocar minha senha</button>
       <button class="nav-item sair-mobile" id="btnSairMobile" type="button">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
         Sair
@@ -1773,7 +1812,7 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
     <div class="side-foot">
       <div class="row" style="justify-content:space-between;align-items:center">
         <small style="color:#cfe0ec;font-weight:600" id="usuarioLogadoNome">—</small>
-        <button class="btn-side" id="btnSair" style="flex:0 0 auto;padding:6px 10px">Sair</button>
+        <span style="display:flex;gap:6px"><button class="btn-side" id="btnTrocarSenha" type="button" title="Trocar minha senha" style="flex:0 0 auto;padding:6px 10px">🔑 Senha</button><button class="btn-side" id="btnSair" style="flex:0 0 auto;padding:6px 10px">Sair</button></span>
       </div>
       <small id="backupStatus" class="bkp-status" style="display:block;font-weight:600">Backup: verificando…</small>
       <small>Dados sincronizados em nuvem (Firebase) — ações no menu 💾 Backup e Restauração.</small>
@@ -3093,6 +3132,42 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
   </div>
 </div>
 
+<div class="modal-overlay" id="modalTrocaSenha">
+  <div class="modal" style="width:min(400px,100%)">
+    <div class="modal-h"><h3>🔑 Trocar minha senha</h3><button class="x-close" data-close id="tsFechar">&times;</button></div>
+    <div class="modal-b">
+      <p id="tsAviso" style="display:none;font-size:13px;line-height:1.5;background:#fff4dc;border:1px solid #f0d08a;border-radius:8px;padding:9px 11px;margin:0 0 12px;color:#6b4a00">Sua senha foi <b>redefinida pelo administrador</b>. Para continuar, crie uma senha nova — só você vai saber qual é. Em <b>Senha atual</b>, digite a senha temporária que recebeu.</p>
+      <div class="field"><label>Senha atual</label><input type="password" id="tsAtual" autocomplete="current-password"></div>
+      <div class="field"><label>Nova senha (mínimo 6, sem espaços)</label><input type="password" id="tsNova" autocomplete="new-password"></div>
+      <div class="field"><label>Confirmar nova senha</label><input type="password" id="tsConf" autocomplete="new-password"></div>
+      <div id="tsMsg" style="color:var(--bad);font-size:12.5px;min-height:16px"></div>
+    </div>
+    <div class="modal-f">
+      <button class="btn btn-ghost" data-close id="tsCancelar">Cancelar</button>
+      <button class="btn btn-ghost" id="tsSair" type="button" style="display:none">Sair</button>
+      <button class="btn btn-accent" id="btnTsOk" type="button">Trocar senha</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalSenhaTemp">
+  <div class="modal" style="width:min(500px,100%)">
+    <div class="modal-h"><h3 id="stTitulo">Senha temporária</h3><button class="x-close" data-close>&times;</button></div>
+    <div class="modal-b">
+      <div id="stTexto" style="font-size:13.5px;line-height:1.6;color:var(--ink-soft)"></div>
+      <div style="display:flex;gap:8px;align-items:center;margin:12px 0">
+        <input type="text" id="stSenha" readonly class="mono" style="font-size:20px;letter-spacing:.08em;text-align:center;flex:1;font-weight:700">
+        <button class="btn btn-ghost" id="btnStCopiar" type="button">📋 Copiar</button>
+      </div>
+      <div id="stPassos" style="font-size:13px;line-height:1.6;color:var(--ink-soft)"></div>
+    </div>
+    <div class="modal-f">
+      <button class="btn btn-ghost" data-close>Fechar</button>
+      <button class="btn btn-dark" id="btnStMarcar" type="button" style="display:none">Já fiz no Console — exigir troca no 1º acesso</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modalConf">
   <div class="modal" style="width:min(430px,100%)">
     <div class="modal-h"><h3 id="confTitulo">Confirmar</h3><button class="x-close" data-close>&times;</button></div>
@@ -3141,6 +3216,8 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
   #loginErro .lnk[disabled]{opacity:.6;cursor:default}
   #btnLoginEntrar{width:100%;justify-content:center;margin-top:6px}
   #btnLoginEntrar[disabled]{opacity:.6;cursor:default}
+  #btnEsqueciSenha{display:block;margin:12px auto 0;background:none;border:none;color:var(--accent-dk);font:inherit;font-size:12.5px;text-decoration:underline;cursor:pointer;padding:0}
+  #btnEsqueciSenha[disabled]{opacity:.55;cursor:default}
 </style>
 
 <div id="loginOverlay">
@@ -3153,6 +3230,7 @@ tr.linha-flash td{animation:linhaFlash 2.4s ease both}
       <div class="field"><label>Usuário</label><input type="text" id="loginUser" autocomplete="username" required></div>
       <div class="field"><label>Senha</label><input type="password" id="loginPass" autocomplete="current-password" required></div>
       <button type="submit" class="btn btn-accent" id="btnLoginEntrar">Entrar</button>
+      <button type="button" id="btnEsqueciSenha">Esqueci minha senha</button>
       <div id="loginErro"></div>
     </form>
     <div id="loginVer" style="margin-top:14px;font-size:11px;opacity:.5"></div>
@@ -3844,7 +3922,8 @@ function montarSessao(fbUser,t){
     nome:(t&&t.nome)||fbUser.displayName||fbUser.email||'',
     tecnicoId:t?t.id:null,
     uid:fbUser.uid,
-    admin:!!(t&&t.admin)
+    admin:!!(t&&t.admin),
+    trocarSenha:!!(t&&t.trocarSenha)   /* código 80: admin redefiniu — exige senha nova */
   };
 }
 /* Quem pode apagar e mexer no cadastro de pessoas. O Firestore também
@@ -4042,6 +4121,7 @@ function revelarApp(){
   document.body.classList.add('logado');
   document.body.classList.toggle('admin',souAdmin());
   $('#usuarioLogadoNome').textContent=usuarioAtual.nome;
+  if(usuarioAtual.trocarSenha&&!trocaSenhaObrigatoria)setTimeout(exigirTrocaDeSenha,300);   /* código 80 */
   requestAnimationFrame(()=>{sigRet.resize();sigDev.resize();sigGuia.resize();sigGuiaPat.resize();sigGuiaDest.resize();});
 }
 
@@ -4115,6 +4195,192 @@ $('#formLogin').addEventListener('submit',async ev=>{
    CONDICIONAL do código 73 continua no login — ele só aparece quando a
    senha digitada bate com o cadastro mas não com o Auth, e orienta a usar
    a senha antiga ou pedir o link. */
+
+/* ===== CÓDIGO 80 — SENHAS: TROCA PRÓPRIA, REDEFINIÇÃO PELO ADMIN, ESQUECI =====
+   Ver o histórico no cabeçalho. Peças: gerarSenhaTemporaria, trocarMinhaSenha
+   (reautentica + updatePassword), redefinirSenhaTecnico (Worker, com
+   fallback honesto para o Console) e o botão "Esqueci minha senha". */
+var trocaSenhaObrigatoria=false;   /* var: lida por fecharModais, que roda antes deste ponto */
+var stTecId=null;                  /* técnico da redefinição em andamento (fallback do Console) */
+
+/* Senha aleatória sem caracteres ambíguos (0 O 1 l I) e sem espaços — o
+   Worker recusa espaço e o Firebase exige 6 ou mais. Amostragem por
+   rejeição: nenhuma letra fica mais provável que outra. */
+function gerarSenhaTemporaria(n){
+  n=n||10;
+  const alf='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  const lim=256-(256%alf.length);
+  let out='';
+  while(out.length<n){
+    const b=new Uint8Array(n*2);
+    crypto.getRandomValues(b);
+    for(const x of b){if(x<lim&&out.length<n)out+=alf[x%alf.length];}
+  }
+  return out;
+}
+
+/* ---- trocar a própria senha ---- */
+function abrirTrocaSenha(obrigatoria){
+  trocaSenhaObrigatoria=!!obrigatoria;
+  ['#tsAtual','#tsNova','#tsConf'].forEach(q=>{$(q).value='';});
+  $('#tsMsg').textContent='';
+  $('#tsAviso').style.display=obrigatoria?'block':'none';
+  $('#tsFechar').style.display=obrigatoria?'none':'';
+  $('#tsCancelar').style.display=obrigatoria?'none':'';
+  $('#tsSair').style.display=obrigatoria?'':'none';
+  $('#modalTrocaSenha').classList.add('show');
+  setTimeout(()=>{const f=$('#tsAtual');if(f)f.focus();},60);
+}
+function exigirTrocaDeSenha(){
+  if(!usuarioAtual||!usuarioAtual.trocarSenha)return;
+  abrirTrocaSenha(true);
+}
+function textoErroTrocaSenha(err){
+  const c=(err&&err.code)?String(err.code):'';
+  if(c.includes('wrong-password')||c.includes('invalid-credential')||c.includes('invalid-login'))return 'A <b>senha atual</b> está incorreta.';
+  if(c.includes('too-many-requests'))return 'Muitas tentativas. Aguarde alguns minutos e tente de novo.';
+  if(c.includes('network-request-failed'))return 'Sem conexão com o Firebase. Verifique a internet.';
+  if(c.includes('weak-password'))return 'O Firebase recusou a senha por ser fraca (mínimo de 6 caracteres).';
+  if(c.includes('requires-recent-login'))return 'Por segurança, saia e entre de novo antes de trocar a senha.';
+  console.warn('[NII] falha ao trocar a própria senha:',c||err);
+  return 'Não foi possível trocar a senha ('+esc(c||'erro desconhecido')+').';
+}
+/* Remove o marcador "troca pendente" do cadastro. Gravação direta na seção
+   (mesmo molde de limparSenhaLegada e do registro do uid): o técnico comum
+   não passa pelo persistir() de técnicos. atualizadoEm novo faz a fusão com
+   o servidor respeitar a limpeza. */
+async function limparMarcadorTrocaSenha(tecId){
+  if(!tecId)return;
+  const agora=Date.now();
+  const mem=(db.tecnicos||[]).find(x=>x.id===tecId);
+  if(mem){delete mem.trocarSenha;mem.atualizadoEm=agora;}
+  try{
+    const snap=await docRefSecao('tecnicos').get();
+    const itens=(snap.exists&&Array.isArray(snap.data().items))?snap.data().items:[];
+    const alvo=itens.find(x=>x.id===tecId);
+    if(!alvo||!alvo.trocarSenha)return;
+    delete alvo.trocarSenha;alvo.atualizadoEm=agora;
+    await docRefSecao('tecnicos').set({items:itens});
+  }catch(err){console.warn('[NII] não foi possível limpar o marcador de troca de senha:',err&&err.code?err.code:err);}
+}
+async function trocarMinhaSenha(){
+  const msg=h=>{$('#tsMsg').innerHTML=h;};
+  const atual=$('#tsAtual').value,nova=$('#tsNova').value,conf=$('#tsConf').value;
+  const u=auth.currentUser;
+  if(!u||!u.email)return msg('Sessão expirada — entre de novo.');
+  if(!atual)return msg('Digite a <b>senha atual</b>.');
+  if(nova.length<6)return msg('A nova senha precisa ter <b>pelo menos 6 caracteres</b>.');
+  if(/\s/.test(nova))return msg('A nova senha <b>não pode ter espaços</b>.');
+  if(nova===atual)return msg('A nova senha precisa ser <b>diferente da atual</b>.');
+  if(nova!==conf)return msg('A confirmação <b>não confere</b> com a nova senha.');
+  const btn=$('#btnTsOk');btn.disabled=true;btn.textContent='Trocando…';msg('');
+  try{
+    await u.reauthenticateWithCredential(firebase.auth.EmailAuthProvider.credential(u.email,atual));
+    await u.updatePassword(nova);
+  }catch(err){
+    msg(textoErroTrocaSenha(err));
+    btn.disabled=false;btn.textContent='Trocar senha';
+    return;
+  }
+  btn.disabled=false;btn.textContent='Trocar senha';
+  const tecId=usuarioAtual&&usuarioAtual.trocarSenha?usuarioAtual.tecnicoId:null;
+  trocaSenhaObrigatoria=false;
+  if(usuarioAtual)usuarioAtual.trocarSenha=false;
+  fecharModais();
+  toast('Senha alterada. Use a <b>nova senha</b> no próximo acesso.','ok');
+  if(tecId)await limparMarcadorTrocaSenha(tecId);
+}
+$('#btnTrocarSenha').addEventListener('click',()=>abrirTrocaSenha(false));
+$('#btnTrocarSenhaMobile').addEventListener('click',()=>{try{fecharMenuMobile();}catch(_){}abrirTrocaSenha(false);});
+$('#btnTsOk').addEventListener('click',trocarMinhaSenha);
+$('#tsSair').addEventListener('click',()=>{trocaSenhaObrigatoria=false;sair();});
+['#tsAtual','#tsNova','#tsConf'].forEach(q=>$(q).addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();trocarMinhaSenha();}}));
+
+/* ---- admin redefine a senha de um técnico ---- */
+/* Tenta aplicar a senha temporária no Firebase Auth. Devolve {ok:true,uid?}
+   ou {ok:false}. Só tenta CRIAR a conta quando o Worker diz que ela não
+   existe (conta:false) ou quando o cadastro não tem uid — com o Worker sem
+   segredo (sem-segredo/rede) nem insiste, vai direto ao Console. */
+async function aplicarRedefinicao(t,email,temp){
+  const ap=await aplicarSenhaNoAcesso(t.uid||'',temp);
+  if(ap&&ap.ok&&ap.aplicada)return {ok:true};
+  const contaNaoExiste=!!(ap&&ap.ok&&ap.conta===false);
+  const semUid=!t.uid||!!(ap&&ap.motivo==='sem-uid');
+  if(contaNaoExiste||semUid){
+    const c=await criarAcessoComDecisao(email,temp);
+    if(c&&c.ok)return {ok:true,uid:c.uid||''};
+  }
+  return {ok:false};
+}
+function mostrarSenhaTemp(t,email,temp,aplicada){
+  stTecId=t.id;
+  $('#stSenha').value=temp;
+  $('#stTitulo').textContent=aplicada?'🔁 Senha temporária gerada':'🔁 Senha temporária — falta 1 passo';
+  if(aplicada){
+    $('#stTexto').innerHTML='A senha de <b>'+esc(t.nome)+'</b> ('+esc(email)+') já está valendo. Passe a senha abaixo <b>pessoalmente ou por telefone</b>. No primeiro acesso ele será obrigado a criar uma senha nova. <b>Esta senha não será mostrada de novo</b> — se perder, gere outra.';
+    $('#stPassos').innerHTML='';
+    $('#btnStMarcar').style.display='none';
+  }else{
+    $('#stTexto').innerHTML='O servidor <b>não conseguiu aplicar</b> a senha sozinho (a conta de serviço do Worker ainda não está configurada), então nada mudou no acesso de <b>'+esc(t.nome)+'</b>. Faça pelo Console com a senha abaixo:';
+    $('#stPassos').innerHTML='<ol style="margin:0 0 0 18px;padding:0"><li>Console do Firebase → <b>Authentication → Users</b>.</li><li>Localize <b class="mono">'+esc(email)+'</b>, abra o menu ⋮ e escolha <b>Delete account</b> (se a conta existir).</li><li><b>Add user</b> com este e-mail e a senha acima.</li><li>Volte aqui e clique em <b>Já fiz no Console</b> — a troca fica obrigatória no 1º acesso.</li></ol>';
+    $('#btnStMarcar').style.display='';
+  }
+  $('#modalSenhaTemp').classList.add('show');
+}
+function redefinirSenhaTecnico(t){
+  if(!souAdmin())return toast('Só um administrador pode redefinir senhas.','bad');
+  if(!t.usuario)return toast('Este técnico não tem <b>usuário de login</b>. Use <b>Editar</b> e defina usuário e senha.','warn');
+  const email=emailDoLogin(t.usuario);
+  confirmar('Redefinir senha',
+    'Gerar uma <b>senha temporária</b> para <b>'+esc(t.nome)+'</b> ('+esc(email)+')? A senha atual deixa de valer e, no próximo acesso, ele será <b>obrigado a criar uma senha nova</b>.',
+    async()=>{
+      const temp=gerarSenhaTemporaria();
+      toast('Aplicando a senha temporária…');
+      const r=await aplicarRedefinicao(t,email,temp);
+      if(r.ok){
+        if(r.uid)t.uid=r.uid;
+        t.trocarSenha=true;delete t.senhaHash;delete t.senha;
+        t.atualizadoEm=Date.now();
+        persistir();atualizarTudo();
+        mostrarSenhaTemp(t,email,temp,true);
+      }else{
+        mostrarSenhaTemp(t,email,temp,false);
+      }
+    },'🔁 Gerar senha');
+}
+$('#btnStMarcar').addEventListener('click',()=>{
+  const t=stTecId?tecById(stTecId):null;
+  if(!t)return;
+  t.trocarSenha=true;delete t.senhaHash;delete t.senha;
+  t.atualizadoEm=Date.now();
+  persistir();atualizarTudo();
+  fecharModais();
+  toast('Troca obrigatória marcada para <b>'+esc(t.nome)+'</b> no primeiro acesso.','ok');
+});
+$('#btnStCopiar').addEventListener('click',async()=>{
+  const v=$('#stSenha').value;if(!v)return;
+  try{await navigator.clipboard.writeText(v);}
+  catch(_){const i=$('#stSenha');i.select();try{document.execCommand('copy');}catch(__){}}
+  toast('Senha copiada.','ok');
+});
+
+/* ---- esqueci minha senha (tela de login) ---- */
+$('#btnEsqueciSenha').addEventListener('click',async()=>{
+  const box=$('#loginErro'),b=$('#btnEsqueciSenha');
+  const usuario=$('#loginUser').value.trim();
+  if(!usuario){box.textContent='Digite seu usuário no campo acima e clique de novo em "Esqueci minha senha".';$('#loginUser').focus();return;}
+  const email=emailDoLogin(usuario);
+  b.disabled=true;
+  const r=await enviarLinkSenha(email);
+  if(r.ok){
+    box.innerHTML=r.mensagem+' O e-mail só chega se <b>'+esc(email)+'</b> for uma caixa que você acessa. '
+      +'<b>Não recebe e-mails neste endereço?</b> Peça ao <b>administrador</b> do sistema para <b>redefinir sua senha</b> — ele gera uma senha temporária.';
+    setTimeout(()=>{b.disabled=false;},60000);
+  }else{
+    box.innerHTML=r.mensagem;
+    b.disabled=false;
+  }
+});
 
 async function sair(motivo){
   /* Bilhete para o próximo carregamento saber que a saída foi de propósito
@@ -5594,14 +5860,16 @@ function renderTecnicos(){
     const botaoAdmin=souAdmin()?`<button class="ibtn ${t.admin?'warn':'okk'}" title="${t.admin?'Remover administrador':'Tornar administrador'}" data-acao="tec-admin" data-id="${t.id}">${t.admin?BAN_SVG:CHK_SVG}</button>`:'';
     /* Inativar em vez de excluir: mantém vínculo, autoria e histórico — a
        pessoa só sai do login e das listas de escolha nova. */
+    const botaoReset=(souAdmin()&&t.usuario&&!souEu)?`<button class="btn btn-ghost btn-sm" data-acao="tec-reset" data-id="${t.id}" title="Gerar senha temporária">🔁 Senha</button>`:'';
     const botaoAtivo=souAdmin()?`<button class="btn btn-ghost btn-sm" data-acao="tec-ativo" data-id="${t.id}">${t.ativo===false?'▶ Reativar':'⏸ Inativar'}</button>`:'';
-    return `<tr data-id="${t.id}"><td><b>${esc(t.nome)}</b>${souEu?' <span class="subtle">(você)</span>':''}${t.ativo===false?' <span class="pill warn">Inativo</span>':''}</td><td class="mono subtle">${esc(t.matricula||'—')}</td>
+    return `<tr data-id="${t.id}"><td><b>${esc(t.nome)}</b>${souEu?' <span class="subtle">(você)</span>':''}${t.ativo===false?' <span class="pill warn">Inativo</span>':''}${t.trocarSenha?' <span class="pill warn" title="Senha redefinida pelo administrador: ele precisará criar uma senha nova no próximo acesso">🔑 troca pendente</span>':''}</td><td class="mono subtle">${esc(t.matricula||'—')}</td>
     <td class="mono subtle">${t.usuario?esc(t.usuario):'<span class="subtle">não configurado</span>'}</td>
     <td>${t.admin?'<span class="pill ok">Administrador</span>':'<span class="pill">Técnico</span>'}</td>
     <td>${n} equipamento(s)</td>
     <td class="td-r"><div class="actions">
       ${botaoAdmin}
       ${botaoAtivo}
+      ${botaoReset}
       <button class="btn btn-ghost btn-sm" data-acao="tec-edit" data-id="${t.id}">✎ Editar</button>
       <button class="ibtn bad" title="Excluir" data-acao="tec-del" data-id="${t.id}">${TRASH_SVG}</button>
     </div></td></tr>`;}).join(''):'<tr><td colspan="6" class="empty"><span class="big">👤</span>Nenhum técnico cadastrado.</td></tr>';
@@ -5617,6 +5885,7 @@ $('#tecTbody').addEventListener('click',e=>{
     $('#btnTecCancel').style.display='inline-flex';
     $('#tecNome').focus();rolarTopo();
   }
+  if(b.dataset.acao==='tec-reset'){redefinirSenhaTecnico(t);return;}   /* código 80 */
   if(b.dataset.acao==='tec-admin'){
     if(!souAdmin())return toast('Só um administrador pode mudar perfis.','bad');
     const eu=t.uid&&usuarioAtual&&t.uid===usuarioAtual.uid;
@@ -7308,6 +7577,8 @@ $('#btnConfOk').addEventListener('click',()=>{const cb=confCb;fecharModais();cb&
 function fecharModais(){
   $$('.modal-overlay').forEach(m=>m.classList.remove('show'));
   confCb=null;devId=null;
+  const st=$('#stSenha');if(st)st.value='';   /* código 80: a senha temporária some ao fechar */
+  if(trocaSenhaObrigatoria){const m=$('#modalTrocaSenha');if(m)m.classList.add('show');}   /* troca obrigatória não fecha */
 }
 $$('.modal-overlay').forEach(m=>m.addEventListener('click',e=>{if(e.target===m||e.target.closest('[data-close]'))fecharModais();}));
 document.addEventListener('keydown',e=>{if(e.key==='Escape')fecharModais();});
