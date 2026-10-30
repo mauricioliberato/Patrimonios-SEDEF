@@ -592,7 +592,7 @@ async function rotaTrocarSenha(request, env) {
     /* conta ainda não existe: o primeiro login cria com a senha do
        cadastro (ponte de migração) — avisa que já vale, sem link */
     if (msg.indexOf('USER_NOT_FOUND') >= 0) return json({ ok: true, aplicada: false, conta: false });
-    return json({ ok: false, motivo: 'firebase', status: r.status, detalhe: msg.slice(0, 160) }, 502);
+    return json({ ok: false, motivo: 'firebase', status: r.status, detalhe: (msg || ('HTTP ' + r.status + (r.statusText ? ' ' + r.statusText : '') + ' sem mensagem')).slice(0, 160) }, 502);
   } catch (e) {
     return json({ ok: false, motivo: 'firebase', detalhe: String((e && e.message) || e).slice(0, 160) }, 502);
   }
@@ -605,7 +605,7 @@ async function rotaTrocarSenha(request, env) {
    CORRETA (com as regras atuais, qualquer conta autenticada escreve em
    sistema/*, então abrir o sign-up liberaria qualquer pessoa com a chave
    pública a criar conta e mexer no banco). Aqui a criação passa pelo
-   Admin SDK REST (accounts:create), que o sign-up não alcança. Mesmas
+   Admin SDK REST (POST projects/<id>/accounts), que o sign-up não alcança. Mesmas
    travas do código 74: segredo → sessão → admin → corpo. Respostas:
    ok+uid | email-existe | sem-segredo 501 | sessao 401 | admin 403 |
    email 400 | senha 400 | firebase 502. */
@@ -646,8 +646,12 @@ async function rotaCriarAcesso(request, env) {
   if (!/^[^\s]{6,128}$/.test(senha)) return json({ ok: false, motivo: 'senha' }, 400);
   try {
     const tok = await tokenServico(conta);
+    /* Correção (404): o Identity Toolkit NÃO tem o método accounts:create.
+       Criar usuário como administrador é POST em .../projects/<id>/accounts
+       (é o que o Admin SDK usa), sem sufixo. O accounts:update da troca de
+       senha existe e continua como está. */
     const r = await fetch('https://identitytoolkit.googleapis.com/v1/projects/' +
-      PROJETO_FIREBASE + '/accounts:create', {
+      PROJETO_FIREBASE + '/accounts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
         body: JSON.stringify({ email: email, password: senha })
@@ -658,7 +662,7 @@ async function rotaCriarAcesso(request, env) {
     /* já existe conta para este e-mail: o app decide o próximo passo
        (senha via código 74, ou aviso para usar Editar) — não é erro */
     if (msg.indexOf('EMAIL_EXISTS') >= 0) return json({ ok: false, motivo: 'email-existe' });
-    return json({ ok: false, motivo: 'firebase', status: r.status, detalhe: msg.slice(0, 160) }, 502);
+    return json({ ok: false, motivo: 'firebase', status: r.status, detalhe: (msg || ('HTTP ' + r.status + (r.statusText ? ' ' + r.statusText : '') + ' sem mensagem')).slice(0, 160) }, 502);
   } catch (e) {
     return json({ ok: false, motivo: 'firebase', detalhe: String((e && e.message) || e).slice(0, 160) }, 502);
   }
