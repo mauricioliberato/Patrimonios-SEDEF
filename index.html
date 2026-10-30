@@ -1241,6 +1241,21 @@
         temporária (peça a). Botão trava por 60 s contra repetição.
         Nada mudou nas regras do Firestore nem no Worker.
 
+
+    81. 🛠 CRIAR ACESSO: 404 NO WORKER E ERRO QUE ESCONDIA A CAUSA — código 81
+        (30/10). Sintoma: técnico salvo, mas sem conta no Firebase; o console
+        mostrava /api/criar-acesso 502 e, em seguida, o signUp do cliente
+        recusado. Resposta do Worker: motivo firebase, status 404, detalhe
+        vazio. CAUSA: o Worker chamava .../projects/<id>/accounts:create,
+        método que NÃO existe no Identity Toolkit. O correto para criar
+        usuário como administrador é POST .../projects/<id>/accounts, sem
+        sufixo (o accounts:update da troca de senha existe e não mudou).
+        Correção no worker-wiki-imagem.js (rotaCriarAcesso); o campo detalhe
+        nunca mais vai vazio (cai em "HTTP <status> ..."). No app, a
+        mensagem passa a dizer o que o SERVIDOR respondeu em vez do
+        "restrita no projeto", que só descreve a tentativa do cliente. É
+        preciso publicar o Worker corrigido: sem isso nada muda.
+
   ATENÇÃO: publique somente depois de seguir o passo a passo em
   CHECKLIST-DEPLOY.md - a ordem das etapas evita tranchar o acesso.
   ============================================================================
@@ -1248,7 +1263,7 @@
 
 <html lang="pt-BR">
 <head>
-<meta name="nii-build" content="20261029-105925">
+<meta name="nii-build" content="20261030-203730">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
@@ -5752,13 +5767,17 @@ async function criarAcessoComDecisao(email,senha){
   const cli=await criarAcessoAuth(email,senha);
   if(cli.ok)return {ok:true,uid:'',via:'cliente'};
   if(cli.existe)return {ok:false,existe:true};
-  return {ok:false,existe:false,codigo:String(cli.codigo||'')};
+  /* código 81: guarda o que o servidor respondeu — antes o aviso só falava
+     do cliente (admin-restricted-operation) e escondia a causa real */
+  const servidor=(srv&&srv.motivo==='firebase')?{status:srv.status||0,detalhe:String(srv.detalhe||'')}:null;
+  return {ok:false,existe:false,codigo:String(cli.codigo||''),servidor:servidor};
 }
 /* Código 79 — traduz o admin-restricted-operation para linguagem de gente:
    a criação de contas próprias está desligada no projeto (User Actions) e
    só o administrador cria conta — por isso o aviso aponta o Console ou a
    conta de serviço, nunca "tente de novo". */
-function avisoAcessoRestrito(codigo){
+function avisoAcessoRestrito(codigo,servidor){
+  if(servidor)return ' — o <b>servidor</b> tentou criar a conta e o Google respondeu <b>'+(servidor.status||'erro')+'</b>'+(servidor.detalhe?' ('+esc(servidor.detalhe)+')':'');
   return String(codigo||'').includes('admin-restricted-operation')
     ? ' — a criação de contas está <b>restrita no projeto</b> (User Actions)'
     : ' ('+esc(codigo||'erro')+')';
@@ -5818,7 +5837,7 @@ $('#formTecnico').addEventListener('submit',async ev=>{
       toast('Conta de acesso de <b>'+esc(nome)+'</b> criada — ele já pode entrar com o usuário e a senha definidos.','ok');
     }
     else if(r.existe)toast('Cadastro gravado, mas já existe conta de acesso para <b>'+esc(emailTec)+'</b>. Para ajustar a senha, use <b>Editar</b>.','warn');
-    else toast('Cadastro gravado, mas o acesso não pôde ser criado'+avisoAcessoRestrito(r.codigo)+'. Crie a conta no <b>Console → Authentication → Add user</b> com este e-mail e a mesma senha.','bad');
+    else toast('Cadastro gravado, mas o acesso não pôde ser criado'+avisoAcessoRestrito(r.codigo,r.servidor)+'. Crie a conta no <b>Console → Authentication → Add user</b> com este e-mail e a mesma senha.','bad');
   }else if(id&&senha){
     /* Código 74: com o Worker configurado, a senha entra NO MESMO TEMPO no
        cadastro e no Firebase Auth. Código 79: se este técnico editado ainda
@@ -5829,7 +5848,7 @@ $('#formTecnico').addEventListener('submit',async ev=>{
       if(r.uid&&tecGravado&&tecGravado.uid!==r.uid){tecGravado.uid=r.uid;persistir();}
       toast('Senha gravada também no acesso — <b>'+esc(nome)+'</b> já pode entrar.','ok');
     }
-    else if(!r.existe)toast('A senha ficou no cadastro, mas o acesso não pôde ser criado'+avisoAcessoRestrito(r.codigo)+'. Crie a conta no <b>Console → Authentication → Add user</b> com <b>'+esc(emailTec)+'</b>.','bad');
+    else if(!r.existe)toast('A senha ficou no cadastro, mas o acesso não pôde ser criado'+avisoAcessoRestrito(r.codigo,r.servidor)+'. Crie a conta no <b>Console → Authentication → Add user</b> com <b>'+esc(emailTec)+'</b>.','bad');
     else await aplicarSenhaOuLink(uidTec,usuario,senha);
   }
 });
